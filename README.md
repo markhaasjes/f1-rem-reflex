@@ -92,3 +92,11 @@ src/components/FlatOutScreen.tsx shown instead of GameFlow when actionType is 'n
   circuit vector, so it's accurate to that lap, not a generic map.
 - Car illustrations are hand-built stylized SVGs with team-evocative color
   palettes, not official liveries or logos.
+- Grandstand markers on the circuit map are curated, not from a real
+  seating-plan data source (none is publicly available for a GPS-derived
+  track shape) - positions loosely follow Circuit Zandvoort's public ticketing
+  map (Tarzan-in, Main Grandstand, Arena, Eastside, etc.), anchored to our own
+  detected corners. Cross-checked our overall track shape/length against the
+  official circuit geometry in [bacinger/f1-circuits](https://github.com/bacinger/f1-circuits)
+  (the data source behind racingcircuitmap.com) - it lines up closely, but
+  that dataset only has the track centerline, not grandstand positions.

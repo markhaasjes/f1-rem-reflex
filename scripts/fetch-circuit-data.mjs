@@ -211,10 +211,33 @@ function findCornerCandidates(samples) {
   return [...indices].sort((a, b) => a - b)
 }
 
-const GRANDSTAND_OFFSET_M = 24
-const GRANDSTAND_LENGTH_M = 16
-const GRANDSTAND_WIDTH_M = 6
-const STRAIGHT_GRANDSTAND_FRACTIONS = [0.25, 0.5, 0.75]
+const GRANDSTAND_OFFSET_M = 26
+const GRANDSTAND_LENGTH_M = 26
+const GRANDSTAND_GAP_M = 4
+
+// Real seating is clustered at specific named zones (per Circuit Zandvoort's
+// public ticketing map), not spread evenly around the lap - most of the rest
+// of the track is bordered by grass banking ("general admission"), not
+// grandstands. Positions are anchored to our own detected corners (by number)
+// since that's the only geometry we have; counts loosely follow the
+// real-world cluster sizes (e.g. 3 stands at Tarzan-in, 2 at Ben Pon).
+const STAND_CLUSTERS = [
+  { count: 3, relativeToCorner: 1, offsetM: -170 }, // Tarzan-in
+  { count: 4, betweenCorners: [10, 11], fraction: 0.55 }, // Eastside
+  { count: 2, relativeToCorner: 11, offsetM: -45 }, // Arena-in
+  { count: 3, relativeToCorner: 12, offsetM: -55 }, // Arena
+  { count: 1, relativeToCorner: 12, offsetM: 55 }, // Arena-out
+  { count: 2, betweenCorners: [8, 9], fraction: 0.5 }, // Hairpin
+  { count: 1, relativeToCorner: 14, offsetM: -60 }, // Accessibility platform
+]
+// Along the main straight, from corner 14 (Arie Luyendijk) toward corner 1
+// (Tarzan): Ben Pon, then Main Grandstand (right at the timing line, like in
+// reality), then Pit, then Tarzan-in (already in STAND_CLUSTERS above).
+const STRAIGHT_STAND_CLUSTERS = [
+  { count: 2, offsetFromLapStartM: -200 }, // Ben Pon
+  { count: 2, offsetFromLapStartM: 0 }, // Main Grandstand, at the line
+  { count: 2, offsetFromLapStartM: 150 }, // Pit
+]
 
 function nearestSampleByDistance(samples, targetDistanceM) {
   let best = samples[0]
@@ -229,40 +252,60 @@ function nearestSampleByDistance(samples, targetDistanceM) {
   return best
 }
 
-// Grandstands are purely decorative (no official position data available for
-// a GPS-derived track shape) - one is placed just outside the track at each
-// corner, plus a few along the main straight, oriented parallel to the track
-// and offset away from the circuit's centroid (a reasonable proxy for "away
-// from the infield" without needing real seating-plan data).
+// Grandstands are purely decorative (no official seating-plan data exists for
+// a GPS-derived track shape), but their positions are curated per
+// STAND_CLUSTERS/STRAIGHT_STAND_CLUSTERS above to loosely match Circuit
+// Zandvoort's real named grandstand zones, rather than one per corner.
 function buildGrandstands(referenceLap, corners) {
   const samples = referenceLap.samples
   const centroid = samples.reduce((acc, s) => ({ x: acc.x + s.x / samples.length, y: acc.y + s.y / samples.length }), { x: 0, y: 0 })
 
-  function standAt(x, y, headingDeg) {
-    const dx = x - centroid.x
-    const dy = y - centroid.y
-    const len = Math.hypot(dx, dy) || 1
-    return { x: round(x + (dx / len) * GRANDSTAND_OFFSET_M, 2), y: round(y + (dy / len) * GRANDSTAND_OFFSET_M, 2), headingDeg: round(headingDeg, 1) }
+  function cornerByNumber(number) {
+    return corners.find((c) => c.number === number)
   }
 
-  const cornerStands = corners.map((corner) => {
-    const index = samples.findIndex((s) => Math.abs(s.distanceM - corner.distanceM) < 0.5)
-    const headingDeg = (headingAt(samples, index === -1 ? 0 : index, 4) * 180) / Math.PI
-    return standAt(corner.x, corner.y, headingDeg)
+  // Spreads `count` stands along the local track tangent, each offset
+  // outward from the circuit's centroid (a reasonable proxy for "away from
+  // the infield" without real seating-plan data).
+  function standCluster(centerX, centerY, sampleIndex, count) {
+    const headingRad = headingAt(samples, sampleIndex, 4)
+    const headingDeg = (headingRad * 180) / Math.PI
+    const tangentX = Math.cos(headingRad)
+    const tangentY = Math.sin(headingRad)
+    const spacing = GRANDSTAND_LENGTH_M + GRANDSTAND_GAP_M
+
+    return Array.from({ length: count }, (_, i) => {
+      const along = (i - (count - 1) / 2) * spacing
+      const x = centerX + tangentX * along
+      const y = centerY + tangentY * along
+      const dx = x - centroid.x
+      const dy = y - centroid.y
+      const len = Math.hypot(dx, dy) || 1
+      return { x: round(x + (dx / len) * GRANDSTAND_OFFSET_M, 2), y: round(y + (dy / len) * GRANDSTAND_OFFSET_M, 2), headingDeg: round(headingDeg, 1) }
+    })
+  }
+
+  const namedStands = STAND_CLUSTERS.flatMap((config) => {
+    let targetDistanceM
+    if ('relativeToCorner' in config) {
+      targetDistanceM = cornerByNumber(config.relativeToCorner).distanceM + config.offsetM
+    } else {
+      const [fromNumber, toNumber] = config.betweenCorners
+      const from = cornerByNumber(fromNumber)
+      const to = cornerByNumber(toNumber)
+      targetDistanceM = from.distanceM + config.fraction * (to.distanceM - from.distanceM)
+    }
+    const sample = nearestSampleByDistance(samples, targetDistanceM)
+    return standCluster(sample.x, sample.y, samples.indexOf(sample), config.count)
   })
 
-  const corner14 = corners.at(-1)
-  const corner1 = corners[0]
-  const straightLengthM = corner1.distanceM + referenceLap.lapLengthM - corner14.distanceM
-  const straightStands = STRAIGHT_GRANDSTAND_FRACTIONS.map((fraction) => {
-    const targetDistanceM = corner14.distanceM + fraction * straightLengthM
-    const sample = nearestSampleByDistance(samples, targetDistanceM > referenceLap.lapLengthM + referenceLap.lapStartDistanceM ? targetDistanceM - referenceLap.lapLengthM : targetDistanceM)
-    const index = samples.indexOf(sample)
-    const headingDeg = (headingAt(samples, index, 4) * 180) / Math.PI
-    return standAt(sample.x, sample.y, headingDeg)
+  const straightStands = STRAIGHT_STAND_CLUSTERS.flatMap(({ count, offsetFromLapStartM }) => {
+    const targetDistanceM = referenceLap.lapStartDistanceM + offsetFromLapStartM
+    const sample = nearestSampleByDistance(samples, targetDistanceM)
+    return standCluster(sample.x, sample.y, samples.indexOf(sample), count)
   })
 
-  return [...cornerStands, ...straightStands]
+  return [...namedStands, ...straightStands]
 }
 
 function buildCircuit(referenceLap) {

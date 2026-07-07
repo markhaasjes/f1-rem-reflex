@@ -18,17 +18,12 @@ const LABEL_POSITIONS = [
 
 function Grandstand({ x, y, headingDeg }: OrientedPoint) {
   return (
-    <rect
-      x={-12}
-      y={-4.5}
-      width={24}
-      height={9}
-      rx={1.5}
-      fill="#dde1e8"
-      stroke="#7d8390"
-      strokeWidth={1}
-      transform={`translate(${x} ${y}) rotate(${headingDeg})`}
-    />
+    <g transform={`translate(${x} ${y}) rotate(${headingDeg})`}>
+      <rect x={-13} y={-5.5} width={26} height={11} rx={2} fill="#F2C230" stroke="#8a6d1a" strokeWidth={1.4} />
+      {/* tiered-seating rows, purely decorative */}
+      <line x1={-11} y1={-1.8} x2={11} y2={-1.8} stroke="#c99f1c" strokeWidth={0.8} />
+      <line x1={-11} y1={1.8} x2={11} y2={1.8} stroke="#c99f1c" strokeWidth={0.8} />
+    </g>
   )
 }
 
