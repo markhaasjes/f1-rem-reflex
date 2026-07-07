@@ -14,8 +14,16 @@ production code.
 
 - Vite + React 19 + TypeScript
 - Tailwind CSS v4 (`@tailwindcss/vite`)
+- Canvas 2D rendering (with `d3-shape` for path generation) instead of SVG:
+  one draw pass per frame, devicePixelRatio capped at 2, so the animated
+  corner view stays smooth on phones.
 - No backend: telemetry is baked into static JSON fixtures at build time, so
-  the running app never talks to OpenF1 directly.
+  the running app never talks to OpenF1 directly. Per-driver telemetry is
+  code-split and lazy-loaded on selection (~22 KB gzip per driver); the
+  initial bundle stays under 90 KB gzip.
+- The rendered track shape (overview and corners) is the official circuit
+  centerline from [bacinger/f1-circuits](https://github.com/bacinger/f1-circuits)
+  GeoJSON, with our OpenF1 telemetry fitted onto it (see below).
 
 ## Run it
 
@@ -34,18 +42,26 @@ the app bundle). It:
    Norris. Location is in decimeters in the raw feed, divided by 10 to get
    meters.
 2. Resamples every driver's lap onto a uniform 20 Hz grid.
-3. Uses Verstappen's pole lap as the **reference lap**: detects the 14 corners
+3. Fetches the official track centerline (GeoJSON, `scripts/lib/geojson.mjs`),
+   smooths it with a Catmull-Rom spline, and solves for the similarity
+   transform (rotation + uniform scale + translation, via circular-offset
+   search plus complex-number orthogonal Procrustes) that best fits one clean
+   telemetry lap onto it (~10 m average residual). All driver telemetry is
+   mapped into that frame, so cars drive on exactly the geometry that is
+   rendered.
+4. Uses Verstappen's pole lap as the **reference lap**: detects the 14 corners
    along it (a mix of real local speed-minima/heading-change detection and a
    few hand-tuned reference offsets for corners taken close to flat-out, see
-   the comment above `CORNER_DEFINITIONS` in the script), and stores the whole
-   lap as the circuit outline (`src/data/circuit.json`).
-4. For every driver and every one of the 14 corners, finds that driver's own
+   the comment above `CORNER_DEFINITIONS` in the script). The circuit outline
+   and a per-corner `roadPath` slice of it go into `src/data/circuit.json`,
+   so the zoomed-in corner view draws the same curve as the overview map.
+5. For every driver and every one of the 14 corners, finds that driver's own
    closest point to the reference corner position, then slices out a
    corner-sized window (capped by distance so tightly-packed corners don't
    overlap) and detects the real ground-truth point in it: the first brake
    transition, or if the corner is taken flat-out, the first throttle lift, or
    if neither happens, marks the corner `actionType: 'none'`.
-5. Writes one file per driver (`src/data/drivers/{VER,HAM,ANT,NOR}.json`),
+6. Writes one file per driver (`src/data/drivers/{VER,HAM,ANT,NOR}.json`),
    each containing all 14 corners.
 
 Re-run it (after editing the driver/lap constants at the top) to regenerate
@@ -64,18 +80,23 @@ weekend data can be swapped in the same way once each session finishes.
 
 ```
 scripts/fetch-circuit-data.mjs   data-prep script (network access, run manually)
-src/data/circuit.json            full track outline + the 14 named corners
-src/data/drivers/*.json          per-driver, per-corner telemetry (no network at runtime)
+scripts/lib/geojson.mjs          official-geometry fetch, spline smoothing, Procrustes fit
+src/data/circuit.json            official track outline + the 14 named corners (with roadPath slices)
+src/data/drivers/*.json          per-driver, per-corner telemetry (lazy-loaded chunks)
+src/lib/canvas.ts                projection math + devicePixelRatio-aware canvas setup
+src/lib/canvasTrack.ts           road/curb/grass/kerb/grandstand/startline drawing
+src/lib/canvasCar.ts             canvas version of the stylized top-down car
 src/lib/corner.ts                sampling/interpolation over a corner fixture
-src/lib/geometry.ts              shared SVG viewBox math
+src/lib/geometry.ts              shared bounding-box math
 src/lib/scoring.ts               Dutch-language result messaging
 src/lib/teamLivery.ts            hand-picked team color palettes (no official logos)
 src/hooks/useBrakeGame.ts        per-corner game state machine (ready/running/result)
-src/components/CircuitView.tsx   full map + CSS-transform zoom into a chosen corner
-src/components/CircuitMap.tsx    circuit outline + clickable numbered corner badges
+src/hooks/useElementSize.ts      ResizeObserver hook driving canvas re-renders
+src/components/CircuitView.tsx   full map + zoom, plus the mobile corner-name legend
+src/components/CircuitMap.tsx    canvas overview map + accessible corner hit-targets
 src/components/DriverSelect.tsx  pick VER/HAM/ANT/NOR for the chosen corner
-src/components/CornerTrack.tsx   the road/curb visual + animated car (SVG)
-src/components/F1Car.tsx         stylized top-down car, colored by team livery
+src/components/CornerTrack.tsx   canvas corner view: grass run-off, curbs, car, pins
+src/components/F1Car.tsx         SVG car (still used in the driver picker cards)
 src/components/GameFlow.tsx      Start/Game/Result wiring for one corner+driver
 src/components/FlatOutScreen.tsx shown instead of GameFlow when actionType is 'none'
 ```
@@ -88,8 +109,6 @@ src/components/FlatOutScreen.tsx shown instead of GameFlow when actionType is 'n
   signature to detect automatically. See the comment in
   `scripts/fetch-circuit-data.mjs`.
 - No leaderboard/persistence.
-- Track shape is drawn directly from a driver's GPS trace, not an official
-  circuit vector, so it's accurate to that lap, not a generic map.
 - Car illustrations are hand-built stylized SVGs with team-evocative color
   palettes, not official liveries or logos.
 - Grandstand markers on the circuit map are curated, not from a real

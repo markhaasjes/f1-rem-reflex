@@ -1,5 +1,5 @@
 import type { CircuitCorner, DriverAcronym } from '../types'
-import { DRIVERS, DRIVER_ORDER } from '../data/drivers'
+import { DRIVER_META, DRIVER_ORDER } from '../data/drivers'
 import { TEAM_LIVERY } from '../lib/teamLivery'
 import { F1Car } from './F1Car'
 import { NumberBadge, Pill } from './Brand'
@@ -22,7 +22,7 @@ export function DriverSelect({ corner, onSelectDriver, onBack }: DriverSelectPro
 
       <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
         {DRIVER_ORDER.map((acronym) => {
-          const driver = DRIVERS[acronym].meta
+          const driver = DRIVER_META[acronym]
           const livery = TEAM_LIVERY[acronym]
           return (
             <button

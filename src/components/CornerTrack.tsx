@@ -1,8 +1,12 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import type { CornerSample } from '../types'
 import type { TeamLivery } from '../lib/teamLivery'
 import { buildPhaseSegments, isVisiblePhase, type DrivingPhase, type VisiblePhaseSegment } from '../lib/phases'
-import { F1Car } from './F1Car'
+import { computeViewBox } from '../lib/geometry'
+import { fitProjection, prepareCanvas } from '../lib/canvas'
+import { drawRoadSurface, drawSausageKerbs } from '../lib/canvasTrack'
+import { drawF1Car } from '../lib/canvasCar'
+import { useElementSize } from '../hooks/useElementSize'
 
 interface MarkerPoint {
   x: number
@@ -10,6 +14,8 @@ interface MarkerPoint {
 }
 
 interface CornerTrackProps {
+  /** The corner's slice of the official track geometry - same source as the circuit overview. */
+  roadPath: MarkerPoint[]
   samples: CornerSample[]
   carPosition: { x: number; y: number; heading: number } | null
   livery: TeamLivery
@@ -20,9 +26,7 @@ interface CornerTrackProps {
 }
 
 const PADDING_M = 35
-const ROAD_WIDTH_M = 13
-const CURB_WIDTH_M = 18
-const PHASE_LINE_WIDTH_M = ROAD_WIDTH_M * 0.4
+const PHASE_LINE_WIDTH_M = 5.2
 
 const PHASE_COLOR: Record<Exclude<DrivingPhase, 'flatout'>, string> = {
   coast: '#facc15',
@@ -45,7 +49,7 @@ const LABEL_DISTANCE_FRACTION: Record<Exclude<DrivingPhase, 'flatout'>, number> 
   accel: 0.7,
 }
 
-function pointAtDistanceFraction(points: { x: number; y: number }[], fraction: number) {
+function pointAtDistanceFraction(points: MarkerPoint[], fraction: number) {
   const cumulative = [0]
   for (let i = 1; i < points.length; i++) {
     cumulative.push(cumulative[i - 1] + Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y))
@@ -55,45 +59,51 @@ function pointAtDistanceFraction(points: { x: number; y: number }[], fraction: n
   return points[index === -1 ? points.length - 1 : index]
 }
 
-function Pin({ x, y, color, label, textColor = 'white', fontSize = 9 }: MarkerPoint & { color: string; label: string; textColor?: string; fontSize?: number }) {
-  return (
-    <g transform={`translate(${x} ${y})`}>
-      <circle r={4.5} fill={color} stroke="#0b1440" strokeWidth={1.5} />
-      <text
-        x={0}
-        y={-9}
-        textAnchor="middle"
-        fontSize={fontSize}
-        fontWeight={800}
-        fill={textColor}
-        stroke="#0b1440"
-        strokeWidth={2.5}
-        paintOrder="stroke"
-      >
-        {label}
-      </text>
-    </g>
-  )
+function nearestIndex(points: MarkerPoint[], target: MarkerPoint) {
+  let best = 0
+  let bestDist = Infinity
+  points.forEach((p, i) => {
+    const d = Math.hypot(p.x - target.x, p.y - target.y)
+    if (d < bestDist) {
+      bestDist = d
+      best = i
+    }
+  })
+  return best
 }
 
-export function CornerTrack({ samples, carPosition, livery, showPhases = false, brakeMarker, playerMarker }: CornerTrackProps) {
-  const viewBox = useMemo(() => {
-    const xs = samples.map((s) => s.x)
-    const ys = samples.map((s) => s.y)
-    const minX = Math.min(...xs) - PADDING_M
-    const minY = Math.min(...ys) - PADDING_M
-    const width = Math.max(...xs) - Math.min(...xs) + PADDING_M * 2
-    const height = Math.max(...ys) - Math.min(...ys) + PADDING_M * 2
-    return { minX, minY, width, height }
-  }, [samples])
+function drawPin(ctx: CanvasRenderingContext2D, x: number, y: number, color: string, label: string, textColor = 'white') {
+  ctx.beginPath()
+  ctx.arc(x, y, 5, 0, Math.PI * 2)
+  ctx.fillStyle = color
+  ctx.strokeStyle = '#0b1440'
+  ctx.lineWidth = 1.5
+  ctx.fill()
+  ctx.stroke()
 
-  const points = useMemo(() => samples.map((s) => `${s.x},${s.y}`).join(' '), [samples])
+  ctx.font = '800 12px Effra, "Helvetica Neue", Helvetica, Arial, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'alphabetic'
+  ctx.lineWidth = 3
+  ctx.strokeStyle = '#0b1440'
+  ctx.strokeText(label, x, y - 10)
+  ctx.fillStyle = textColor
+  ctx.fillText(label, x, y - 10)
+}
+
+export function CornerTrack({ roadPath, samples, carPosition, livery, showPhases = false, brakeMarker, playerMarker }: CornerTrackProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const { width, height } = useElementSize(containerRef)
+
+  const viewBox = useMemo(() => computeViewBox([...roadPath, ...samples], PADDING_M), [roadPath, samples])
+  const projection = useMemo(() => (width > 0 && height > 0 ? fitProjection(viewBox, width, height) : null), [viewBox, width, height])
+
   const apexSample = useMemo(() => samples.reduce((min, s) => (s.speedKph < min.speedKph ? s : min), samples[0]), [samples])
   const phaseSegments = useMemo(
     () => (showPhases ? buildPhaseSegments(samples, apexSample.t).filter(isVisiblePhase) : []),
     [showPhases, samples, apexSample],
   )
-
   // Label only the longest run of each phase (skips tiny blips, e.g. a brief
   // throttle lift right before the apex) so labels don't pile up on top of
   // each other or the result pins.
@@ -106,73 +116,79 @@ export function CornerTrack({ samples, carPosition, livery, showPhases = false, 
     return [...longestByPhase.values()].filter((segment) => segment.points.length >= 3)
   }, [phaseSegments])
 
-  const carScale = ROAD_WIDTH_M / 22
-  const scaleBarOrigin = { x: viewBox.minX + 12, y: viewBox.minY + viewBox.height - 14 }
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas || !projection || width === 0 || height === 0) return
+    const ctx = prepareCanvas(canvas, width, height)
+    if (!ctx) return
+
+    drawRoadSurface(ctx, roadPath, projection, { style: 'realistic' })
+    drawSausageKerbs(ctx, roadPath, nearestIndex(roadPath, apexSample), projection)
+
+    for (const segment of phaseSegments) {
+      const screenPoints = segment.points.map((p) => projection.toScreen(p.x, p.y))
+      ctx.beginPath()
+      screenPoints.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)))
+      ctx.strokeStyle = PHASE_COLOR[segment.phase]
+      ctx.lineWidth = PHASE_LINE_WIDTH_M * projection.scale
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+      ctx.stroke()
+    }
+
+    for (const segment of labeledSegments) {
+      const point = pointAtDistanceFraction(segment.points, LABEL_DISTANCE_FRACTION[segment.phase])
+      const [x, y] = projection.toScreen(point.x, point.y)
+      ctx.font = '700 11px Effra, "Helvetica Neue", Helvetica, Arial, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'alphabetic'
+      ctx.lineWidth = 2.5
+      ctx.strokeStyle = '#0b1440'
+      ctx.strokeText(PHASE_LABEL[segment.phase], x, y - 9)
+      ctx.fillStyle = 'white'
+      ctx.fillText(PHASE_LABEL[segment.phase], x, y - 9)
+    }
+
+    const [apexX, apexY] = projection.toScreen(apexSample.x, apexSample.y)
+    drawPin(ctx, apexX, apexY, '#2f6fed', 'APEX', '#dbe6ff')
+    if (brakeMarker) {
+      const [x, y] = projection.toScreen(brakeMarker.x, brakeMarker.y)
+      drawPin(ctx, x, y, '#22c55e', 'Rempunt')
+    }
+    if (playerMarker) {
+      const [x, y] = projection.toScreen(playerMarker.x, playerMarker.y)
+      drawPin(ctx, x, y, '#f59e0b', 'Jij')
+    }
+
+    if (carPosition) {
+      drawF1Car(ctx, carPosition.x, carPosition.y, carPosition.heading, livery, 13 / 22, projection)
+    }
+
+    // scale bar
+    const originX = viewBox.minX + 12
+    const originY = viewBox.minY + viewBox.height - 14
+    const [ox, oy] = projection.toScreen(originX, originY)
+    const [ex] = projection.toScreen(originX + 50, originY)
+    ctx.strokeStyle = 'white'
+    ctx.lineWidth = 1.5
+    ctx.beginPath()
+    ctx.moveTo(ox, oy)
+    ctx.lineTo(ex, oy)
+    ctx.moveTo(ox, oy - 3)
+    ctx.lineTo(ox, oy + 3)
+    ctx.moveTo(ex, oy - 3)
+    ctx.lineTo(ex, oy + 3)
+    ctx.stroke()
+    ctx.font = '400 9px Effra, "Helvetica Neue", Helvetica, Arial, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillStyle = 'white'
+    ctx.fillText('50 m', (ox + ex) / 2, oy - 6)
+  }, [roadPath, samples, carPosition, livery, phaseSegments, labeledSegments, brakeMarker, playerMarker, apexSample, projection, width, height, viewBox])
 
   return (
-    <svg
-      viewBox={`${viewBox.minX} ${viewBox.minY} ${viewBox.width} ${viewBox.height}`}
-      className="h-full w-full"
-      role="img"
-      aria-label="Bovenaanzicht van de bocht met de rijlijn en de raceauto"
-    >
-      {/* checkered curb peeking out on both edges */}
-      <polyline points={points} fill="none" stroke="#c81e2c" strokeWidth={CURB_WIDTH_M} strokeLinecap="round" strokeLinejoin="round" />
-      <polyline points={points} fill="none" stroke="#f5f4ef" strokeWidth={CURB_WIDTH_M} strokeDasharray="9 9" strokeLinejoin="round" />
-
-      {/* asphalt road surface */}
-      <polyline points={points} fill="none" stroke="#e9e5d6" strokeWidth={ROAD_WIDTH_M} strokeLinecap="round" strokeLinejoin="round" />
-
-      {phaseSegments.map((segment) => (
-        <polyline
-          key={`${segment.phase}-${segment.points[0].x}-${segment.points[0].y}`}
-          points={segment.points.map((p) => `${p.x},${p.y}`).join(' ')}
-          fill="none"
-          stroke={PHASE_COLOR[segment.phase]}
-          strokeWidth={PHASE_LINE_WIDTH_M}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      ))}
-
-      {labeledSegments.map((segment) => {
-        const label = pointAtDistanceFraction(segment.points, LABEL_DISTANCE_FRACTION[segment.phase])
-        return (
-          <text
-            key={`${segment.phase}-label-${segment.points[0].x}-${segment.points[0].y}`}
-            x={label.x}
-            y={label.y - 8}
-            textAnchor="middle"
-            fontSize={8}
-            fontWeight={700}
-            fill="white"
-            stroke="#0b1440"
-            strokeWidth={2}
-            paintOrder="stroke"
-          >
-            {PHASE_LABEL[segment.phase]}
-          </text>
-        )
-      })}
-
-      <Pin x={apexSample.x} y={apexSample.y} color="#2f6fed" label="APEX" textColor="#dbe6ff" fontSize={12} />
-      {brakeMarker && <Pin {...brakeMarker} color="#22c55e" label="Rempunt" />}
-      {playerMarker && <Pin {...playerMarker} color="#f59e0b" label="Jij" />}
-
-      {carPosition && (
-        <g transform={`translate(${carPosition.x} ${carPosition.y}) rotate(${carPosition.heading})`}>
-          <F1Car livery={livery} size={carScale} />
-        </g>
-      )}
-
-      <g transform={`translate(${scaleBarOrigin.x} ${scaleBarOrigin.y})`}>
-        <line x1={0} y1={0} x2={50} y2={0} stroke="white" strokeWidth={1.5} />
-        <line x1={0} y1={-3} x2={0} y2={3} stroke="white" strokeWidth={1.5} />
-        <line x1={50} y1={-3} x2={50} y2={3} stroke="white" strokeWidth={1.5} />
-        <text x={25} y={-6} textAnchor="middle" fontSize={9} fill="white">
-          50 m
-        </text>
-      </g>
-    </svg>
+    <div ref={containerRef} className="relative h-full w-full">
+      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
+      <div className="sr-only">Bovenaanzicht van de bocht met de rijlijn en de raceauto</div>
+    </div>
   )
 }

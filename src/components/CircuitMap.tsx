@@ -1,95 +1,121 @@
-import { useMemo } from 'react'
-import type { CircuitCorner, CircuitData, OrientedPoint } from '../types'
+import { useEffect, useMemo, useRef } from 'react'
+import type { CircuitCorner, CircuitData } from '../types'
 import type { ViewBox } from '../lib/geometry'
+import { fitProjection, prepareCanvas } from '../lib/canvas'
+import { drawGrandstand, drawRoadSurface, drawStartFinishLine } from '../lib/canvasTrack'
+import { useElementSize } from '../hooks/useElementSize'
 
 interface CircuitMapProps {
   circuit: CircuitData
   viewBox: ViewBox
+  /** Draw corner names next to the badges - disabled on narrow screens where they can't fit. */
+  showNames: boolean
   onSelectCorner: (corner: CircuitCorner) => void
 }
 
-// Corners 2-12 sit close together; rotating the label through three positions
-// means adjacent corners rarely land in the same spot.
-const LABEL_POSITIONS = [
-  { x: 22, y: 0, textAnchor: 'start' as const },
-  { x: 0, y: 27, textAnchor: 'middle' as const },
-  { x: -22, y: -18, textAnchor: 'end' as const },
-]
-
-function Grandstand({ x, y, headingDeg }: OrientedPoint) {
-  return (
-    <g transform={`translate(${x} ${y}) rotate(${headingDeg})`}>
-      <rect x={-13} y={-5.5} width={26} height={11} rx={2} fill="#F2C230" stroke="#8a6d1a" strokeWidth={1.4} />
-      {/* tiered-seating rows, purely decorative */}
-      <line x1={-11} y1={-1.8} x2={11} y2={-1.8} stroke="#c99f1c" strokeWidth={0.8} />
-      <line x1={-11} y1={1.8} x2={11} y2={1.8} stroke="#c99f1c" strokeWidth={0.8} />
-    </g>
-  )
+interface LabelPosition {
+  dx: number
+  dy: number
+  align: CanvasTextAlign
 }
 
-function StartFinishLine({ x, y, headingDeg }: OrientedPoint) {
-  return (
-    <g transform={`translate(${x} ${y}) rotate(${headingDeg + 90})`}>
-      <line x1={-15} y1={0} x2={15} y2={0} stroke="white" strokeWidth={6} strokeLinecap="round" />
-      <line x1={-15} y1={0} x2={15} y2={0} stroke="#111827" strokeWidth={6} strokeLinecap="round" strokeDasharray="3.2 3.2" />
-    </g>
-  )
+const LABEL_BELOW: LabelPosition = { dx: 0, dy: 27, align: 'center' }
+const LABEL_ABOVE: LabelPosition = { dx: 0, dy: -25, align: 'center' }
+const LABEL_RIGHT: LabelPosition = { dx: 22, dy: 0, align: 'left' }
+const LABEL_LEFT: LabelPosition = { dx: -22, dy: 0, align: 'right' }
+
+// Hand-placed per corner: the middle sector packs corners close together and
+// several sit near the map edge, so a generic rotation scheme either clips or
+// collides. Tuned against the rendered overview.
+const LABEL_BY_CORNER: Record<number, LabelPosition> = {
+  1: LABEL_BELOW,
+  2: LABEL_BELOW,
+  3: LABEL_ABOVE,
+  4: LABEL_BELOW,
+  5: LABEL_ABOVE,
+  6: LABEL_BELOW,
+  7: LABEL_BELOW,
+  8: LABEL_BELOW,
+  9: LABEL_RIGHT,
+  10: LABEL_ABOVE,
+  11: LABEL_RIGHT,
+  12: LABEL_RIGHT,
+  13: LABEL_RIGHT,
+  14: LABEL_LEFT,
 }
 
-export function CircuitMap({ circuit, viewBox, onSelectCorner }: CircuitMapProps) {
-  const points = useMemo(() => circuit.trackOutline.map((p) => `${p.x},${p.y}`).join(' '), [circuit])
+const BADGE_RADIUS_PX = 15
+const HIT_TARGET_PX = 34
+
+export function CircuitMap({ circuit, viewBox, showNames, onSelectCorner }: CircuitMapProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const { width, height } = useElementSize(containerRef)
+
+  const projection = useMemo(() => (width > 0 && height > 0 ? fitProjection(viewBox, width, height) : null), [viewBox, width, height])
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas || !projection || width === 0 || height === 0) return
+    const ctx = prepareCanvas(canvas, width, height)
+    if (!ctx) return
+
+    for (const stand of circuit.grandstands) drawGrandstand(ctx, stand, projection)
+    drawRoadSurface(ctx, circuit.trackOutline, projection, { style: 'map' })
+    drawStartFinishLine(ctx, circuit.startFinish, projection)
+
+    for (const corner of circuit.corners) {
+      const [px, py] = projection.toScreen(corner.x, corner.y)
+      ctx.beginPath()
+      ctx.arc(px, py, BADGE_RADIUS_PX, 0, Math.PI * 2)
+      ctx.fillStyle = '#2f6fed'
+      ctx.fill()
+      ctx.strokeStyle = 'white'
+      ctx.lineWidth = 3
+      ctx.stroke()
+
+      ctx.fillStyle = 'white'
+      ctx.font = '800 15px Effra, "Helvetica Neue", Helvetica, Arial, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(String(corner.number), px, py + 1)
+
+      if (showNames) {
+        const label = LABEL_BY_CORNER[corner.number] ?? LABEL_BELOW
+        ctx.font = '700 12px Effra, "Helvetica Neue", Helvetica, Arial, sans-serif'
+        ctx.textAlign = label.align
+        ctx.textBaseline = 'middle'
+        ctx.lineWidth = 3
+        ctx.strokeStyle = '#0b1440'
+        ctx.fillStyle = 'white'
+        ctx.strokeText(corner.name, px + label.dx, py + label.dy)
+        ctx.fillText(corner.name, px + label.dx, py + label.dy)
+      }
+    }
+  }, [circuit, projection, showNames, width, height])
+
+  const buttons = useMemo(() => {
+    if (!projection) return []
+    return circuit.corners.map((corner) => {
+      const [px, py] = projection.toScreen(corner.x, corner.y)
+      return { corner, px, py }
+    })
+  }, [circuit, projection])
 
   return (
-    <svg
-      viewBox={`${viewBox.minX} ${viewBox.minY} ${viewBox.width} ${viewBox.height}`}
-      className="h-full w-full"
-      role="img"
-      aria-label={`Circuitkaart van ${circuit.meta.circuit} met alle veertien bochten`}
-    >
-      {circuit.grandstands.map((stand) => (
-        <Grandstand key={`${stand.x}-${stand.y}`} {...stand} />
+    <div ref={containerRef} className="relative h-full w-full">
+      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
+      <div className="sr-only">Circuitkaart van {circuit.meta.circuit} met alle veertien bochten</div>
+      {buttons.map(({ corner, px, py }) => (
+        <button
+          key={corner.number}
+          type="button"
+          onClick={() => onSelectCorner(corner)}
+          aria-label={`Bocht ${corner.number}: ${corner.name}`}
+          className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+          style={{ left: px, top: py, width: HIT_TARGET_PX, height: HIT_TARGET_PX }}
+        />
       ))}
-
-      <polyline points={points} fill="none" stroke="#101d63" strokeWidth={20} strokeLinecap="round" strokeLinejoin="round" />
-      <polyline points={points} fill="none" stroke="white" strokeWidth={13} strokeLinecap="round" strokeLinejoin="round" />
-
-      <StartFinishLine {...circuit.startFinish} />
-
-      {circuit.corners.map((corner) => {
-        const labelProps = LABEL_POSITIONS[corner.number % LABEL_POSITIONS.length]
-
-        return (
-          <g
-            key={corner.number}
-            transform={`translate(${corner.x} ${corner.y})`}
-            className="cursor-pointer"
-            onClick={() => onSelectCorner(corner)}
-            role="button"
-            tabIndex={0}
-            aria-label={`Bocht ${corner.number}: ${corner.name}`}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') onSelectCorner(corner)
-            }}
-          >
-            <circle r={17} fill="#2f6fed" stroke="white" strokeWidth={3} />
-            <text textAnchor="middle" dominantBaseline="central" fontSize={17} fontWeight={800} fill="white">
-              {corner.number}
-            </text>
-            <text
-              {...labelProps}
-              dominantBaseline="central"
-              fontSize={12}
-              fontWeight={700}
-              fill="white"
-              stroke="#0b1440"
-              strokeWidth={3}
-              paintOrder="stroke"
-            >
-              {corner.name}
-            </text>
-          </g>
-        )
-      })}
-    </svg>
+    </div>
   )
 }

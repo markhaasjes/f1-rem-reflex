@@ -5,6 +5,7 @@ import { CornerTrack } from './CornerTrack'
 
 interface StartScreenProps {
   corner: PlayableCornerData
+  roadPath: { x: number; y: number }[]
   onStart: () => void
   onBack: () => void
 }
@@ -14,7 +15,7 @@ const ACTION_LABEL: Record<'brake' | 'lift', string> = {
   lift: 'Druk op REM op het moment dat hij van het gas gaat.',
 }
 
-export function StartScreen({ corner, onStart, onBack }: StartScreenProps) {
+export function StartScreen({ corner, roadPath, onStart, onBack }: StartScreenProps) {
   const livery = TEAM_LIVERY[corner.meta.driverAcronym as DriverAcronym]
 
   return (
@@ -29,7 +30,12 @@ export function StartScreen({ corner, onStart, onBack }: StartScreenProps) {
       </p>
 
       <div className="h-[22rem] w-full overflow-hidden rounded-2xl bg-track-blue-dark/40 sm:h-[30rem] md:h-[38rem] lg:h-[42rem]">
-        <CornerTrack samples={corner.samples} carPosition={{ x: corner.samples[0].x, y: corner.samples[0].y, heading: 0 }} livery={livery} />
+        <CornerTrack
+          roadPath={roadPath}
+          samples={corner.samples}
+          carPosition={{ x: corner.samples[0].x, y: corner.samples[0].y, heading: 0 }}
+          livery={livery}
+        />
       </div>
 
       <p className="text-sm text-white/90 sm:text-base">{ACTION_LABEL[corner.actionType]}</p>

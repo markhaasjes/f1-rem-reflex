@@ -6,11 +6,12 @@ import { CornerTrack } from './CornerTrack'
 
 interface GameScreenProps {
   corner: PlayableCornerData
+  roadPath: { x: number; y: number }[]
   elapsedT: number
   onBrake: () => void
 }
 
-export function GameScreen({ corner, elapsedT, onBrake }: GameScreenProps) {
+export function GameScreen({ corner, roadPath, elapsedT, onBrake }: GameScreenProps) {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.code === 'Space') {
@@ -34,7 +35,7 @@ export function GameScreen({ corner, elapsedT, onBrake }: GameScreenProps) {
       </div>
 
       <div className="h-[22rem] w-full overflow-hidden rounded-2xl bg-track-blue-dark/40 sm:h-[30rem] md:h-[38rem] lg:h-[42rem]">
-        <CornerTrack samples={corner.samples} carPosition={{ x: state.x, y: state.y, heading }} livery={livery} />
+        <CornerTrack roadPath={roadPath} samples={corner.samples} carPosition={{ x: state.x, y: state.y, heading }} livery={livery} />
       </div>
 
       <button

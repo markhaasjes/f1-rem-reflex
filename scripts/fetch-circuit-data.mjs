@@ -307,7 +307,46 @@ function buildGrandstands(referenceLap, corners) {
   return [...namedStands, ...straightStands]
 }
 
-function buildCircuit(referenceLap, officialOutline) {
+// Slices a window out of a closed curve centered on the point nearest (x, y),
+// walking backward/forward by arc length (wrapping around the loop). Used to
+// give each corner its own segment of the official track geometry, the same
+// source drawn for the full circuit overview, so zooming into a corner shows
+// "the same circuit, more detailed" rather than a different data source.
+function sliceCurveAroundPoint(curve, x, y, lookbackCapM, lookaheadCapM) {
+  const n = curve.length
+  let nearestIndex = 0
+  let nearestDist = Infinity
+  for (let i = 0; i < n; i++) {
+    const d = Math.hypot(curve[i].x - x, curve[i].y - y)
+    if (d < nearestDist) {
+      nearestDist = d
+      nearestIndex = i
+    }
+  }
+
+  const points = [curve[nearestIndex]]
+  let backAcc = 0
+  let i = nearestIndex
+  while (backAcc < lookbackCapM && points.length <= n) {
+    const prevI = (i - 1 + n) % n
+    backAcc += Math.hypot(curve[i].x - curve[prevI].x, curve[i].y - curve[prevI].y)
+    points.unshift(curve[prevI])
+    i = prevI
+  }
+
+  let forwardAcc = 0
+  i = nearestIndex
+  while (forwardAcc < lookaheadCapM && points.length <= n) {
+    const nextI = (i + 1) % n
+    forwardAcc += Math.hypot(curve[nextI].x - curve[i].x, curve[nextI].y - curve[i].y)
+    points.push(curve[nextI])
+    i = nextI
+  }
+
+  return points
+}
+
+function buildCircuit(referenceLap, officialOutline, officialDense) {
   const candidates = findCornerCandidates(referenceLap.samples)
 
   function snapNear(targetDistanceM) {
@@ -329,6 +368,18 @@ function buildCircuit(referenceLap, officialOutline) {
     const index = snapIndex ?? referenceLap.samples.findIndex((s) => s.distanceM >= targetDistanceM)
     const sample = referenceLap.samples[index]
     return { number: def.number, name: def.name, x: round(sample.x, 2), y: round(sample.y, 2), distanceM: round(sample.distanceM, 2) }
+  })
+
+  // Each corner also gets its own slice of the official curve (same source as
+  // the overview, not our per-driver telemetry), so the zoomed-in corner view
+  // is "the same circuit, more detailed" rather than a different geometry.
+  corners.forEach((corner, i) => {
+    const prev = corners[i - 1]
+    const next = corners[i + 1]
+    const gapBeforeM = prev ? corner.distanceM - prev.distanceM : corner.distanceM - (corners.at(-1).distanceM - referenceLap.lapLengthM)
+    const gapAfterM = next ? next.distanceM - corner.distanceM : corners[0].distanceM + referenceLap.lapLengthM - corner.distanceM
+    const roadPath = sliceCurveAroundPoint(officialDense, corner.x, corner.y, Math.min(MAX_LOOKBACK_M, gapBeforeM * 0.6), Math.min(MAX_LOOKAHEAD_M, gapAfterM * 0.6))
+    corner.roadPath = roadPath.map((p) => ({ x: round(p.x, 2), y: round(p.y, 2) }))
   })
 
   // The rendered track shape comes from the official geometry (already
@@ -501,7 +552,7 @@ async function main() {
 
   const { points: officialOutline } = resampleByArcLength(officialSmoothRealigned, OUTLINE_POINT_COUNT)
 
-  const circuit = buildCircuit(referenceLap, officialOutline)
+  const circuit = buildCircuit(referenceLap, officialOutline, officialSmoothRealigned)
   console.log('Detected corners:')
   circuit.corners.forEach((c) => console.log(`  ${c.number}. ${c.name} @ ${c.distanceM.toFixed(0)}m`))
 

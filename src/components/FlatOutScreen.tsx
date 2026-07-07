@@ -7,13 +7,14 @@ import { CornerTrack } from './CornerTrack'
 
 interface FlatOutScreenProps {
   corner: Extract<CornerData, { actionType: 'none' }>
+  roadPath: { x: number; y: number }[]
   onPickAnother: () => void
 }
 
 // Some corners (Hunserug, Scheivlak, ...) are taken close to flat-out - there's
 // no real brake/lift point to guess, so instead of a reflex game this just
 // auto-plays the real lap through the corner as a small fact card.
-export function FlatOutScreen({ corner, onPickAnother }: FlatOutScreenProps) {
+export function FlatOutScreen({ corner, roadPath, onPickAnother }: FlatOutScreenProps) {
   const [elapsedT, setElapsedT] = useState(0)
   const rafRef = useRef<number | null>(null)
   const livery = TEAM_LIVERY[corner.meta.driverAcronym as DriverAcronym]
@@ -61,7 +62,7 @@ export function FlatOutScreen({ corner, onPickAnother }: FlatOutScreenProps) {
       </p>
 
       <div className="h-[22rem] w-full overflow-hidden rounded-2xl bg-track-blue-dark/40 sm:h-[30rem] md:h-[38rem] lg:h-[42rem]">
-        <CornerTrack samples={corner.samples} carPosition={{ x: state.x, y: state.y, heading }} livery={livery} showPhases />
+        <CornerTrack roadPath={roadPath} samples={corner.samples} carPosition={{ x: state.x, y: state.y, heading }} livery={livery} showPhases />
       </div>
 
       <button

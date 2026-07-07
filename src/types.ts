@@ -80,6 +80,10 @@ export interface CircuitCorner {
   x: number
   y: number
   distanceM: number
+  // Slice of the official track geometry around this corner - the same
+  // source drawn on the circuit overview, so the zoomed-in corner view is
+  // the same circuit, just more detailed, not a different data source.
+  roadPath: { x: number; y: number }[]
 }
 
 export interface OrientedPoint {
