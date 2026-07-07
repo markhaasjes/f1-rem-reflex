@@ -1,0 +1,1670 @@
+{
+  "meta": {
+    "corner": "Tarzanbocht",
+    "cornerNumber": 1,
+    "circuit": "Circuit Zandvoort",
+    "meetingName": "Dutch Grand Prix",
+    "year": 2025,
+    "sessionName": "Qualifying",
+    "sessionKey": 9916,
+    "lapNumber": 17,
+    "lapDurationS": 68.925,
+    "driverNumber": 1,
+    "driverName": "Max VERSTAPPEN",
+    "driverAcronym": "VER",
+    "teamName": "Red Bull Racing",
+    "teamColor": "#4781D7",
+    "source": "https://openf1.org",
+    "generatedFrom": {
+      "sessionKey": 9916,
+      "driverNumber": 1,
+      "lapStart": "2025-08-30T13:59:50.121+00:00",
+      "windowSeconds": 10,
+      "cornerEndSeconds": 9,
+      "sampleRateHz": 20
+    }
+  },
+  "samples": [
+    {
+      "t": 0,
+      "x": 79.3,
+      "y": 447.4,
+      "distanceM": 0,
+      "speedKph": 327,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 0.05,
+      "x": 79.3,
+      "y": 447.4,
+      "distanceM": 0,
+      "speedKph": 327,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 0.1,
+      "x": 79.3,
+      "y": 447.4,
+      "distanceM": 0,
+      "speedKph": 327,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 0.15,
+      "x": 79.3,
+      "y": 447.4,
+      "distanceM": 0,
+      "speedKph": 327,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 0.2,
+      "x": 79.3,
+      "y": 447.4,
+      "distanceM": 0,
+      "speedKph": 327,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 0.25,
+      "x": 79.3,
+      "y": 447.4,
+      "distanceM": 0,
+      "speedKph": 328,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 0.3,
+      "x": 79.3,
+      "y": 447.4,
+      "distanceM": 0,
+      "speedKph": 328,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 0.35,
+      "x": 79.3,
+      "y": 447.4,
+      "distanceM": 0,
+      "speedKph": 329,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 0.4,
+      "x": 79.3,
+      "y": 447.4,
+      "distanceM": 0,
+      "speedKph": 329,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 0.45,
+      "x": 79.3,
+      "y": 447.4,
+      "distanceM": 0,
+      "speedKph": 329,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 0.5,
+      "x": 79.3,
+      "y": 447.4,
+      "distanceM": 0,
+      "speedKph": 330,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 0.55,
+      "x": 79.3,
+      "y": 447.4,
+      "distanceM": 0,
+      "speedKph": 330,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 0.6,
+      "x": 79.3,
+      "y": 447.4,
+      "distanceM": 0,
+      "speedKph": 330,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 0.65,
+      "x": 79.3,
+      "y": 447.4,
+      "distanceM": 0,
+      "speedKph": 330,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 0.7,
+      "x": 79.3,
+      "y": 447.4,
+      "distanceM": 0,
+      "speedKph": 330,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 0.75,
+      "x": 79.85111111111111,
+      "y": 448.76,
+      "distanceM": 1.467420681600938,
+      "speedKph": 330,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 0.8,
+      "x": 81.57333333333334,
+      "y": 453.01,
+      "distanceM": 6.053110311603831,
+      "speedKph": 330,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 0.85,
+      "x": 83.29555555555555,
+      "y": 457.26,
+      "distanceM": 10.63879994160672,
+      "speedKph": 330,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 0.9,
+      "x": 85.01777777777778,
+      "y": 461.51,
+      "distanceM": 15.224489571609613,
+      "speedKph": 331,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 0.95,
+      "x": 86.76,
+      "y": 465.76,
+      "distanceM": 19.81772789240301,
+      "speedKph": 331,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 1,
+      "x": 88.51,
+      "y": 470.01,
+      "distanceM": 24.41392197011557,
+      "speedKph": 331,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 1.05,
+      "x": 90.26,
+      "y": 474.26000000000005,
+      "distanceM": 29.01011604782818,
+      "speedKph": 331,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 1.1,
+      "x": 91.98909090909092,
+      "y": 478.51000000000005,
+      "distanceM": 33.59838972884383,
+      "speedKph": 331,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 1.15,
+      "x": 93.71636363636364,
+      "y": 482.76,
+      "distanceM": 38.18597853718091,
+      "speedKph": 331,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 1.2,
+      "x": 95.44363636363636,
+      "y": 487.01,
+      "distanceM": 42.773567345518046,
+      "speedKph": 331,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 1.25,
+      "x": 97.17090909090909,
+      "y": 491.26,
+      "distanceM": 47.361156153855184,
+      "speedKph": 331,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 1.3,
+      "x": 99.29071428571429,
+      "y": 496.4664285714286,
+      "distanceM": 52.98258591267199,
+      "speedKph": 331,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 1.35,
+      "x": 101.77285714285715,
+      "y": 502.5557142857143,
+      "distanceM": 59.55833177709449,
+      "speedKph": 332,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 1.4,
+      "x": 104.255,
+      "y": 508.645,
+      "distanceM": 66.13407764151692,
+      "speedKph": 332,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 1.45,
+      "x": 106.73714285714286,
+      "y": 514.7342857142856,
+      "distanceM": 72.70982350593937,
+      "speedKph": 332,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 1.5,
+      "x": 109.21928571428572,
+      "y": 520.8235714285714,
+      "distanceM": 79.28556937036191,
+      "speedKph": 332,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 1.55,
+      "x": 111.70142857142858,
+      "y": 526.9128571428571,
+      "distanceM": 85.86131523478436,
+      "speedKph": 332,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 1.6,
+      "x": 112.86058823529413,
+      "y": 529.9570588235293,
+      "distanceM": 89.11873983083268,
+      "speedKph": 332,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 1.65,
+      "x": 113.90470588235294,
+      "y": 532.7364705882353,
+      "distanceM": 92.08779884316058,
+      "speedKph": 332,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 1.7,
+      "x": 114.94882352941177,
+      "y": 535.5158823529412,
+      "distanceM": 95.05685785548839,
+      "speedKph": 332,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 1.75,
+      "x": 115.9929411764706,
+      "y": 538.295294117647,
+      "distanceM": 98.02591686781619,
+      "speedKph": 332,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 1.8,
+      "x": 117.03705882352942,
+      "y": 541.0747058823529,
+      "distanceM": 100.994975880144,
+      "speedKph": 332,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 1.85,
+      "x": 118.08117647058825,
+      "y": 543.8541176470588,
+      "distanceM": 103.96403489247191,
+      "speedKph": 332,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 1.9,
+      "x": 119.22909090909091,
+      "y": 547.0227272727273,
+      "distanceM": 107.33416760766302,
+      "speedKph": 332,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 1.95,
+      "x": 121.13818181818182,
+      "y": 553.0454545454545,
+      "distanceM": 113.65222679548535,
+      "speedKph": 332,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 2,
+      "x": 123.04727272727274,
+      "y": 559.0681818181818,
+      "distanceM": 119.97028598330769,
+      "speedKph": 332,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 2.05,
+      "x": 124.95636363636363,
+      "y": 565.090909090909,
+      "distanceM": 126.28834517113002,
+      "speedKph": 332,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 2.1,
+      "x": 126.86545454545455,
+      "y": 571.1136363636364,
+      "distanceM": 132.60640435895246,
+      "speedKph": 332,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 2.15,
+      "x": 128.612,
+      "y": 577.24,
+      "distanceM": 138.97686371678154,
+      "speedKph": 333,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 2.2,
+      "x": 130.29533333333333,
+      "y": 583.4066666666666,
+      "distanceM": 145.3691550812993,
+      "speedKph": 333,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 2.25,
+      "x": 131.97866666666667,
+      "y": 589.5733333333333,
+      "distanceM": 151.76144644581709,
+      "speedKph": 333,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 2.3,
+      "x": 133.662,
+      "y": 595.7399999999999,
+      "distanceM": 158.15373781033486,
+      "speedKph": 333,
+      "brakeActive": false,
+      "gear": 8
+    },
+    {
+      "t": 2.35,
+      "x": 135.34533333333334,
+      "y": 601.9066666666666,
+      "distanceM": 164.54602917485275,
+      "speedKph": 332,
+      "brakeActive": true,
+      "gear": 8
+    },
+    {
+      "t": 2.4,
+      "x": 137.02866666666665,
+      "y": 608.0733333333333,
+      "distanceM": 170.93832053937052,
+      "speedKph": 328,
+      "brakeActive": true,
+      "gear": 8
+    },
+    {
+      "t": 2.45,
+      "x": 138.09142857142857,
+      "y": 611.6342857142856,
+      "distanceM": 174.65448048286373,
+      "speedKph": 324,
+      "brakeActive": true,
+      "gear": 8
+    },
+    {
+      "t": 2.5,
+      "x": 138.91285714285715,
+      "y": 614.1819047619048,
+      "distanceM": 177.33125236514118,
+      "speedKph": 319,
+      "brakeActive": true,
+      "gear": 8
+    },
+    {
+      "t": 2.55,
+      "x": 139.7342857142857,
+      "y": 616.7295238095238,
+      "distanceM": 180.00802424741852,
+      "speedKph": 314,
+      "brakeActive": true,
+      "gear": 8
+    },
+    {
+      "t": 2.6,
+      "x": 140.5557142857143,
+      "y": 619.2771428571428,
+      "distanceM": 182.68479612969585,
+      "speedKph": 303,
+      "brakeActive": true,
+      "gear": 8
+    },
+    {
+      "t": 2.65,
+      "x": 141.37714285714287,
+      "y": 621.8247619047619,
+      "distanceM": 185.3615680119732,
+      "speedKph": 292,
+      "brakeActive": true,
+      "gear": 8
+    },
+    {
+      "t": 2.7,
+      "x": 142.19857142857143,
+      "y": 624.3723809523809,
+      "distanceM": 188.03833989425053,
+      "speedKph": 282,
+      "brakeActive": true,
+      "gear": 8
+    },
+    {
+      "t": 2.75,
+      "x": 143.02,
+      "y": 626.9200000000001,
+      "distanceM": 190.71511177652798,
+      "speedKph": 271,
+      "brakeActive": true,
+      "gear": 8
+    },
+    {
+      "t": 2.8,
+      "x": 143.84142857142857,
+      "y": 629.4676190476191,
+      "distanceM": 193.3918836588053,
+      "speedKph": 260,
+      "brakeActive": true,
+      "gear": 8
+    },
+    {
+      "t": 2.85,
+      "x": 144.80727272727273,
+      "y": 632.1090909090909,
+      "distanceM": 196.20439650825608,
+      "speedKph": 249,
+      "brakeActive": true,
+      "gear": 8
+    },
+    {
+      "t": 2.9,
+      "x": 146.08,
+      "y": 634.95,
+      "distanceM": 199.31736923116162,
+      "speedKph": 238,
+      "brakeActive": true,
+      "gear": 8
+    },
+    {
+      "t": 2.95,
+      "x": 147.3527272727273,
+      "y": 637.7909090909092,
+      "distanceM": 202.43034195406716,
+      "speedKph": 228,
+      "brakeActive": true,
+      "gear": 8
+    },
+    {
+      "t": 3,
+      "x": 148.62545454545455,
+      "y": 640.6318181818183,
+      "distanceM": 205.5433146769727,
+      "speedKph": 220,
+      "brakeActive": true,
+      "gear": 8
+    },
+    {
+      "t": 3.05,
+      "x": 149.89818181818183,
+      "y": 643.4727272727273,
+      "distanceM": 208.65628739987812,
+      "speedKph": 216,
+      "brakeActive": true,
+      "gear": 8
+    },
+    {
+      "t": 3.1,
+      "x": 151.3170124481328,
+      "y": 645.7041493775935,
+      "distanceM": 211.30058786816315,
+      "speedKph": 213,
+      "brakeActive": true,
+      "gear": 8
+    },
+    {
+      "t": 3.15,
+      "x": 152.7485477178423,
+      "y": 647.882572614108,
+      "distanceM": 213.90727561812642,
+      "speedKph": 209,
+      "brakeActive": true,
+      "gear": 8
+    },
+    {
+      "t": 3.2,
+      "x": 154.18008298755188,
+      "y": 650.0609958506225,
+      "distanceM": 216.51396336808972,
+      "speedKph": 205,
+      "brakeActive": true,
+      "gear": 8
+    },
+    {
+      "t": 3.25,
+      "x": 155.61161825726143,
+      "y": 652.239419087137,
+      "distanceM": 219.12065111805302,
+      "speedKph": 202,
+      "brakeActive": true,
+      "gear": 8
+    },
+    {
+      "t": 3.3,
+      "x": 156.925,
+      "y": 654.2125000000001,
+      "distanceM": 221.490887370173,
+      "speedKph": 198,
+      "brakeActive": true,
+      "gear": 6
+    },
+    {
+      "t": 3.35,
+      "x": 157.175,
+      "y": 654.3375000000001,
+      "distanceM": 221.77039586736046,
+      "speedKph": 193,
+      "brakeActive": true,
+      "gear": 6
+    },
+    {
+      "t": 3.4,
+      "x": 157.42499999999998,
+      "y": 654.4625,
+      "distanceM": 222.04990436454787,
+      "speedKph": 189,
+      "brakeActive": true,
+      "gear": 6
+    },
+    {
+      "t": 3.45,
+      "x": 157.67499999999998,
+      "y": 654.5875,
+      "distanceM": 222.32941286173534,
+      "speedKph": 185,
+      "brakeActive": true,
+      "gear": 6
+    },
+    {
+      "t": 3.5,
+      "x": 159.225,
+      "y": 656.175,
+      "distanceM": 224.54811884721425,
+      "speedKph": 181,
+      "brakeActive": true,
+      "gear": 6
+    },
+    {
+      "t": 3.55,
+      "x": 160.91944444444445,
+      "y": 657.925,
+      "distanceM": 226.98402565481356,
+      "speedKph": 176,
+      "brakeActive": true,
+      "gear": 4
+    },
+    {
+      "t": 3.6,
+      "x": 162.6138888888889,
+      "y": 659.675,
+      "distanceM": 229.41993246241287,
+      "speedKph": 173,
+      "brakeActive": true,
+      "gear": 4
+    },
+    {
+      "t": 3.65,
+      "x": 164.32500000000002,
+      "y": 661.2524999999999,
+      "distanceM": 231.74725012112813,
+      "speedKph": 170,
+      "brakeActive": true,
+      "gear": 4
+    },
+    {
+      "t": 3.7,
+      "x": 166.07500000000002,
+      "y": 662.4275,
+      "distanceM": 233.8551222709513,
+      "speedKph": 166,
+      "brakeActive": true,
+      "gear": 4
+    },
+    {
+      "t": 3.75,
+      "x": 167.82500000000002,
+      "y": 663.6025,
+      "distanceM": 235.9629944207744,
+      "speedKph": 163,
+      "brakeActive": true,
+      "gear": 4
+    },
+    {
+      "t": 3.8,
+      "x": 169.57500000000002,
+      "y": 664.7775,
+      "distanceM": 238.0708665705976,
+      "speedKph": 160,
+      "brakeActive": true,
+      "gear": 4
+    },
+    {
+      "t": 3.85,
+      "x": 171.3659090909091,
+      "y": 665.825,
+      "distanceM": 240.14562236873405,
+      "speedKph": 156,
+      "brakeActive": true,
+      "gear": 4
+    },
+    {
+      "t": 3.9,
+      "x": 173.25227272727273,
+      "y": 666.575,
+      "distanceM": 242.17561442994884,
+      "speedKph": 153,
+      "brakeActive": true,
+      "gear": 4
+    },
+    {
+      "t": 3.95,
+      "x": 175.13863636363638,
+      "y": 667.325,
+      "distanceM": 244.20560649116365,
+      "speedKph": 149,
+      "brakeActive": true,
+      "gear": 4
+    },
+    {
+      "t": 4,
+      "x": 177.025,
+      "y": 668.075,
+      "distanceM": 246.23559855237843,
+      "speedKph": 146,
+      "brakeActive": true,
+      "gear": 4
+    },
+    {
+      "t": 4.05,
+      "x": 178.91136363636363,
+      "y": 668.8249999999999,
+      "distanceM": 248.26559061359316,
+      "speedKph": 143,
+      "brakeActive": true,
+      "gear": 4
+    },
+    {
+      "t": 4.1,
+      "x": 180.79772727272726,
+      "y": 669.165909090909,
+      "distanceM": 250.1825117848622,
+      "speedKph": 140,
+      "brakeActive": true,
+      "gear": 4
+    },
+    {
+      "t": 4.15,
+      "x": 182.6840909090909,
+      "y": 669.4613636363637,
+      "distanceM": 252.0918732375539,
+      "speedKph": 139,
+      "brakeActive": true,
+      "gear": 4
+    },
+    {
+      "t": 4.2,
+      "x": 184.57045454545454,
+      "y": 669.7568181818182,
+      "distanceM": 254.00123469024552,
+      "speedKph": 138,
+      "brakeActive": true,
+      "gear": 4
+    },
+    {
+      "t": 4.25,
+      "x": 186.45681818181816,
+      "y": 670.0522727272728,
+      "distanceM": 255.91059614293718,
+      "speedKph": 136,
+      "brakeActive": true,
+      "gear": 4
+    },
+    {
+      "t": 4.3,
+      "x": 188.30384615384614,
+      "y": 670.1423076923078,
+      "distanceM": 257.7598172287954,
+      "speedKph": 135,
+      "brakeActive": true,
+      "gear": 4
+    },
+    {
+      "t": 4.35,
+      "x": 190.11153846153846,
+      "y": 670.0269230769231,
+      "distanceM": 259.57118828099794,
+      "speedKph": 133,
+      "brakeActive": true,
+      "gear": 4
+    },
+    {
+      "t": 4.4,
+      "x": 191.91923076923078,
+      "y": 669.9115384615385,
+      "distanceM": 261.3825593332005,
+      "speedKph": 132,
+      "brakeActive": true,
+      "gear": 4
+    },
+    {
+      "t": 4.45,
+      "x": 193.72692307692307,
+      "y": 669.7961538461539,
+      "distanceM": 263.19393038540306,
+      "speedKph": 130,
+      "brakeActive": true,
+      "gear": 4
+    },
+    {
+      "t": 4.5,
+      "x": 195.5346153846154,
+      "y": 669.6807692307692,
+      "distanceM": 265.0053014376056,
+      "speedKph": 129,
+      "brakeActive": true,
+      "gear": 4
+    },
+    {
+      "t": 4.55,
+      "x": 197.2977272727273,
+      "y": 669.4704545454546,
+      "distanceM": 266.780912824385,
+      "speedKph": 127,
+      "brakeActive": true,
+      "gear": 4
+    },
+    {
+      "t": 4.6,
+      "x": 198.95681818181816,
+      "y": 669.0386363636364,
+      "distanceM": 268.4952784758073,
+      "speedKph": 126,
+      "brakeActive": true,
+      "gear": 4
+    },
+    {
+      "t": 4.65,
+      "x": 200.6159090909091,
+      "y": 668.6068181818182,
+      "distanceM": 270.20964412722975,
+      "speedKph": 124,
+      "brakeActive": true,
+      "gear": 4
+    },
+    {
+      "t": 4.7,
+      "x": 202.275,
+      "y": 668.1750000000001,
+      "distanceM": 271.92400977865213,
+      "speedKph": 124,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 4.75,
+      "x": 203.9340909090909,
+      "y": 667.7431818181818,
+      "distanceM": 273.6383754300745,
+      "speedKph": 123,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 4.8,
+      "x": 205.48679245283017,
+      "y": 667.0773584905661,
+      "distanceM": 275.3278140313642,
+      "speedKph": 122,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 4.85,
+      "x": 207.02767295597485,
+      "y": 666.385534591195,
+      "distanceM": 277.01687679891086,
+      "speedKph": 122,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 4.9,
+      "x": 208.56855345911953,
+      "y": 665.6937106918239,
+      "distanceM": 278.7059395664575,
+      "speedKph": 121,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 4.95,
+      "x": 209.95142857142858,
+      "y": 664.8828571428571,
+      "distanceM": 280.3090075793989,
+      "speedKph": 120,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 5,
+      "x": 211.27285714285713,
+      "y": 664.0257142857143,
+      "distanceM": 281.884084513056,
+      "speedKph": 119,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 5.05,
+      "x": 212.5942857142857,
+      "y": 663.1685714285715,
+      "distanceM": 283.45916144671315,
+      "speedKph": 118,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 5.1,
+      "x": 213.7925,
+      "y": 662.0266666666666,
+      "distanceM": 285.114354474656,
+      "speedKph": 117,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 5.15,
+      "x": 214.98000000000002,
+      "y": 660.86,
+      "distanceM": 286.77906687057043,
+      "speedKph": 118,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 5.2,
+      "x": 216.16750000000002,
+      "y": 659.6933333333334,
+      "distanceM": 288.4437792664848,
+      "speedKph": 118,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 5.25,
+      "x": 217.35500000000002,
+      "y": 658.5266666666666,
+      "distanceM": 290.1084916623993,
+      "speedKph": 119,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 5.3,
+      "x": 218.51500000000001,
+      "y": 657.335,
+      "distanceM": 291.77152186189784,
+      "speedKph": 119,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 5.35,
+      "x": 219.47333333333333,
+      "y": 655.96,
+      "distanceM": 293.44753730865773,
+      "speedKph": 120,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 5.4,
+      "x": 220.43166666666667,
+      "y": 654.5849999999999,
+      "distanceM": 295.12355275541773,
+      "speedKph": 121,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 5.45,
+      "x": 221.39000000000001,
+      "y": 653.2099999999999,
+      "distanceM": 296.7995682021776,
+      "speedKph": 121,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 5.5,
+      "x": 222.34833333333333,
+      "y": 651.8349999999999,
+      "distanceM": 298.4755836489375,
+      "speedKph": 122,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 5.55,
+      "x": 223.36,
+      "y": 650.084,
+      "distanceM": 300.4978275621301,
+      "speedKph": 122,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 5.6,
+      "x": 224.48499999999999,
+      "y": 647.534,
+      "distanceM": 303.2849631885394,
+      "speedKph": 123,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 5.65,
+      "x": 225.61,
+      "y": 644.984,
+      "distanceM": 306.0720988149487,
+      "speedKph": 124,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 5.7,
+      "x": 226.735,
+      "y": 642.434,
+      "distanceM": 308.85923444135807,
+      "speedKph": 126,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 5.75,
+      "x": 227.57238095238094,
+      "y": 640.2961904761905,
+      "distanceM": 311.1551953337734,
+      "speedKph": 128,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 5.8,
+      "x": 227.79857142857142,
+      "y": 639.0342857142857,
+      "distanceM": 312.43721162058,
+      "speedKph": 130,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 5.85,
+      "x": 228.0247619047619,
+      "y": 637.772380952381,
+      "distanceM": 313.7192279073865,
+      "speedKph": 132,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 5.9,
+      "x": 228.25095238095238,
+      "y": 636.5104761904762,
+      "distanceM": 315.0012441941931,
+      "speedKph": 134,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 5.95,
+      "x": 228.47714285714287,
+      "y": 635.2485714285715,
+      "distanceM": 316.28326048099956,
+      "speedKph": 136,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 6,
+      "x": 228.70333333333335,
+      "y": 633.9866666666667,
+      "distanceM": 317.56527676780615,
+      "speedKph": 138,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 6.05,
+      "x": 228.9295238095238,
+      "y": 632.724761904762,
+      "distanceM": 318.84729305461263,
+      "speedKph": 140,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 6.1,
+      "x": 229.15571428571428,
+      "y": 631.4628571428572,
+      "distanceM": 320.12930934141923,
+      "speedKph": 142,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 6.15,
+      "x": 229.38190476190476,
+      "y": 630.2009523809523,
+      "distanceM": 321.4113256282258,
+      "speedKph": 144,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 6.2,
+      "x": 229.33428571428573,
+      "y": 627.8,
+      "distanceM": 323.8127501865447,
+      "speedKph": 146,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 6.25,
+      "x": 229.26285714285714,
+      "y": 625.3000000000001,
+      "distanceM": 326.31377038654625,
+      "speedKph": 148,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 6.3,
+      "x": 229.1914285714286,
+      "y": 622.8000000000001,
+      "distanceM": 328.81479058654793,
+      "speedKph": 150,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 6.35,
+      "x": 229.12,
+      "y": 620.3000000000001,
+      "distanceM": 331.3158107865496,
+      "speedKph": 151,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 6.4,
+      "x": 229.04857142857142,
+      "y": 617.8,
+      "distanceM": 333.8168309865514,
+      "speedKph": 152,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 6.45,
+      "x": 228.9,
+      "y": 615.5733333333334,
+      "distanceM": 336.0484487660629,
+      "speedKph": 153,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 6.5,
+      "x": 228.5875,
+      "y": 613.9275,
+      "distanceM": 337.72368714047747,
+      "speedKph": 154,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 6.55,
+      "x": 228.275,
+      "y": 612.2816666666668,
+      "distanceM": 339.39892551489197,
+      "speedKph": 156,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 6.6,
+      "x": 227.9625,
+      "y": 610.6358333333334,
+      "distanceM": 341.07416388930653,
+      "speedKph": 157,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 6.65,
+      "x": 227.65,
+      "y": 608.99,
+      "distanceM": 342.7494022637211,
+      "speedKph": 159,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 6.7,
+      "x": 227.18583333333333,
+      "y": 607.0191666666667,
+      "distanceM": 344.7741577359256,
+      "speedKph": 161,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 6.75,
+      "x": 226.58166666666668,
+      "y": 604.7483333333333,
+      "distanceM": 347.12398781252455,
+      "speedKph": 163,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 6.8,
+      "x": 225.9775,
+      "y": 602.4775,
+      "distanceM": 349.4738178891235,
+      "speedKph": 164,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 6.85,
+      "x": 225.37333333333333,
+      "y": 600.2066666666667,
+      "distanceM": 351.82364796572233,
+      "speedKph": 167,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 6.9,
+      "x": 224.76916666666665,
+      "y": 597.9358333333332,
+      "distanceM": 354.1734780423214,
+      "speedKph": 170,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 6.95,
+      "x": 224.06,
+      "y": 595.6049999999999,
+      "distanceM": 356.6098075333568,
+      "speedKph": 174,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 7,
+      "x": 223.31,
+      "y": 593.2508333333333,
+      "distanceM": 359.08055654821936,
+      "speedKph": 177,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 7.05,
+      "x": 222.56,
+      "y": 590.8966666666666,
+      "distanceM": 361.55130556308194,
+      "speedKph": 178,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 7.1,
+      "x": 221.81,
+      "y": 588.5425,
+      "distanceM": 364.0220545779445,
+      "speedKph": 180,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 7.15,
+      "x": 221.06,
+      "y": 586.1883333333333,
+      "distanceM": 366.49280359280715,
+      "speedKph": 182,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 7.2,
+      "x": 219.79692307692306,
+      "y": 582.7092307692308,
+      "distanceM": 370.19408958083267,
+      "speedKph": 183,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 7.25,
+      "x": 218.48923076923077,
+      "y": 579.1323076923077,
+      "distanceM": 374.00255881004045,
+      "speedKph": 184,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 7.3,
+      "x": 217.18153846153845,
+      "y": 575.5553846153846,
+      "distanceM": 377.81102803924824,
+      "speedKph": 184,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 7.35,
+      "x": 215.87384615384616,
+      "y": 571.9784615384615,
+      "distanceM": 381.61949726845603,
+      "speedKph": 184,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 7.4,
+      "x": 214.5661538461538,
+      "y": 568.4015384615384,
+      "distanceM": 385.4279664976638,
+      "speedKph": 184,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 7.45,
+      "x": 213.80142857142854,
+      "y": 566.3457142857143,
+      "distanceM": 387.6214153317392,
+      "speedKph": 186,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 7.5,
+      "x": 213.24785714285713,
+      "y": 564.8814285714286,
+      "distanceM": 389.18684625630647,
+      "speedKph": 190,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 7.55,
+      "x": 212.6942857142857,
+      "y": 563.4171428571428,
+      "distanceM": 390.7522771808739,
+      "speedKph": 193,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 7.6,
+      "x": 212.14071428571427,
+      "y": 561.9528571428572,
+      "distanceM": 392.3177081054412,
+      "speedKph": 197,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 7.65,
+      "x": 211.58714285714285,
+      "y": 560.4885714285715,
+      "distanceM": 393.8831390300085,
+      "speedKph": 199,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 7.7,
+      "x": 211.0064705882353,
+      "y": 558.9864705882353,
+      "distanceM": 395.49356978555716,
+      "speedKph": 200,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 7.75,
+      "x": 210.2270588235294,
+      "y": 557.2070588235295,
+      "distanceM": 397.43619402285464,
+      "speedKph": 202,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 7.8,
+      "x": 209.44764705882355,
+      "y": 555.4276470588236,
+      "distanceM": 399.37881826015206,
+      "speedKph": 203,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 7.85,
+      "x": 208.66823529411766,
+      "y": 553.6482352941177,
+      "distanceM": 401.32144249744954,
+      "speedKph": 204,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 7.9,
+      "x": 207.88882352941178,
+      "y": 551.8688235294118,
+      "distanceM": 403.26406673474713,
+      "speedKph": 205,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 7.95,
+      "x": 207.1094117647059,
+      "y": 550.0894117647059,
+      "distanceM": 405.2066909720446,
+      "speedKph": 206,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 8,
+      "x": 206.33,
+      "y": 548.3100000000001,
+      "distanceM": 407.1493152093421,
+      "speedKph": 207,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 8.05,
+      "x": 205.08,
+      "y": 545.4885714285714,
+      "distanceM": 410.23524443466044,
+      "speedKph": 208,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 8.1,
+      "x": 202.83000000000004,
+      "y": 540.4528571428572,
+      "distanceM": 415.75076058161767,
+      "speedKph": 209,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 8.15,
+      "x": 200.57999999999998,
+      "y": 535.4171428571428,
+      "distanceM": 421.26627672857506,
+      "speedKph": 210,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 8.2,
+      "x": 199.05526315789473,
+      "y": 532.0147368421053,
+      "distanceM": 424.9947065762236,
+      "speedKph": 211,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 8.25,
+      "x": 198.2,
+      "y": 530.12,
+      "distanceM": 427.07352902416943,
+      "speedKph": 213,
+      "brakeActive": false,
+      "gear": 4
+    },
+    {
+      "t": 8.3,
+      "x": 197.34473684210525,
+      "y": 528.2252631578947,
+      "distanceM": 429.15235147211524,
+      "speedKph": 214,
+      "brakeActive": false,
+      "gear": 5
+    },
+    {
+      "t": 8.35,
+      "x": 196.48947368421054,
+      "y": 526.3305263157895,
+      "distanceM": 431.23117392006094,
+      "speedKph": 216,
+      "brakeActive": false,
+      "gear": 5
+    },
+    {
+      "t": 8.4,
+      "x": 195.63421052631577,
+      "y": 524.4357894736842,
+      "distanceM": 433.30999636800675,
+      "speedKph": 217,
+      "brakeActive": false,
+      "gear": 5
+    },
+    {
+      "t": 8.45,
+      "x": 194.77894736842106,
+      "y": 522.541052631579,
+      "distanceM": 435.38881881595245,
+      "speedKph": 219,
+      "brakeActive": false,
+      "gear": 5
+    },
+    {
+      "t": 8.5,
+      "x": 193.92368421052632,
+      "y": 520.6463157894738,
+      "distanceM": 437.46764126389814,
+      "speedKph": 220,
+      "brakeActive": false,
+      "gear": 5
+    },
+    {
+      "t": 8.55,
+      "x": 193.06842105263158,
+      "y": 518.7515789473684,
+      "distanceM": 439.54646371184396,
+      "speedKph": 222,
+      "brakeActive": false,
+      "gear": 5
+    },
+    {
+      "t": 8.6,
+      "x": 191.8709090909091,
+      "y": 515.9445454545455,
+      "distanceM": 442.5982618585598,
+      "speedKph": 224,
+      "brakeActive": false,
+      "gear": 5
+    },
+    {
+      "t": 8.65,
+      "x": 190.64363636363635,
+      "y": 513.0581818181818,
+      "distanceM": 445.7347078390336,
+      "speedKph": 226,
+      "brakeActive": false,
+      "gear": 5
+    },
+    {
+      "t": 8.7,
+      "x": 189.41636363636363,
+      "y": 510.1718181818182,
+      "distanceM": 448.87115381950724,
+      "speedKph": 228,
+      "brakeActive": false,
+      "gear": 5
+    },
+    {
+      "t": 8.75,
+      "x": 188.18909090909088,
+      "y": 507.2854545454545,
+      "distanceM": 452.007599799981,
+      "speedKph": 228,
+      "brakeActive": false,
+      "gear": 5
+    },
+    {
+      "t": 8.8,
+      "x": 187.04999999999995,
+      "y": 504.3399999999999,
+      "distanceM": 455.1656420065566,
+      "speedKph": 229,
+      "brakeActive": false,
+      "gear": 5
+    },
+    {
+      "t": 8.85,
+      "x": 185.9923076923077,
+      "y": 501.34,
+      "distanceM": 458.3466344645406,
+      "speedKph": 229,
+      "brakeActive": false,
+      "gear": 5
+    },
+    {
+      "t": 8.9,
+      "x": 184.93461538461537,
+      "y": 498.34,
+      "distanceM": 461.5276269225247,
+      "speedKph": 230,
+      "brakeActive": false,
+      "gear": 5
+    },
+    {
+      "t": 8.95,
+      "x": 183.87692307692308,
+      "y": 495.34000000000003,
+      "distanceM": 464.7086193805087,
+      "speedKph": 231,
+      "brakeActive": false,
+      "gear": 5
+    },
+    {
+      "t": 9,
+      "x": 182.81923076923078,
+      "y": 492.34000000000003,
+      "distanceM": 467.8896118384928,
+      "speedKph": 232,
+      "brakeActive": false,
+      "gear": 5
+    }
+  ],
+  "brakePoint": {
+    "t": 2.35,
+    "distanceM": 164.54602917485275,
+    "speedKph": 332
+  },
+  "apexPoint": {
+    "t": 5.1,
+    "distanceM": 285.114354474656,
+    "speedKph": 117
+  },
+  "durationS": 9,
+  "totalDistanceM": 467.8896118384928
+}
