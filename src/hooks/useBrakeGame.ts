@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { BrakeAttempt, CornerData, GamePhase } from '../types'
+import type { BrakeAttempt, GamePhase, PlayableCornerData } from '../types'
 import { sampleAt } from '../lib/corner'
 
-export function useBrakeGame(corner: CornerData) {
+export function useBrakeGame(corner: PlayableCornerData) {
   const [phase, setPhase] = useState<GamePhase>('ready')
   const [elapsedT, setElapsedT] = useState(0)
   const [playerAttempt, setPlayerAttempt] = useState<BrakeAttempt | null>(null)

@@ -1,5 +1,7 @@
 import { useMemo } from 'react'
 import type { CornerSample } from '../types'
+import type { TeamLivery } from '../lib/teamLivery'
+import { F1Car } from './F1Car'
 
 interface MarkerPoint {
   x: number
@@ -9,18 +11,20 @@ interface MarkerPoint {
 interface CornerTrackProps {
   samples: CornerSample[]
   carPosition: { x: number; y: number; heading: number } | null
-  teamColor: string
+  livery: TeamLivery
   brakeMarker?: MarkerPoint | null
   playerMarker?: MarkerPoint | null
   apexMarker?: MarkerPoint | null
 }
 
 const PADDING_M = 35
+const ROAD_WIDTH_M = 13
+const CURB_WIDTH_M = 17
 
 function Pin({ x, y, color, label }: MarkerPoint & { color: string; label: string }) {
   return (
     <g transform={`translate(${x} ${y})`}>
-      <circle r={4.5} fill={color} stroke="white" strokeWidth={1.5} />
+      <circle r={4.5} fill={color} stroke="#0b1440" strokeWidth={1.5} />
       <text
         x={0}
         y={-9}
@@ -38,7 +42,7 @@ function Pin({ x, y, color, label }: MarkerPoint & { color: string; label: strin
   )
 }
 
-export function CornerTrack({ samples, carPosition, teamColor, brakeMarker, playerMarker, apexMarker }: CornerTrackProps) {
+export function CornerTrack({ samples, carPosition, livery, brakeMarker, playerMarker, apexMarker }: CornerTrackProps) {
   const viewBox = useMemo(() => {
     const xs = samples.map((s) => s.x)
     const ys = samples.map((s) => s.y)
@@ -50,6 +54,7 @@ export function CornerTrack({ samples, carPosition, teamColor, brakeMarker, play
   }, [samples])
 
   const points = useMemo(() => samples.map((s) => `${s.x},${s.y}`).join(' '), [samples])
+  const carScale = ROAD_WIDTH_M / 22
 
   const scaleBarOrigin = { x: viewBox.minX + 12, y: viewBox.minY + viewBox.height - 14 }
 
@@ -58,11 +63,16 @@ export function CornerTrack({ samples, carPosition, teamColor, brakeMarker, play
       viewBox={`${viewBox.minX} ${viewBox.minY} ${viewBox.width} ${viewBox.height}`}
       className="h-full w-full"
       role="img"
-      aria-label="Bovenaanzicht van de Tarzanbocht met de baanlijn en de raceauto"
+      aria-label="Bovenaanzicht van de bocht met de rijlijn en de raceauto"
     >
-      <polyline points={points} fill="none" stroke="#101d63" strokeWidth={16} strokeLinecap="round" strokeLinejoin="round" />
-      <polyline points={points} fill="none" stroke="white" strokeWidth={11} strokeLinecap="round" strokeLinejoin="round" />
-      <polyline points={points} fill="none" stroke="#c7d2fe" strokeWidth={1} strokeDasharray="3 4" strokeLinecap="round" opacity={0.7} />
+      {/* checkered curb peeking out on both edges */}
+      <polyline points={points} fill="none" stroke="#8b8f98" strokeWidth={CURB_WIDTH_M} strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points={points} fill="none" stroke="#f5f4ef" strokeWidth={CURB_WIDTH_M} strokeDasharray="9 9" strokeLinejoin="round" />
+
+      {/* asphalt road surface */}
+      <polyline points={points} fill="none" stroke="#e9e5d6" strokeWidth={ROAD_WIDTH_M} strokeLinecap="round" strokeLinejoin="round" />
+      {/* faint ideal-line ribbon, purely decorative */}
+      <polyline points={points} fill="none" stroke="#e8a3a3" strokeWidth={ROAD_WIDTH_M * 0.16} strokeLinecap="round" strokeLinejoin="round" opacity={0.6} />
 
       {apexMarker && <Pin {...apexMarker} color="#facc15" label="Apex" />}
       {brakeMarker && <Pin {...brakeMarker} color="#22c55e" label="Rempunt" />}
@@ -70,7 +80,7 @@ export function CornerTrack({ samples, carPosition, teamColor, brakeMarker, play
 
       {carPosition && (
         <g transform={`translate(${carPosition.x} ${carPosition.y}) rotate(${carPosition.heading})`}>
-          <path d="M -9 6 L 9 6 L 12 0 L 9 -6 L -9 -6 L -12 0 Z" fill={teamColor} stroke="white" strokeWidth={1.8} />
+          <F1Car livery={livery} size={carScale} />
         </g>
       )}
 

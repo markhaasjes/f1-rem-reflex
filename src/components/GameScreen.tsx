@@ -1,10 +1,11 @@
 import { useEffect } from 'react'
-import type { CornerData } from '../types'
+import type { DriverAcronym, PlayableCornerData } from '../types'
 import { headingAt, sampleAt } from '../lib/corner'
+import { TEAM_LIVERY } from '../lib/teamLivery'
 import { CornerTrack } from './CornerTrack'
 
 interface GameScreenProps {
-  corner: CornerData
+  corner: PlayableCornerData
   elapsedT: number
   onBrake: () => void
 }
@@ -23,6 +24,7 @@ export function GameScreen({ corner, elapsedT, onBrake }: GameScreenProps) {
 
   const state = sampleAt(corner.samples, elapsedT)
   const heading = headingAt(corner.samples, elapsedT)
+  const livery = TEAM_LIVERY[corner.meta.driverAcronym as DriverAcronym]
 
   return (
     <div className="flex w-full max-w-md flex-col items-center gap-5">
@@ -32,7 +34,7 @@ export function GameScreen({ corner, elapsedT, onBrake }: GameScreenProps) {
       </div>
 
       <div className="h-72 w-full overflow-hidden rounded-2xl bg-track-blue-dark/40">
-        <CornerTrack samples={corner.samples} carPosition={{ x: state.x, y: state.y, heading }} teamColor={corner.meta.teamColor} />
+        <CornerTrack samples={corner.samples} carPosition={{ x: state.x, y: state.y, heading }} livery={livery} />
       </div>
 
       <button

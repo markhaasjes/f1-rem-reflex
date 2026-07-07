@@ -1,6 +1,7 @@
-import type { BrakeAttempt, CornerData } from '../types'
+import type { BrakeAttempt, DriverAcronym, PlayableCornerData } from '../types'
 import { sampleAt } from '../lib/corner'
 import { describeAttempt } from '../lib/scoring'
+import { TEAM_LIVERY } from '../lib/teamLivery'
 import { CornerTrack } from './CornerTrack'
 
 const TONE_STYLES = {
@@ -11,19 +12,21 @@ const TONE_STYLES = {
 } as const
 
 interface ResultScreenProps {
-  corner: CornerData
+  corner: PlayableCornerData
   playerAttempt: BrakeAttempt | null
   crashed: boolean
   onRetry: () => void
+  onPickAnother: () => void
 }
 
-export function ResultScreen({ corner, playerAttempt, crashed, onRetry }: ResultScreenProps) {
+export function ResultScreen({ corner, playerAttempt, crashed, onRetry, onPickAnother }: ResultScreenProps) {
+  const livery = TEAM_LIVERY[corner.meta.driverAcronym as DriverAcronym]
   const brakePos = sampleAt(corner.samples, corner.brakePoint.t)
   const apexPos = sampleAt(corner.samples, corner.apexPoint.t)
   const playerPos = playerAttempt ? sampleAt(corner.samples, playerAttempt.t) : null
 
   const deltaM = playerAttempt ? playerAttempt.distanceM - corner.brakePoint.distanceM : null
-  const result = describeAttempt(deltaM)
+  const result = describeAttempt(deltaM, { actionType: corner.actionType, cornerName: corner.meta.corner })
 
   return (
     <div className="flex w-full max-w-md flex-col items-center gap-5 text-center">
@@ -36,7 +39,7 @@ export function ResultScreen({ corner, playerAttempt, crashed, onRetry }: Result
         <CornerTrack
           samples={corner.samples}
           carPosition={null}
-          teamColor={corner.meta.teamColor}
+          livery={livery}
           apexMarker={apexPos}
           brakeMarker={brakePos}
           playerMarker={playerPos}
@@ -65,6 +68,9 @@ export function ResultScreen({ corner, playerAttempt, crashed, onRetry }: Result
         className="w-full rounded-full bg-white px-8 py-4 text-lg font-extrabold text-ink transition hover:scale-[1.02] active:scale-95"
       >
         Probeer opnieuw
+      </button>
+      <button type="button" onClick={onPickAnother} className="text-sm font-semibold text-white/70 underline underline-offset-4">
+        Andere coureur of bocht kiezen
       </button>
     </div>
   )

@@ -1,10 +1,11 @@
 # RemReflex
 
 Proof of concept for a browser reflex game built on real Formula 1 telemetry
-from [OpenF1](https://openf1.org). You watch a real driver's onboard data
-play back through the Tarzanbocht at Circuit Zandvoort, and have to hit
-**REM!** at the moment you think the real driver braked. The result screen
-compares your brake point to the real one, in meters and km/h.
+from [OpenF1](https://openf1.org). Pick any of Circuit Zandvoort's 14 corners
+on the circuit map, zoom in, pick a driver, and watch their real onboard data
+play back through that corner. Hit **REM!** at the moment you think the real
+driver braked (or lifted, for corners taken almost flat-out) — the result
+screen compares your point to the real one, in meters and km/h.
 
 This is a POC for a nos.nl feature around the Dutch Grand Prix — not
 production code.
@@ -13,8 +14,8 @@ production code.
 
 - Vite + React 19 + TypeScript
 - Tailwind CSS v4 (`@tailwindcss/vite`)
-- No backend: telemetry is baked into a static JSON fixture at build time,
-  so the running app never talks to OpenF1 directly.
+- No backend: telemetry is baked into static JSON fixtures at build time, so
+  the running app never talks to OpenF1 directly.
 
 ## Run it
 
@@ -25,25 +26,33 @@ npm run dev
 
 ## How the data works
 
-`scripts/fetch-corner-data.mjs` is a one-off data-prep script (not part of
+`scripts/fetch-circuit-data.mjs` is a one-off data-prep script (not part of
 the app bundle). It:
 
-1. Pulls `car_data` and `location` from the OpenF1 free/historical API for
-   one lap of one driver, in a fixed time window.
-2. Resamples both onto a uniform 20 Hz grid and merges them (location is in
-   decimeters in the raw feed — divided by 10 to get meters).
-3. Detects the real brake point (first `brake` transition) and the apex
-   (minimum speed) in that window.
-4. Writes the result to `src/data/tarzanbocht-2025.json`.
+1. Pulls `car_data` and `location` from OpenF1 for one full qualifying lap
+   (2025 Dutch GP) for each of four drivers: Verstappen, Hamilton, Antonelli,
+   Norris. Location is in decimeters in the raw feed — divided by 10 to get
+   meters.
+2. Resamples every driver's lap onto a uniform 20 Hz grid.
+3. Uses Verstappen's pole lap as the **reference lap**: detects the 14 corners
+   along it (a mix of real local speed-minima/heading-change detection and a
+   few hand-tuned reference offsets for corners taken close to flat-out — see
+   the comment above `CORNER_DEFINITIONS` in the script), and stores the whole
+   lap as the circuit outline (`src/data/circuit.json`).
+4. For every driver and every one of the 14 corners, finds that driver's own
+   closest point to the reference corner position, then slices out a
+   corner-sized window (capped by distance so tightly-packed corners don't
+   overlap) and detects the real ground-truth point in it: the first brake
+   transition, or if the corner is taken flat-out, the first throttle lift, or
+   if neither happens, marks the corner `actionType: 'none'`.
+5. Writes one file per driver (`src/data/drivers/{VER,HAM,ANT,NOR}.json`),
+   each containing all 14 corners.
 
-The current fixture is Max Verstappen's fastest lap (lap 17, pole position)
-in qualifying for the 2025 Dutch Grand Prix — chosen because it's a clean,
-single push lap with no traffic. Re-run the script (after editing the
-constants at the top) to regenerate it for a different session, driver, or
-corner:
+Re-run it (after editing the driver/lap constants at the top) to regenerate
+for a different session or set of drivers:
 
 ```bash
-node scripts/fetch-corner-data.mjs
+node scripts/fetch-circuit-data.mjs
 ```
 
 Because OpenF1's free tier only serves **historical** data (real-time data
@@ -54,17 +63,32 @@ weekend data can be swapped in the same way once each session finishes.
 ## Structure
 
 ```
-scripts/fetch-corner-data.mjs   data-prep script (network access, run manually)
-src/data/*.json                 baked telemetry fixtures (no network at runtime)
-src/lib/corner.ts               sampling/interpolation over the fixture
-src/lib/scoring.ts              Dutch-language result messaging
-src/hooks/useBrakeGame.ts       game state machine (ready/running/result)
-src/components/                 CornerTrack (SVG), Start/Game/Result screens
+scripts/fetch-circuit-data.mjs   data-prep script (network access, run manually)
+src/data/circuit.json            full track outline + the 14 named corners
+src/data/drivers/*.json          per-driver, per-corner telemetry (no network at runtime)
+src/lib/corner.ts                sampling/interpolation over a corner fixture
+src/lib/geometry.ts              shared SVG viewBox math
+src/lib/scoring.ts               Dutch-language result messaging
+src/lib/teamLivery.ts            hand-picked team color palettes (no official logos)
+src/hooks/useBrakeGame.ts        per-corner game state machine (ready/running/result)
+src/components/CircuitView.tsx   full map + CSS-transform zoom into a chosen corner
+src/components/CircuitMap.tsx    circuit outline + clickable numbered corner badges
+src/components/DriverSelect.tsx  pick VER/HAM/ANT/NOR for the chosen corner
+src/components/CornerTrack.tsx   the road/curb visual + animated car (SVG)
+src/components/F1Car.tsx         stylized top-down car, colored by team livery
+src/components/GameFlow.tsx      Start/Game/Result wiring for one corner+driver
+src/components/FlatOutScreen.tsx shown instead of GameFlow when actionType is 'none'
 ```
 
 ## Known limitations (POC scope)
 
-- Single corner (Tarzanbocht), single driver/lap.
+- Corner boundaries for the twisty middle sector (roughly corners 4–10) are
+  partly interpolated rather than fully auto-detected — several of those
+  corners are taken close to flat-out and don't leave a clear brake/speed
+  signature to detect automatically. See the comment in
+  `scripts/fetch-circuit-data.mjs`.
 - No leaderboard/persistence.
-- Track shape is drawn directly from the driver's GPS trace, not an
-  official circuit vector — it's accurate to that lap, not a generic map.
+- Track shape is drawn directly from a driver's GPS trace, not an official
+  circuit vector — accurate to that lap, not a generic map.
+- Car illustrations are hand-built stylized SVGs with team-evocative color
+  palettes, not official liveries or logos.
