@@ -7,6 +7,7 @@
 // data (see src/types.ts CornerData) so the app never needs to fetch anything.
 
 import { writeFile } from 'node:fs/promises'
+import { applyTransform, fetchOfficialTrackOutline, fitSimilarityTransform, resampleByArcLength, smoothClosedCurve } from './lib/geojson.mjs'
 
 const OPENF1_BASE = 'https://api.openf1.org/v1'
 const SESSION_KEY = 9916 // 2025 Dutch Grand Prix - Qualifying
@@ -16,21 +17,19 @@ const TRAIL_PAD_S = 5 // seconds fetched after official lap end
 
 const REFERENCE_DRIVER = 'VER' // pole lap, used to define the circuit outline + corner positions
 
+const FIT_SAMPLE_COUNT = 360 // points used to solve for the telemetry -> official-geometry transform
+const OUTLINE_POINT_COUNT = 900 // points kept in the final rendered track outline
+
 // OpenF1's raw x/y are in an arbitrary FIA reference frame - plotted as-is
 // (y increasing downward, matching SVG) the lap traces counter-clockwise on
 // screen, which is a mirror image of reality (Zandvoort is driven clockwise).
-// MIRROR_X fixes that chirality; MAP_ROTATION_DEG then turns the result to
-// roughly match the official formula1.com circuit map orientation (start/
-// finish straight near-vertical, Tarzanbocht at the bottom).
+// This fixes that chirality; main() then fits the result onto the official
+// track geometry (see fitSimilarityTransform), which supplies the exact
+// rotation, scale and translation - no manual angle tuning needed here.
 const MIRROR_X = true
-const MAP_ROTATION_DEG = 0
 
 function orientPoint(rawX, rawY) {
-  const x = MIRROR_X ? -rawX : rawX
-  const rad = (MAP_ROTATION_DEG * Math.PI) / 180
-  const cos = Math.cos(rad)
-  const sin = Math.sin(rad)
-  return { x: x * cos - rawY * sin, y: x * sin + rawY * cos }
+  return { x: MIRROR_X ? -rawX : rawX, y: rawY }
 }
 
 const DRIVERS = [
@@ -308,7 +307,7 @@ function buildGrandstands(referenceLap, corners) {
   return [...namedStands, ...straightStands]
 }
 
-function buildCircuit(referenceLap) {
+function buildCircuit(referenceLap, officialOutline) {
   const candidates = findCornerCandidates(referenceLap.samples)
 
   function snapNear(targetDistanceM) {
@@ -332,9 +331,11 @@ function buildCircuit(referenceLap) {
     return { number: def.number, name: def.name, x: round(sample.x, 2), y: round(sample.y, 2), distanceM: round(sample.distanceM, 2) }
   })
 
-  const trackOutline = referenceLap.samples
-    .filter((_, i) => i % 2 === 0) // thin the outline for a smaller payload; plenty smooth at 10 Hz for a static map
-    .map((s) => ({ x: round(s.x, 2), y: round(s.y, 2) }))
+  // The rendered track shape comes from the official geometry (already
+  // fitted into our telemetry's coordinate frame - see fitSimilarityTransform
+  // in main()), not our own noisier GPS trace, so both the overview map and
+  // zoomed-in corners are drawn from one consistent, accurate source.
+  const trackOutline = officialOutline.map((p) => ({ x: round(p.x, 2), y: round(p.y, 2) }))
 
   const startFinishIndex = Math.round(LEAD_PAD_S * SAMPLE_RATE_HZ)
   const startFinishSample = referenceLap.samples[startFinishIndex]
@@ -356,6 +357,7 @@ function buildCircuit(referenceLap) {
       referenceDriver: REFERENCE_DRIVER,
       lapLengthM: referenceLap.lapLengthM,
       source: 'https://openf1.org',
+      trackOutlineSource: 'https://github.com/bacinger/f1-circuits',
     },
     trackOutline,
     startFinish,
@@ -454,7 +456,52 @@ async function main() {
   }
 
   const referenceLap = driverLaps[REFERENCE_DRIVER]
-  const circuit = buildCircuit(referenceLap)
+
+  console.log('Fetching official track geometry...')
+  const officialRaw = await fetchOfficialTrackOutline()
+  const officialSmooth = smoothClosedCurve(officialRaw, 15) // ~119 control points -> ~1785 dense points
+  const { points: officialForFit } = resampleByArcLength(officialSmooth, FIT_SAMPLE_COUNT)
+
+  const oneLapPoints = referenceLap.samples
+    .filter((s) => s.distanceM >= referenceLap.lapStartDistanceM && s.distanceM < referenceLap.lapStartDistanceM + referenceLap.lapLengthM)
+    .map((s) => ({ x: s.x, y: s.y }))
+  const { points: telemetryForFit } = resampleByArcLength(oneLapPoints, FIT_SAMPLE_COUNT)
+
+  const transform = fitSimilarityTransform(telemetryForFit, officialForFit)
+  const scale = Math.hypot(transform.kx, transform.ky)
+  const rotationDeg = (Math.atan2(transform.ky, transform.kx) * 180) / Math.PI
+  console.log(`  fit: rotation=${rotationDeg.toFixed(1)}deg scale=${scale.toFixed(3)} avgError=${transform.avgErrorM.toFixed(1)}m`)
+
+  for (const lap of Object.values(driverLaps)) {
+    for (const sample of lap.samples) {
+      const oriented = applyTransform(sample, transform)
+      sample.x = oriented.x
+      sample.y = oriented.y
+    }
+  }
+
+  // The fit above matches shape/scale but its rotation is whatever the error
+  // search happened to land on - re-orient so Tarzanbocht ends up at the
+  // bottom with the pit straight running up, matching the official
+  // formula1.com map layout, same as before this geojson pass.
+  const officialCentroid = officialForFit.reduce((acc, p) => ({ x: acc.x + p.x / officialForFit.length, y: acc.y + p.y / officialForFit.length }), { x: 0, y: 0 })
+  const approxCorner1 = nearestSampleByDistance(referenceLap.samples, referenceLap.lapStartDistanceM + CORNER_DEFINITIONS[0].expectedIntoLapM)
+  const currentAngleRad = Math.atan2(approxCorner1.y - officialCentroid.y, approxCorner1.x - officialCentroid.x)
+  const realignRotationRad = Math.PI / 2 - currentAngleRad // Math.PI/2 = pointing straight down
+  const realignTransform = { kx: Math.cos(realignRotationRad), ky: Math.sin(realignRotationRad), tx: 0, ty: 0 }
+
+  for (const lap of Object.values(driverLaps)) {
+    for (const sample of lap.samples) {
+      const realigned = applyTransform(sample, realignTransform)
+      sample.x = realigned.x
+      sample.y = realigned.y
+    }
+  }
+  const officialSmoothRealigned = officialSmooth.map((p) => applyTransform(p, realignTransform))
+
+  const { points: officialOutline } = resampleByArcLength(officialSmoothRealigned, OUTLINE_POINT_COUNT)
+
+  const circuit = buildCircuit(referenceLap, officialOutline)
   console.log('Detected corners:')
   circuit.corners.forEach((c) => console.log(`  ${c.number}. ${c.name} @ ${c.distanceM.toFixed(0)}m`))
 
