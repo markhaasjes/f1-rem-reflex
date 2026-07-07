@@ -1,0 +1,34 @@
+# Dependency directories
+node_modules/
+package.json
+package-lock.json
+.vscode
+
+# Next.js build output
+.next
+out/
+build
+dist
+
+# Test coverage files
+coverage
+
+# Static folders
+public/
+storybook-static
+
+### Node ###
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Generated
+src/data-service/corgi/generated.ts
+src/data-service/corgi/schema.graphql
+
+# Next.js auto-generated
+next-env.d.ts

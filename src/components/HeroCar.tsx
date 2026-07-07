@@ -1,11 +1,16 @@
-import { VERSTAPPEN_LIVERY } from '../lib/teamLivery'
+import { VERSTAPPEN_LIVERY } from "../lib/teamLivery";
 
 // Flat-illustration side view of the car (nose to the left), in the style of
 // the reference artwork: bold shapes, dark wheels with a brake-glow arc.
-export function HeroCar({ className = '' }: { className?: string }) {
-  const { body, accent, highlight, cockpit } = VERSTAPPEN_LIVERY
+export function HeroCar({ className = "" }: { className?: string }) {
+  const { body, accent, highlight, cockpit } = VERSTAPPEN_LIVERY;
   return (
-    <svg viewBox="0 0 240 96" className={className} role="img" aria-label="Illustratie van de raceauto van Max Verstappen">
+    <svg
+      viewBox="0 0 240 96"
+      className={className}
+      role="img"
+      aria-label="Illustratie van de raceauto van Max Verstappen"
+    >
       {/* shadow */}
       <ellipse cx={120} cy={86} rx={100} ry={6} fill="#0b1440" opacity={0.18} />
 
@@ -28,21 +33,42 @@ export function HeroCar({ className = '' }: { className?: string }) {
         fill={body}
       />
       {/* nose tip */}
-      <path d="M 6 66 L 40 60 L 44 70 L 10 74 C 5 74 4 68 6 66 Z" fill={accent} />
+      <path
+        d="M 6 66 L 40 60 L 44 70 L 10 74 C 5 74 4 68 6 66 Z"
+        fill={accent}
+      />
       {/* engine cover accent sweep */}
-      <path d="M 120 46 C 140 42 165 42 186 52 L 180 60 C 160 50 140 50 124 54 Z" fill={accent} />
+      <path
+        d="M 120 46 C 140 42 165 42 186 52 L 180 60 C 160 50 140 50 124 54 Z"
+        fill={accent}
+      />
       {/* halo + cockpit */}
-      <path d="M 128 46 C 132 34 150 34 154 46 L 148 46 C 146 40 136 40 134 46 Z" fill={cockpit} />
+      <path
+        d="M 128 46 C 132 34 150 34 154 46 L 148 46 C 146 40 136 40 134 46 Z"
+        fill={cockpit}
+      />
       <circle cx={141} cy={44} r={7} fill={cockpit} />
       <rect x={112} y={52} width={10} height={4} rx={2} fill={highlight} />
 
       {/* wheels: rear, front, with brake-glow arcs */}
       <circle cx={178} cy={70} r={22} fill="#1c2230" />
       <circle cx={178} cy={70} r={9} fill="#2c3444" />
-      <path d="M 178 56 A 14 14 0 0 1 191 66" fill="none" stroke="#f2811d" strokeWidth={4} strokeLinecap="round" />
+      <path
+        d="M 178 56 A 14 14 0 0 1 191 66"
+        fill="none"
+        stroke="#f2811d"
+        strokeWidth={4}
+        strokeLinecap="round"
+      />
       <circle cx={62} cy={72} r={19} fill="#1c2230" />
       <circle cx={62} cy={72} r={8} fill="#2c3444" />
-      <path d="M 62 60 A 12 12 0 0 1 73 68" fill="none" stroke="#f2811d" strokeWidth={3.5} strokeLinecap="round" />
+      <path
+        d="M 62 60 A 12 12 0 0 1 73 68"
+        fill="none"
+        stroke="#f2811d"
+        strokeWidth={3.5}
+        strokeLinecap="round"
+      />
     </svg>
-  )
+  );
 }
