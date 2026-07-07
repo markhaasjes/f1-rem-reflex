@@ -27,20 +27,20 @@ export function GameScreen({ corner, elapsedT, onBrake }: GameScreenProps) {
   const livery = TEAM_LIVERY[corner.meta.driverAcronym as DriverAcronym]
 
   return (
-    <div className="flex w-full max-w-md flex-col items-center gap-5">
-      <div className="flex w-full items-baseline justify-between px-2">
-        <span className="text-4xl font-extrabold tabular-nums">{Math.round(state.speedKph)}</span>
-        <span className="text-sm text-white/70">km/h</span>
+    <div className="flex w-full flex-col items-center gap-4">
+      <div className="flex w-full max-w-sm items-baseline justify-between px-2">
+        <span className="text-4xl font-extrabold tabular-nums sm:text-5xl md:text-6xl">{Math.round(state.speedKph)}</span>
+        <span className="text-sm text-white/70 sm:text-base">km/h</span>
       </div>
 
-      <div className="h-72 w-full overflow-hidden rounded-2xl bg-track-blue-dark/40">
+      <div className="h-[22rem] w-full overflow-hidden rounded-2xl bg-track-blue-dark/40 sm:h-[30rem] md:h-[38rem] lg:h-[42rem]">
         <CornerTrack samples={corner.samples} carPosition={{ x: state.x, y: state.y, heading }} livery={livery} />
       </div>
 
       <button
         type="button"
         onClick={onBrake}
-        className="w-full select-none rounded-full bg-red-600 px-8 py-6 text-2xl font-extrabold tracking-wide text-white shadow-lg transition active:scale-95"
+        className="w-full max-w-sm select-none rounded-full bg-red-600 px-8 py-6 text-2xl font-extrabold tracking-wide text-white shadow-lg transition active:scale-95 sm:text-3xl"
       >
         REM!
       </button>

@@ -29,13 +29,13 @@ export function ResultScreen({ corner, playerAttempt, crashed, onRetry, onPickAn
   const result = describeAttempt(deltaM, { actionType: corner.actionType, cornerName: corner.meta.corner })
 
   return (
-    <div className="flex w-full max-w-md flex-col items-center gap-5 text-center">
-      <div className={`w-full rounded-2xl px-5 py-4 ${TONE_STYLES[result.tone]}`}>
-        <h2 className="text-xl font-extrabold text-white">{result.title}</h2>
+    <div className="flex w-full flex-col items-center gap-4 text-center">
+      <div className={`w-full max-w-sm rounded-2xl px-5 py-3 sm:max-w-md ${TONE_STYLES[result.tone]}`}>
+        <h2 className="text-lg font-extrabold text-white sm:text-xl">{result.title}</h2>
         <p className="text-sm text-white/90">{result.detail}</p>
       </div>
 
-      <div className="h-72 w-full overflow-hidden rounded-2xl bg-track-blue-dark/40">
+      <div className="h-[22rem] w-full overflow-hidden rounded-2xl bg-track-blue-dark/40 sm:h-[30rem] md:h-[38rem] lg:h-[42rem]">
         <CornerTrack
           samples={corner.samples}
           carPosition={null}
@@ -46,26 +46,21 @@ export function ResultScreen({ corner, playerAttempt, crashed, onRetry, onPickAn
         />
       </div>
 
-      <dl className="grid w-full grid-cols-2 gap-3 text-left">
+      <dl className="grid w-full max-w-sm grid-cols-2 gap-3 text-left sm:max-w-md">
         <div className="rounded-xl bg-white/10 px-4 py-3">
           <dt className="text-xs uppercase tracking-wide text-white/60">{corner.meta.driverAcronym} remde bij</dt>
-          <dd className="text-lg font-bold tabular-nums">{corner.brakePoint.speedKph} km/h</dd>
+          <dd className="text-lg font-bold tabular-nums sm:text-xl">{corner.brakePoint.speedKph} km/h</dd>
         </div>
         <div className="rounded-xl bg-white/10 px-4 py-3">
           <dt className="text-xs uppercase tracking-wide text-white/60">Jij remde bij</dt>
-          <dd className="text-lg font-bold tabular-nums">{crashed || !playerAttempt ? '—' : `${Math.round(playerAttempt.speedKph)} km/h`}</dd>
+          <dd className="text-lg font-bold tabular-nums sm:text-xl">{crashed || !playerAttempt ? '—' : `${Math.round(playerAttempt.speedKph)} km/h`}</dd>
         </div>
       </dl>
-
-      <p className="text-xs text-white/60">
-        Databron: OpenF1.org — {corner.meta.meetingName} {corner.meta.year}, {corner.meta.sessionName}, ronde {corner.meta.lapNumber} van{' '}
-        {corner.meta.driverName}.
-      </p>
 
       <button
         type="button"
         onClick={onRetry}
-        className="w-full rounded-full bg-white px-8 py-4 text-lg font-extrabold text-ink transition hover:scale-[1.02] active:scale-95"
+        className="w-full max-w-sm rounded-full bg-white px-8 py-4 text-lg font-extrabold text-ink transition hover:scale-[1.02] active:scale-95 sm:text-xl"
       >
         Probeer opnieuw
       </button>

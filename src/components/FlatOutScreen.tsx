@@ -49,28 +49,25 @@ export function FlatOutScreen({ corner, onPickAnother }: FlatOutScreenProps) {
   const heading = headingAt(corner.samples, elapsedT)
 
   return (
-    <div className="flex w-full max-w-md flex-col items-center gap-6 text-center">
-      <Pill className="gap-3 text-lg">
+    <div className="flex w-full flex-col items-center gap-4 text-center">
+      <Pill className="gap-3 text-base sm:text-lg">
         <NumberBadge>{corner.meta.cornerNumber}</NumberBadge>
         {corner.meta.corner}
       </Pill>
 
-      <div className="h-64 w-full overflow-hidden rounded-2xl bg-track-blue-dark/40">
-        <CornerTrack samples={corner.samples} carPosition={{ x: state.x, y: state.y, heading }} livery={livery} />
-      </div>
+      <p className="text-sm text-white/80 sm:text-base">
+        <strong style={{ color: corner.meta.teamColor }}>{corner.meta.driverName}</strong> — bijna vol gas, niet lager dan{' '}
+        <strong>{minSpeed} km/h</strong>
+      </p>
 
-      <div className="w-full rounded-2xl bg-white/10 px-5 py-4">
-        <h2 className="text-lg font-extrabold">Hier is geen rempunt nodig</h2>
-        <p className="text-sm text-white/80">
-          <strong style={{ color: corner.meta.teamColor }}>{corner.meta.driverName}</strong> neemt de {corner.meta.corner} bijna vol gas —
-          niet lager dan <strong>{minSpeed} km/h</strong>.
-        </p>
+      <div className="h-[22rem] w-full overflow-hidden rounded-2xl bg-track-blue-dark/40 sm:h-[30rem] md:h-[38rem] lg:h-[42rem]">
+        <CornerTrack samples={corner.samples} carPosition={{ x: state.x, y: state.y, heading }} livery={livery} />
       </div>
 
       <button
         type="button"
         onClick={onPickAnother}
-        className="w-full rounded-full bg-white px-8 py-4 text-lg font-extrabold text-ink transition hover:scale-[1.02] active:scale-95"
+        className="w-full max-w-sm rounded-full bg-white px-8 py-4 text-lg font-extrabold text-ink transition hover:scale-[1.02] active:scale-95 sm:text-xl"
       >
         Kies een andere bocht
       </button>

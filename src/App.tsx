@@ -42,29 +42,31 @@ function App() {
     selectedCorner && selectedDriver ? (DRIVERS[selectedDriver].corners[String(selectedCorner.number)] ?? null) : null
 
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center gap-8 bg-track-blue px-4 py-10 text-white">
-      <Pill className="gap-3">
+    <div className="flex min-h-svh flex-col items-center justify-center gap-5 bg-track-blue px-3 py-5 text-white sm:gap-7 sm:px-6 sm:py-8">
+      <Pill className="gap-3 text-sm sm:text-base">
         <NumberBadge>NOS</NumberBadge>
         RemReflex — {circuit.meta.circuit}
       </Pill>
 
-      {phase === 'circuit' && (
-        <div className="flex w-full max-w-md flex-col items-center gap-4 text-center">
-          <p className="text-white/90">Kies een bocht op de circuitkaart om 'm uit te proberen.</p>
-          <CircuitView circuit={circuit} onZoomComplete={handleZoomComplete} />
-        </div>
-      )}
+      <div className="flex w-full max-w-md flex-col items-center gap-4 sm:max-w-xl md:max-w-3xl lg:max-w-5xl">
+        {phase === 'circuit' && (
+          <div className="flex w-full flex-col items-center gap-3 text-center">
+            <p className="text-sm text-white/80 sm:text-base">Kies een bocht:</p>
+            <CircuitView circuit={circuit} onZoomComplete={handleZoomComplete} />
+          </div>
+        )}
 
-      {phase === 'driverSelect' && selectedCorner && (
-        <DriverSelect corner={selectedCorner} onSelectDriver={handleSelectDriver} onBack={handleBackToCircuit} />
-      )}
+        {phase === 'driverSelect' && selectedCorner && (
+          <DriverSelect corner={selectedCorner} onSelectDriver={handleSelectDriver} onBack={handleBackToCircuit} />
+        )}
 
-      {phase === 'game' && cornerData?.actionType === 'none' && (
-        <FlatOutScreen corner={cornerData} onPickAnother={handleBackToDriverSelect} />
-      )}
-      {phase === 'game' && cornerData && cornerData.actionType !== 'none' && (
-        <GameFlow key={`${selectedDriver}-${selectedCorner?.number}`} corner={cornerData} onPickAnother={handleBackToDriverSelect} />
-      )}
+        {phase === 'game' && cornerData?.actionType === 'none' && (
+          <FlatOutScreen corner={cornerData} onPickAnother={handleBackToDriverSelect} />
+        )}
+        {phase === 'game' && cornerData && cornerData.actionType !== 'none' && (
+          <GameFlow key={`${selectedDriver}-${selectedCorner?.number}`} corner={cornerData} onPickAnother={handleBackToDriverSelect} />
+        )}
+      </div>
     </div>
   )
 }

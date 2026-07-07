@@ -10,7 +10,7 @@ export function Pill({ children, className = '' }: { children: ReactNode; classN
 
 export function NumberBadge({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-badge-blue text-sm font-extrabold text-white">
+    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-badge-blue text-sm font-extrabold text-white sm:h-9 sm:w-9 sm:text-base">
       {children}
     </span>
   )

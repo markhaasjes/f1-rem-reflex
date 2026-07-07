@@ -34,7 +34,7 @@ export function CircuitView({ circuit, onZoomComplete }: CircuitViewProps) {
   }
 
   return (
-    <div className="h-80 w-full overflow-hidden rounded-2xl bg-track-blue-dark/40">
+    <div className="h-[26rem] w-full overflow-hidden rounded-2xl bg-track-blue-dark/40 sm:h-[34rem] md:h-[42rem] lg:h-[46rem]">
       <div
         className="h-full w-full"
         style={{
