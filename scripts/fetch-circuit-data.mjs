@@ -16,6 +16,23 @@ const TRAIL_PAD_S = 5 // seconds fetched after official lap end
 
 const REFERENCE_DRIVER = 'VER' // pole lap, used to define the circuit outline + corner positions
 
+// OpenF1's raw x/y are in an arbitrary FIA reference frame - plotted as-is
+// (y increasing downward, matching SVG) the lap traces counter-clockwise on
+// screen, which is a mirror image of reality (Zandvoort is driven clockwise).
+// MIRROR_X fixes that chirality; MAP_ROTATION_DEG then turns the result to
+// roughly match the official formula1.com circuit map orientation (start/
+// finish straight near-vertical, Tarzanbocht at the bottom).
+const MIRROR_X = true
+const MAP_ROTATION_DEG = 0
+
+function orientPoint(rawX, rawY) {
+  const x = MIRROR_X ? -rawX : rawX
+  const rad = (MAP_ROTATION_DEG * Math.PI) / 180
+  const cos = Math.cos(rad)
+  const sin = Math.sin(rad)
+  return { x: x * cos - rawY * sin, y: x * sin + rawY * cos }
+}
+
 const DRIVERS = [
   { acronym: 'VER', driverNumber: 1, lapNumber: 17, lapStart: '2025-08-30T13:59:50.121+00:00', lapDurationS: 68.925 },
   { acronym: 'HAM', driverNumber: 44, lapNumber: 13, lapStart: '2025-08-30T13:32:28.195+00:00', lapDurationS: 69.261 },
@@ -119,7 +136,7 @@ async function fetchDriverLap(driver) {
     .map((s) => ({ t: (new Date(s.date).getTime() - t0) / 1000, speed: s.speed, brake: s.brake > 0 ? 1 : 0, gear: s.n_gear, throttle: s.throttle }))
     .sort((a, b) => a.t - b.t)
   const location = rawLocation
-    .map((s) => ({ t: (new Date(s.date).getTime() - t0) / 1000, x: s.x / 10, y: s.y / 10 }))
+    .map((s) => ({ t: (new Date(s.date).getTime() - t0) / 1000, ...orientPoint(s.x / 10, s.y / 10) }))
     .sort((a, b) => a.t - b.t)
 
   const endT = Math.min(carData.at(-1).t, location.at(-1).t)
