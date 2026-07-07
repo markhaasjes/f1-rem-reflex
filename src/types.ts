@@ -5,6 +5,7 @@ export interface CornerSample {
   distanceM: number
   speedKph: number
   brakeActive: boolean
+  throttle: number
   gear: number
 }
 

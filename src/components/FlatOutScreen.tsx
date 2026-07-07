@@ -61,7 +61,7 @@ export function FlatOutScreen({ corner, onPickAnother }: FlatOutScreenProps) {
       </p>
 
       <div className="h-[22rem] w-full overflow-hidden rounded-2xl bg-track-blue-dark/40 sm:h-[30rem] md:h-[38rem] lg:h-[42rem]">
-        <CornerTrack samples={corner.samples} carPosition={{ x: state.x, y: state.y, heading }} livery={livery} />
+        <CornerTrack samples={corner.samples} carPosition={{ x: state.x, y: state.y, heading }} livery={livery} showPhases />
       </div>
 
       <button

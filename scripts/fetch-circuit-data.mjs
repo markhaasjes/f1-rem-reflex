@@ -278,6 +278,7 @@ function extractCornerForDriver(driverLap, corner, neighborGapsM) {
     distanceM: round(s.distanceM - distance0, 2),
     speedKph: s.speedKph,
     brakeActive: s.brakeActive,
+    throttle: s.throttle,
     gear: s.gear,
   }))
 

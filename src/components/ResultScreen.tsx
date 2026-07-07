@@ -22,7 +22,6 @@ interface ResultScreenProps {
 export function ResultScreen({ corner, playerAttempt, crashed, onRetry, onPickAnother }: ResultScreenProps) {
   const livery = TEAM_LIVERY[corner.meta.driverAcronym as DriverAcronym]
   const brakePos = sampleAt(corner.samples, corner.brakePoint.t)
-  const apexPos = sampleAt(corner.samples, corner.apexPoint.t)
   const playerPos = playerAttempt ? sampleAt(corner.samples, playerAttempt.t) : null
 
   const deltaM = playerAttempt ? playerAttempt.distanceM - corner.brakePoint.distanceM : null
@@ -36,14 +35,7 @@ export function ResultScreen({ corner, playerAttempt, crashed, onRetry, onPickAn
       </div>
 
       <div className="h-[22rem] w-full overflow-hidden rounded-2xl bg-track-blue-dark/40 sm:h-[30rem] md:h-[38rem] lg:h-[42rem]">
-        <CornerTrack
-          samples={corner.samples}
-          carPosition={null}
-          livery={livery}
-          apexMarker={apexPos}
-          brakeMarker={brakePos}
-          playerMarker={playerPos}
-        />
+        <CornerTrack samples={corner.samples} carPosition={null} livery={livery} showPhases brakeMarker={brakePos} playerMarker={playerPos} />
       </div>
 
       <dl className="grid w-full max-w-sm grid-cols-2 gap-3 text-left sm:max-w-md">
