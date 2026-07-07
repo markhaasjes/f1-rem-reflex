@@ -9,7 +9,7 @@ interface CircuitViewProps {
 }
 
 const ZOOM_SCALE = 4.5
-const PADDING_M = 60
+const PADDING_M = 120 // extra room so corner-name labels near the edge don't clip
 
 export function CircuitView({ circuit, onZoomComplete }: CircuitViewProps) {
   const [zoomOrigin, setZoomOrigin] = useState({ x: 50, y: 50 })

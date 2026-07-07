@@ -82,6 +82,12 @@ export interface CircuitCorner {
   distanceM: number
 }
 
+export interface OrientedPoint {
+  x: number
+  y: number
+  headingDeg: number
+}
+
 export interface CircuitData {
   meta: {
     circuit: string
@@ -94,6 +100,8 @@ export interface CircuitData {
     source: string
   }
   trackOutline: { x: number; y: number }[]
+  startFinish: OrientedPoint
+  grandstands: OrientedPoint[]
   corners: CircuitCorner[]
 }
 

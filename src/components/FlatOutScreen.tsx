@@ -56,7 +56,7 @@ export function FlatOutScreen({ corner, onPickAnother }: FlatOutScreenProps) {
       </Pill>
 
       <p className="text-sm text-white/80 sm:text-base">
-        <strong style={{ color: corner.meta.teamColor }}>{corner.meta.driverName}</strong> — bijna vol gas, niet lager dan{' '}
+        <strong style={{ color: corner.meta.teamColor }}>{corner.meta.driverName}</strong> gaat hier bijna vol gas, niet lager dan{' '}
         <strong>{minSpeed} km/h</strong>
       </p>
 

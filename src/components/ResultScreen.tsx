@@ -45,7 +45,7 @@ export function ResultScreen({ corner, playerAttempt, crashed, onRetry, onPickAn
         </div>
         <div className="rounded-xl bg-white/10 px-4 py-3">
           <dt className="text-xs uppercase tracking-wide text-white/60">Jij remde bij</dt>
-          <dd className="text-lg font-bold tabular-nums sm:text-xl">{crashed || !playerAttempt ? '—' : `${Math.round(playerAttempt.speedKph)} km/h`}</dd>
+          <dd className="text-lg font-bold tabular-nums sm:text-xl">{crashed || !playerAttempt ? '-' : `${Math.round(playerAttempt.speedKph)} km/h`}</dd>
         </div>
       </dl>
 

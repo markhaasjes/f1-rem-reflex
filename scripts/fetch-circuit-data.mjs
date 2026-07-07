@@ -211,6 +211,60 @@ function findCornerCandidates(samples) {
   return [...indices].sort((a, b) => a - b)
 }
 
+const GRANDSTAND_OFFSET_M = 24
+const GRANDSTAND_LENGTH_M = 16
+const GRANDSTAND_WIDTH_M = 6
+const STRAIGHT_GRANDSTAND_FRACTIONS = [0.25, 0.5, 0.75]
+
+function nearestSampleByDistance(samples, targetDistanceM) {
+  let best = samples[0]
+  let bestDiff = Infinity
+  for (const sample of samples) {
+    const diff = Math.abs(sample.distanceM - targetDistanceM)
+    if (diff < bestDiff) {
+      bestDiff = diff
+      best = sample
+    }
+  }
+  return best
+}
+
+// Grandstands are purely decorative (no official position data available for
+// a GPS-derived track shape) - one is placed just outside the track at each
+// corner, plus a few along the main straight, oriented parallel to the track
+// and offset away from the circuit's centroid (a reasonable proxy for "away
+// from the infield" without needing real seating-plan data).
+function buildGrandstands(referenceLap, corners) {
+  const samples = referenceLap.samples
+  const centroid = samples.reduce((acc, s) => ({ x: acc.x + s.x / samples.length, y: acc.y + s.y / samples.length }), { x: 0, y: 0 })
+
+  function standAt(x, y, headingDeg) {
+    const dx = x - centroid.x
+    const dy = y - centroid.y
+    const len = Math.hypot(dx, dy) || 1
+    return { x: round(x + (dx / len) * GRANDSTAND_OFFSET_M, 2), y: round(y + (dy / len) * GRANDSTAND_OFFSET_M, 2), headingDeg: round(headingDeg, 1) }
+  }
+
+  const cornerStands = corners.map((corner) => {
+    const index = samples.findIndex((s) => Math.abs(s.distanceM - corner.distanceM) < 0.5)
+    const headingDeg = (headingAt(samples, index === -1 ? 0 : index, 4) * 180) / Math.PI
+    return standAt(corner.x, corner.y, headingDeg)
+  })
+
+  const corner14 = corners.at(-1)
+  const corner1 = corners[0]
+  const straightLengthM = corner1.distanceM + referenceLap.lapLengthM - corner14.distanceM
+  const straightStands = STRAIGHT_GRANDSTAND_FRACTIONS.map((fraction) => {
+    const targetDistanceM = corner14.distanceM + fraction * straightLengthM
+    const sample = nearestSampleByDistance(samples, targetDistanceM > referenceLap.lapLengthM + referenceLap.lapStartDistanceM ? targetDistanceM - referenceLap.lapLengthM : targetDistanceM)
+    const index = samples.indexOf(sample)
+    const headingDeg = (headingAt(samples, index, 4) * 180) / Math.PI
+    return standAt(sample.x, sample.y, headingDeg)
+  })
+
+  return [...cornerStands, ...straightStands]
+}
+
 function buildCircuit(referenceLap) {
   const candidates = findCornerCandidates(referenceLap.samples)
 
@@ -239,6 +293,16 @@ function buildCircuit(referenceLap) {
     .filter((_, i) => i % 2 === 0) // thin the outline for a smaller payload; plenty smooth at 10 Hz for a static map
     .map((s) => ({ x: round(s.x, 2), y: round(s.y, 2) }))
 
+  const startFinishIndex = Math.round(LEAD_PAD_S * SAMPLE_RATE_HZ)
+  const startFinishSample = referenceLap.samples[startFinishIndex]
+  const startFinish = {
+    x: round(startFinishSample.x, 2),
+    y: round(startFinishSample.y, 2),
+    headingDeg: round((headingAt(referenceLap.samples, startFinishIndex, 4) * 180) / Math.PI, 1),
+  }
+
+  const grandstands = buildGrandstands(referenceLap, corners)
+
   return {
     meta: {
       circuit: 'Circuit Zandvoort',
@@ -251,6 +315,8 @@ function buildCircuit(referenceLap) {
       source: 'https://openf1.org',
     },
     trackOutline,
+    startFinish,
+    grandstands,
     corners,
   }
 }

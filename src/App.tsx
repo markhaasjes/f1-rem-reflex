@@ -45,7 +45,7 @@ function App() {
     <div className="flex min-h-svh flex-col items-center justify-center gap-5 bg-track-blue px-3 py-5 text-white sm:gap-7 sm:px-6 sm:py-8">
       <Pill className="gap-3 text-sm sm:text-base">
         <NumberBadge>NOS</NumberBadge>
-        RemReflex — {circuit.meta.circuit}
+        Rem Reflex · {circuit.meta.circuit}
       </Pill>
 
       <div className="flex w-full max-w-md flex-col items-center gap-4 sm:max-w-xl md:max-w-3xl lg:max-w-5xl">
