@@ -1,0 +1,15 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Segoe UI', system-ui, Roboto, sans-serif;
+
+  --color-track-blue: #1a2c8f;
+  --color-track-blue-dark: #101d63;
+  --color-badge-blue: #2f6fed;
+  --color-ink: #0b1440;
+}
+
+body {
+  margin: 0;
+  color-scheme: dark;
+}
