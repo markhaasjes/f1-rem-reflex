@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useElementSize } from '../hooks/useElementSize';
 import { fitProjection, prepareCanvas } from '../lib/canvas';
 import { drawF1Car } from '../lib/canvasCar';
-import { headingAt, sampleAt } from '../lib/corner';
+import { decelerationAt, headingAt, positionAt, sampleAt } from '../lib/corner';
 import { computeViewBox } from '../lib/geometry';
 import { buildPhaseSegments, isVisiblePhase, type DrivingPhase } from '../lib/phases';
 import {
@@ -125,8 +125,21 @@ export function CornerScene({ fixture, phase, elapsedT, playerAttempt }: CornerS
     if (phase === 'running') carT = elapsedT;
     else if (phase === 'result') carT = fixture.durationS;
     const carState = sampleAt(fixture.samples, carT);
+    const carPos = positionAt(fixture.samples, carT);
     const carHeading = headingAt(fixture.samples, carT);
-    drawF1Car(ctx, carState.x, carState.y, carHeading, VERSTAPPEN_LIVERY, CAR_SCALE, projection);
+    drawF1Car(ctx, {
+      x: carPos.x,
+      y: carPos.y,
+      headingDeg: carHeading,
+      livery: VERSTAPPEN_LIVERY,
+      sizeScale: CAR_SCALE,
+      projection,
+      // Only dress the car with speed/brake effects while the lap is playing.
+      dynamics:
+        phase === 'running'
+          ? { speedKph: carState.speedKph, decel: decelerationAt(fixture.samples, carT), braking: carState.brakeActive }
+          : undefined,
+    });
 
     drawScaleBar(ctx, projection, height);
   }, [fixture, phase, elapsedT, projection, width, height, apexRoadIndex, drawResultOverlay]);
