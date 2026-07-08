@@ -1,14 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
-import { useElementSize } from "../hooks/useElementSize";
-import { fitProjection, prepareCanvas } from "../lib/canvas";
-import { drawF1Car } from "../lib/canvasCar";
-import { headingAt, sampleAt } from "../lib/corner";
-import { computeViewBox } from "../lib/geometry";
-import {
-  buildPhaseSegments,
-  isVisiblePhase,
-  type DrivingPhase,
-} from "../lib/phases";
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useElementSize } from '../hooks/useElementSize';
+import { fitProjection, prepareCanvas } from '../lib/canvas';
+import { drawF1Car } from '../lib/canvasCar';
+import { headingAt, sampleAt } from '../lib/corner';
+import { computeViewBox } from '../lib/geometry';
+import { buildPhaseSegments, isVisiblePhase, type DrivingPhase } from '../lib/phases';
 import {
   drawCurb,
   drawDashedGuide,
@@ -22,11 +18,11 @@ import {
   drawTrackRibbon,
   nearestIndex,
   outsideSignAt,
-} from "../lib/scene";
-import { VERSTAPPEN_LIVERY } from "../lib/teamLivery";
-import type { BrakeAttempt, TarzanFixture } from "../types";
+} from '../lib/scene';
+import { VERSTAPPEN_LIVERY } from '../lib/teamLivery';
+import type { BrakeAttempt, TarzanFixture } from '../types';
 
-export type ScenePhase = "idle" | "running" | "result";
+export type ScenePhase = 'idle' | 'running' | 'result';
 
 interface CornerSceneProps {
   fixture: TarzanFixture;
@@ -38,35 +34,26 @@ interface CornerSceneProps {
 const PADDING_M = 30;
 const CAR_SCALE = 13 / 22;
 
-const PHASE_COLOR: Record<Exclude<DrivingPhase, "flatout">, string> = {
-  coast: "#f2a11c",
-  brake: "#e10600",
-  accel: "#12a37f",
+const PHASE_COLOR: Record<Exclude<DrivingPhase, 'flatout'>, string> = {
+  coast: '#f2a11c',
+  brake: '#e10600',
+  accel: '#12a37f',
 };
 
-const PHASE_LABEL_TEXT: Record<Exclude<DrivingPhase, "flatout">, string> = {
-  coast: "Gas los",
-  brake: "Remmen",
-  accel: "Vol gas",
+const PHASE_LABEL_TEXT: Record<Exclude<DrivingPhase, 'flatout'>, string> = {
+  coast: 'Gas los',
+  brake: 'Remmen',
+  accel: 'Vol gas',
 };
 
-export function CornerScene({
-  fixture,
-  phase,
-  elapsedT,
-  playerAttempt,
-}: CornerSceneProps) {
+export function CornerScene({ fixture, phase, elapsedT, playerAttempt }: CornerSceneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { width, height } = useElementSize(containerRef);
 
-  const viewBox = useMemo(
-    () => computeViewBox([...fixture.roadPath, ...fixture.samples], PADDING_M),
-    [fixture],
-  );
+  const viewBox = useMemo(() => computeViewBox([...fixture.roadPath, ...fixture.samples], PADDING_M), [fixture]);
   const projection = useMemo(
-    () =>
-      width > 0 && height > 0 ? fitProjection(viewBox, width, height) : null,
+    () => (width > 0 && height > 0 ? fitProjection(viewBox, width, height) : null),
     [viewBox, width, height],
   );
 
@@ -76,18 +63,12 @@ export function CornerScene({
   }, [fixture]);
 
   const phaseSegments = useMemo(
-    () =>
-      buildPhaseSegments(fixture.samples, fixture.apexPoint.t).filter(
-        isVisiblePhase,
-      ),
+    () => buildPhaseSegments(fixture.samples, fixture.apexPoint.t).filter(isVisiblePhase),
     [fixture],
   );
 
   const drawResultOverlay = useCallback(
-    (
-      ctx: CanvasRenderingContext2D,
-      projection: NonNullable<ReturnType<typeof fitProjection>>,
-    ) => {
+    (ctx: CanvasRenderingContext2D, projection: NonNullable<ReturnType<typeof fitProjection>>) => {
       for (const segment of phaseSegments) {
         drawRibbon(ctx, segment.points, PHASE_COLOR[segment.phase], projection);
       }
@@ -95,23 +76,17 @@ export function CornerScene({
         if (segment.points.length < 4) continue;
         const mid = segment.points[Math.floor(segment.points.length / 2)];
         const [mx, my] = projection.toScreen(mid.x, mid.y);
-        drawPhaseLabel(
-          ctx,
-          mx,
-          my - 14,
-          PHASE_COLOR[segment.phase],
-          PHASE_LABEL_TEXT[segment.phase],
-        );
+        drawPhaseLabel(ctx, mx, my - 14, PHASE_COLOR[segment.phase], PHASE_LABEL_TEXT[segment.phase]);
       }
 
       const brakeState = sampleAt(fixture.samples, fixture.brakePoint.t);
       const [bx, by] = projection.toScreen(brakeState.x, brakeState.y);
-      drawPin(ctx, bx, by, "#0b7a43", "Max remt");
+      drawPin(ctx, bx, by, '#0b7a43', 'Max remt');
 
       if (playerAttempt) {
         const playerState = sampleAt(fixture.samples, playerAttempt.t);
         const [px, py] = projection.toScreen(playerState.x, playerState.y);
-        drawPin(ctx, px, py, "#1a2c8f", "Jij");
+        drawPin(ctx, px, py, '#1a2c8f', 'Jij');
       }
     },
     [fixture, phaseSegments, playerAttempt],
@@ -129,70 +104,38 @@ export function CornerScene({
     drawGravelTrap(ctx, fixture.roadPath, apexRoadIndex, projection);
     drawTrackRibbon(ctx, fixture.roadPath, projection);
     const outside = outsideSignAt(fixture.roadPath, apexRoadIndex);
-    drawCurb(
-      ctx,
-      fixture.roadPath,
-      apexRoadIndex - 16,
-      apexRoadIndex + 8,
-      -outside,
-      projection,
-    ); // inside apex curb
-    drawCurb(
-      ctx,
-      fixture.roadPath,
-      apexRoadIndex + 8,
-      apexRoadIndex + 30,
-      outside,
-      projection,
-    ); // exit curb
+    drawCurb(ctx, fixture.roadPath, apexRoadIndex - 16, apexRoadIndex + 8, -outside, projection); // inside apex curb
+    drawCurb(ctx, fixture.roadPath, apexRoadIndex + 8, apexRoadIndex + 30, outside, projection); // exit curb
 
-    if (phase !== "result") {
+    if (phase !== 'result') {
       drawDashedGuide(ctx, fixture.samples, projection);
     }
 
-    if (phase === "running") {
+    if (phase === 'running') {
       const driven = fixture.samples.filter((s) => s.t <= elapsedT);
-      drawRibbon(ctx, driven, "rgba(225, 6, 0, 0.75)", projection);
+      drawRibbon(ctx, driven, 'rgba(225, 6, 0, 0.75)', projection);
     }
 
-    if (phase === "result") {
+    if (phase === 'result') {
       drawResultOverlay(ctx, projection);
     }
 
     // idle/running: car follows the lap; result: car sits at the corner exit
     let carT = 0;
-    if (phase === "running") carT = elapsedT;
-    else if (phase === "result") carT = fixture.durationS;
+    if (phase === 'running') carT = elapsedT;
+    else if (phase === 'result') carT = fixture.durationS;
     const carState = sampleAt(fixture.samples, carT);
     const carHeading = headingAt(fixture.samples, carT);
-    drawF1Car(
-      ctx,
-      carState.x,
-      carState.y,
-      carHeading,
-      VERSTAPPEN_LIVERY,
-      CAR_SCALE,
-      projection,
-    );
+    drawF1Car(ctx, carState.x, carState.y, carHeading, VERSTAPPEN_LIVERY, CAR_SCALE, projection);
 
     drawScaleBar(ctx, projection, height);
-  }, [
-    fixture,
-    phase,
-    elapsedT,
-    projection,
-    width,
-    height,
-    apexRoadIndex,
-    drawResultOverlay,
-  ]);
+  }, [fixture, phase, elapsedT, projection, width, height, apexRoadIndex, drawResultOverlay]);
 
   return (
     <div ref={containerRef} className="relative h-full w-full">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
       <div className="sr-only">
-        Bovenaanzicht van de Tarzanbocht met zand, grind, gras en de raceauto
-        van Max Verstappen
+        Bovenaanzicht van de Tarzanbocht met zand, grind, gras en de raceauto van Max Verstappen
       </div>
     </div>
   );

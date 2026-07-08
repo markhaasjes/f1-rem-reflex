@@ -1,6 +1,6 @@
-import { useMemo } from "react";
-import { computeViewBox } from "../lib/geometry";
-import type { TarzanFixture } from "../types";
+import { useMemo } from 'react';
+import { computeViewBox } from '../lib/geometry';
+import type { TarzanFixture } from '../types';
 
 interface CircuitMiniMapProps {
   fixture: TarzanFixture;
@@ -13,10 +13,7 @@ const PADDING_M = 70;
 export function CircuitMiniMap({ fixture }: CircuitMiniMapProps) {
   const { outline, startFinish, corner } = fixture.map;
   const viewBox = useMemo(() => computeViewBox(outline, PADDING_M), [outline]);
-  const points = useMemo(
-    () => outline.map((p) => `${p.x},${p.y}`).join(" "),
-    [outline],
-  );
+  const points = useMemo(() => outline.map((p) => `${p.x},${p.y}`).join(' '), [outline]);
 
   return (
     <svg
@@ -42,18 +39,8 @@ export function CircuitMiniMap({ fixture }: CircuitMiniMapProps) {
         strokeLinejoin="round"
       />
 
-      <g
-        transform={`translate(${startFinish.x} ${startFinish.y}) rotate(${startFinish.headingDeg + 90})`}
-      >
-        <line
-          x1={-16}
-          y1={0}
-          x2={16}
-          y2={0}
-          stroke="white"
-          strokeWidth={7}
-          strokeLinecap="round"
-        />
+      <g transform={`translate(${startFinish.x} ${startFinish.y}) rotate(${startFinish.headingDeg + 90})`}>
+        <line x1={-16} y1={0} x2={16} y2={0} stroke="white" strokeWidth={7} strokeLinecap="round" />
         <line
           x1={-16}
           y1={0}
@@ -68,27 +55,11 @@ export function CircuitMiniMap({ fixture }: CircuitMiniMapProps) {
 
       <g transform={`translate(${corner.x} ${corner.y})`}>
         <circle r={30} fill="#2f6fed" opacity={0.5}>
-          <animate
-            attributeName="r"
-            values="30;50;30"
-            dur="2.2s"
-            repeatCount="indefinite"
-          />
-          <animate
-            attributeName="opacity"
-            values="0.5;0;0.5"
-            dur="2.2s"
-            repeatCount="indefinite"
-          />
+          <animate attributeName="r" values="30;50;30" dur="2.2s" repeatCount="indefinite" />
+          <animate attributeName="opacity" values="0.5;0;0.5" dur="2.2s" repeatCount="indefinite" />
         </circle>
         <circle r={30} fill="#2f6fed" stroke="white" strokeWidth={6} />
-        <text
-          textAnchor="middle"
-          dominantBaseline="central"
-          fontSize={32}
-          fontWeight={800}
-          fill="white"
-        >
+        <text textAnchor="middle" dominantBaseline="central" fontSize={32} fontWeight={800} fill="white">
           {fixture.meta.cornerNumber}
         </text>
         <text

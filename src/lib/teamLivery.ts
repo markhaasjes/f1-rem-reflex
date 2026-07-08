@@ -1,8 +1,8 @@
 export interface TeamLivery {
-  body: string
-  accent: string
-  highlight: string
-  cockpit: string
+  body: string;
+  accent: string;
+  highlight: string;
+  cockpit: string;
 }
 
 // Colors evoking the real 2025 Red Bull livery (not exact hex matches, no
@@ -12,4 +12,4 @@ export const VERSTAPPEN_LIVERY: TeamLivery = {
   accent: '#E10600',
   highlight: '#F2C744',
   cockpit: '#0A1230',
-}
+};
