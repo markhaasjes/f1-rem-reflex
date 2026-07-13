@@ -69,7 +69,7 @@ function App() {
     reset();
   };
 
-  const roundLabel = isScoring ? 'Scoreronde · dit telt' : `Oefenronde ${attempt} van ${PRACTICE_ROUNDS}`;
+  const roundLabel = isScoring ? 'Scoreronde · dit telt' : 'Oefenronde';
   const showVerdict = phase === 'result' && isScoring;
 
   let resultButtonLabel = 'Volgende oefenronde';

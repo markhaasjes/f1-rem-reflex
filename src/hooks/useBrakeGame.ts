@@ -2,10 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { sampleAt } from '../lib/corner';
 import type { BrakeAttempt, GamePhase, TarzanFixture } from '../types';
 
-// The player gets two blind practice laps to find the braking feel, then a
-// third lap that counts and reveals Max's real line.
-export const PRACTICE_ROUNDS = 2;
-export const TOTAL_ROUNDS = 3;
+// The player gets one blind practice lap to find the braking feel, then a
+// second lap that counts and reveals Max's real line.
+export const PRACTICE_ROUNDS = 1;
+export const TOTAL_ROUNDS = 2;
 
 export function useBrakeGame(corner: TarzanFixture) {
   const [phase, setPhase] = useState<GamePhase>('ready');
