@@ -223,17 +223,6 @@ export function drawCurb(
   ctx.setLineDash([]);
 }
 
-export function drawDashedGuide(ctx: CanvasRenderingContext2D, points: Point[], projection: ScreenProjection) {
-  const s = projection.scale;
-  tracePath(ctx, points, projection);
-  ctx.lineCap = 'round';
-  ctx.setLineDash([4 * s, 6 * s]);
-  ctx.lineWidth = 1.6 * s;
-  ctx.strokeStyle = 'rgba(120, 116, 105, 0.55)';
-  ctx.stroke();
-  ctx.setLineDash([]);
-}
-
 export function drawRibbon(
   ctx: CanvasRenderingContext2D,
   points: Point[],
@@ -251,7 +240,14 @@ export function drawRibbon(
   ctx.stroke();
 }
 
-export function drawPin(ctx: CanvasRenderingContext2D, screenX: number, screenY: number, color: string, label: string) {
+export function drawPin(
+  ctx: CanvasRenderingContext2D,
+  screenX: number,
+  screenY: number,
+  color: string,
+  label: string,
+  labelBelow = false,
+) {
   ctx.beginPath();
   ctx.arc(screenX, screenY, 6, 0, Math.PI * 2);
   ctx.fillStyle = color;
@@ -260,14 +256,17 @@ export function drawPin(ctx: CanvasRenderingContext2D, screenX: number, screenY:
   ctx.fill();
   ctx.stroke();
 
+  // Max's pins label above the dot, the player's below, so a well-timed mark
+  // (player pin landing on Max's) doesn't stack the two labels illegibly.
+  const labelY = labelBelow ? screenY + 20 : screenY - 12;
   ctx.font = "800 13px Effra, 'Helvetica Neue', Helvetica, Arial, sans-serif";
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
   ctx.lineWidth = 4;
   ctx.strokeStyle = PALETTE.white;
-  ctx.strokeText(label, screenX, screenY - 12);
+  ctx.strokeText(label, screenX, labelY);
   ctx.fillStyle = color;
-  ctx.fillText(label, screenX, screenY - 12);
+  ctx.fillText(label, screenX, labelY);
 }
 
 export function drawPhaseLabel(
