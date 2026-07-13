@@ -1,4 +1,4 @@
-import type { CornerSample } from '../types';
+import type { CornerPoint, CornerSample } from '../types';
 
 const SAMPLE_RATE_HZ = 20;
 
@@ -155,14 +155,12 @@ export function headingAt(samples: CornerSample[], t: number): number {
   return (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
 }
 
-// Instantaneous deceleration in km/h per second (positive = slowing down),
-// read straight from the recorded speed trace. Drives how hard the brake glow
-// and tyre smoke read in the scene.
-export function decelerationAt(samples: CornerSample[], t: number): number {
-  const delta = 0.1;
-  const maxT = samples.at(-1)!.t;
-  const before = sampleAt(samples, Math.max(t - delta, 0)).speedKph;
-  const after = sampleAt(samples, Math.min(t + delta, maxT)).speedKph;
-  const span = Math.min(t + delta, maxT) - Math.max(t - delta, 0) || delta;
-  return (before - after) / span;
+const GAS_THROTTLE_THRESHOLD = 95;
+
+// Where Max gets back to full throttle out of the corner - the player's second
+// target. Defined as the first sample past the apex where throttle is committed
+// (>= 95%), i.e. the start of the "vol gas" phase.
+export function computeGasPoint(samples: CornerSample[], apexT: number): CornerPoint {
+  const sample = samples.find((s) => s.t > apexT && s.throttle >= GAS_THROTTLE_THRESHOLD) ?? samples.at(-1)!;
+  return { t: sample.t, distanceM: sample.distanceM, speedKph: sample.speedKph };
 }
