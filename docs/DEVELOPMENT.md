@@ -220,13 +220,18 @@ sand + dunes (screen space) -> green corridor + striped infield -> paddock
 `sampleAt()` ([corner.ts](../src/lib/corner.ts)) linearly interpolates the
 20 Hz samples — it feeds _scoring_ (distance at the moment of a press) and
 must track recorded telemetry exactly. `positionAt()`/`headingAt()` feed
-_drawing_: OpenF1's GPS trace has stalls (x/y freezes while speed reads
-200+ km/h) that make a linearly-driven car freeze and its heading spin. The
-fix: build a jitter-filtered, Catmull-Rom-smoothed geometric path once per
-samples array (WeakMap-cached), integrate the speed channel into a travel
-curve rescaled to the path length, and walk the car by arc length. If a
-future fixture makes the car jitter or spin, it's GPS stalls again — look at
-`MIN_SEGMENT_M` before anything else.
+_drawing_: OpenF1's location channel only updates every ~15–40m of travel,
+and the pipeline's 20 Hz resample lerps between updates — so the raw trace
+is a chain of perfectly collinear fill points that renders as straight
+chords through corners (and stalls make a linearly-driven car freeze and
+its heading spin). The fix, once per samples array (WeakMap-cached): drop
+sub-`MIN_SEGMENT_M` jitter, collapse the collinear lerp-fill runs back to
+their real GPS endpoints, densify through those true vertices with
+centripetal Catmull-Rom, then integrate the speed channel into a travel
+curve rescaled to the path length and walk the car by arc length. If a
+future fixture draws straight-edged corners or a spinning car, it's this
+sparse-location problem again — start at `collapseCollinearRuns`, not at
+the renderer.
 
 ## Scoring
 
