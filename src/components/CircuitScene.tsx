@@ -158,16 +158,14 @@ export function CircuitScene(props: CircuitSceneProps) {
         for (const segment of roundSegments[roundIndex]) {
           drawRibbon(ctx, segment.points, PHASE_COLOR[segment.phase], projection);
         }
-        // Pins sit on the same track-projected path as the drawn line -
-        // raw sample positions can drift off the rendered asphalt.
         for (const event of round.events) {
-          const p = positionAt(samples, event.t);
-          const [x, y] = projection.toScreen(p.x, p.y);
+          const s = sampleAt(samples, event.t);
+          const [x, y] = projection.toScreen(s.x, s.y);
           drawPin(ctx, x, y, '#0b7a43', event.type === 'brake' ? 'Max rem' : 'Max gas');
         }
         for (const mark of marks) {
-          const p = positionAt(samples, mark.t);
-          const [x, y] = projection.toScreen(p.x, p.y);
+          const s = sampleAt(samples, mark.t);
+          const [x, y] = projection.toScreen(s.x, s.y);
           drawPin(ctx, x, y, '#1a2c8f', mark.type === 'brake' ? 'Jij rem' : 'Jij gas', true);
         }
       }

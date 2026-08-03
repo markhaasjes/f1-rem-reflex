@@ -53,88 +53,14 @@ const MODEL_CACHE = new WeakMap<LapSample[], PathModel>();
 // them so they don't leave a kink the heading tangent would trip over.
 const MIN_SEGMENT_M = 0.4;
 
-// OpenF1's location channel only updates every ~15-40m of travel; the
-// pipeline's 20 Hz resample lerps between those updates, so the trace is a
-// chain of PERFECTLY collinear fill points between sparse real GPS vertices.
-// Interior points closer than this to the chord through a run's endpoints
-// are lerp fill, not data (real driving never holds a centimeter-straight
-// line) - collapse each run to its endpoints to recover Max's true vertices.
-const COLLINEAR_DEV_M = 0.06;
-
-function collapseCollinearRuns(pts: Point[]): Point[] {
-  const devFromChord = (a: Point, b: Point, p: Point) => {
-    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-    return Math.abs((b.y - a.y) * (p.x - a.x) - (b.x - a.x) * (p.y - a.y)) / len;
-  };
-  const result: Point[] = [pts[0]];
-  let i = 0;
-  while (i < pts.length - 1) {
-    let j = i + 2;
-    while (j < pts.length) {
-      let allOnChord = true;
-      for (let k = i + 1; k < j; k++) {
-        if (devFromChord(pts[i], pts[j], pts[k]) >= COLLINEAR_DEV_M) {
-          allOnChord = false;
-          break;
-        }
-      }
-      if (!allOnChord) break;
-      j++;
-    }
-    // pts[i]..pts[j-1] is the longest collinear run starting at i
-    result.push(pts[j - 1]);
-    i = j - 1;
-  }
-  return result;
-}
-
-// Centripetal Catmull-Rom (alpha 0.5) densification through the sparse real
-// vertices: restores the smooth curve the car actually drove between GPS
-// updates, without cusps or overshoot at uneven vertex spacing.
-function densifyCentripetal(pts: Point[], stepM: number): Point[] {
-  const knot = (a: Point, b: Point, prev: number) => prev + Math.sqrt(Math.hypot(b.x - a.x, b.y - a.y)) || prev + 1e-6;
-  const dense: Point[] = [pts[0]];
-  for (let i = 0; i < pts.length - 1; i++) {
-    const p0 = pts[Math.max(0, i - 1)];
-    const p1 = pts[i];
-    const p2 = pts[i + 1];
-    const p3 = pts[Math.min(pts.length - 1, i + 2)];
-    const t0 = 0;
-    const t1 = knot(p0, p1, t0);
-    const t2 = knot(p1, p2, t1);
-    const t3 = knot(p2, p3, t2);
-    const segLen = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-    const steps = Math.max(1, Math.ceil(segLen / stepM));
-    for (let s = 1; s <= steps; s++) {
-      const u = t1 + ((t2 - t1) * s) / steps;
-      const lerp = (a: Point, b: Point, ta: number, tb: number): Point => {
-        const w = tb - ta || 1e-9;
-        return {
-          x: ((tb - u) / w) * a.x + ((u - ta) / w) * b.x,
-          y: ((tb - u) / w) * a.y + ((u - ta) / w) * b.y,
-        };
-      };
-      const a1 = lerp(p0, p1, t0, t1);
-      const a2 = lerp(p1, p2, t1, t2);
-      const a3 = lerp(p2, p3, t2, t3);
-      const b1 = lerp(a1, a2, t0, t2);
-      const b2 = lerp(a2, a3, t1, t3);
-      dense.push(lerp(b1, b2, t1, t2));
-    }
-  }
-  return dense;
-}
-
 function buildModel(samples: LapSample[]): PathModel {
   const raw = samples.map((s) => ({ x: s.x, y: s.y }));
-  let pts = [raw[0]];
+  const pts = [raw[0]];
   for (let i = 1; i < raw.length - 1; i++) {
     const prev = pts.at(-1)!;
     if (Math.hypot(raw[i].x - prev.x, raw[i].y - prev.y) >= MIN_SEGMENT_M) pts.push(raw[i]);
   }
   pts.push(raw.at(-1)!);
-  // Real sparse vertices only, then a smooth curve back through them.
-  pts = densifyCentripetal(collapseCollinearRuns(pts), 2);
 
   const cumLen = [0];
   for (let i = 1; i < pts.length; i++) {
