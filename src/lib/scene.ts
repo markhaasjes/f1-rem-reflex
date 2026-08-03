@@ -10,19 +10,24 @@ const GRAVEL_FROM_M = ROAD_WIDTH_M / 2 + 3.5;
 const GRAVEL_TO_M = GRAVEL_FROM_M + 26;
 const GREEN_BAND_M = 110; // grass corridor around the track, F1 TV map style
 
+// Sampled from the aerial/broadcast photos in docs/corners: medium-gray
+// asphalt with a lighter worn line, paved beige-gray run-offs, khaki dune
+// sand with olive scrub, muted grass banks. Curbs are white + NOS red
+// (docs/colors.ts redNosRood) per design.
 export const PALETTE = {
-  sand: '#eddbb6',
-  sandLight: '#f5e9cf',
-  sandSpeckle: '#d9c193',
-  grass: '#55a55c',
-  grassStripe: '#4b9752',
-  gravel: '#dcc9a2',
-  gravelSpeckle: '#b9a173',
-  asphalt: '#2e3138',
-  asphaltLight: '#3a3e47',
-  paddock: '#c7c9cc',
+  sand: '#d8cdb2',
+  sandLight: '#e4dbc6',
+  sandSpeckle: '#b8ab8d',
+  scrub: '#a3a077',
+  grass: '#5f9558',
+  grassStripe: '#568a4f',
+  gravel: '#b5aea1',
+  gravelSpeckle: '#8f887b',
+  asphalt: '#53565c',
+  asphaltLight: '#5f6268',
+  paddock: '#aaa8a4',
   white: '#ffffff',
-  curbRed: '#d92b3a',
+  curbRed: '#e61e14', // redNosRood
 };
 
 // Deterministic PRNG so decorative speckles land in the same spots on every
@@ -182,6 +187,24 @@ export function drawSandBackground(ctx: CanvasRenderingContext2D, width: number,
     ctx.fillStyle = PALETTE.sandLight;
     ctx.fill();
   }
+
+  // olive dune scrub
+  for (let i = 0; i < 8; i++) {
+    ctx.beginPath();
+    ctx.ellipse(
+      rand() * width,
+      rand() * height,
+      (0.05 + rand() * 0.09) * width,
+      (0.04 + rand() * 0.06) * height,
+      rand() * Math.PI,
+      0,
+      Math.PI * 2,
+    );
+    ctx.fillStyle = PALETTE.scrub;
+    ctx.globalAlpha = 0.35 + rand() * 0.2;
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
 
   // speckle dashes
   ctx.fillStyle = PALETTE.sandSpeckle;
@@ -390,18 +413,29 @@ export function drawCurb(
   }
 }
 
-// Red/white curbs on both sides of a corner (inside apex + outside exit).
+export interface CurbExtent {
+  /** meters of inside curb before the apex */
+  backM: number;
+  /** meters of inside curb past the apex */
+  fwdInM: number;
+  /** meters of outside (exit) curb past the apex */
+  fwdOutM: number;
+}
+
+// Red/white curbs on both sides of a corner (inside apex + outside exit),
+// with per-corner extents tuned against the docs/corners photos.
 export function drawCornerCurbs(
   ctx: CanvasRenderingContext2D,
   outline: Point[],
   cornerIndex: number,
   projection: ScreenProjection,
+  extent: CurbExtent = { backM: 55, fwdInM: 33, fwdOutM: 55 },
 ) {
   const spacingM = 4218 / outline.length;
-  const reach = Math.round(55 / spacingM);
+  const toIdx = (m: number) => Math.round(m / spacingM);
   const outside = outsideSignAt(outline, cornerIndex);
-  drawCurb(ctx, outline, cornerIndex - reach, cornerIndex + Math.round(reach * 0.6), -outside, projection);
-  drawCurb(ctx, outline, cornerIndex, cornerIndex + reach, outside, projection);
+  drawCurb(ctx, outline, cornerIndex - toIdx(extent.backM), cornerIndex + toIdx(extent.fwdInM), -outside, projection);
+  drawCurb(ctx, outline, cornerIndex, cornerIndex + toIdx(extent.fwdOutM), outside, projection);
 }
 
 export function drawStartFinish(
@@ -445,26 +479,35 @@ export function drawRibbon(
 }
 
 // Corner-number badge in the NOS bochten-kaart style, fixed screen size.
+// `minor` badges (corners the game never visits) render small and muted so
+// the four playable corners carry the map.
 export function drawCornerBadge(
   ctx: CanvasRenderingContext2D,
   screenX: number,
   screenY: number,
   label: string,
-  opts: { highlight?: boolean; alpha?: number } = {},
+  opts: { highlight?: boolean; minor?: boolean; alpha?: number; compact?: boolean } = {},
 ) {
-  const { highlight = false, alpha = 1 } = opts;
+  const { highlight = false, minor = false, alpha = 1, compact = false } = opts;
   if (alpha <= 0.01) return;
-  const r = highlight ? 13 : 10;
+  const scale = compact ? 0.8 : 1;
+  let r = 11;
+  if (highlight) r = 14;
+  else if (minor) r = 7;
+  r *= scale;
   ctx.save();
-  ctx.globalAlpha = alpha;
+  ctx.globalAlpha = minor ? alpha * 0.55 : alpha;
   ctx.beginPath();
   ctx.arc(screenX, screenY, r, 0, Math.PI * 2);
-  ctx.fillStyle = highlight ? '#e10600' : '#2f6fed';
+  ctx.fillStyle = highlight ? '#e61e14' : '#2f6fed';
   ctx.strokeStyle = PALETTE.white;
-  ctx.lineWidth = 2.5;
+  ctx.lineWidth = minor ? 1.5 : 2.5;
   ctx.fill();
   ctx.stroke();
-  ctx.font = `800 ${highlight ? 14 : 11}px Effra, 'Helvetica Neue', Helvetica, Arial, sans-serif`;
+  let fontPx = 12;
+  if (highlight) fontPx = 15;
+  else if (minor) fontPx = 9;
+  ctx.font = `800 ${Math.round(fontPx * scale)}px Effra, 'Helvetica Neue', Helvetica, Arial, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = PALETTE.white;
@@ -479,11 +522,12 @@ export function drawMapLabel(
   screenY: number,
   label: string,
   alpha = 1,
+  fontPx = 13,
 ) {
   if (alpha <= 0.01) return;
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.font = "800 13px Effra, 'Helvetica Neue', Helvetica, Arial, sans-serif";
+  ctx.font = `800 ${fontPx}px Effra, 'Helvetica Neue', Helvetica, Arial, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
   ctx.lineWidth = 4;

@@ -57,6 +57,30 @@ const GRAVEL_TRAPS: Record<number, { backM: number; fwdM: number }> = {
   14: { backM: 45, fwdM: 60 }, // Arie Luyendijk banking entry
 };
 
+// Curb extents per corner number (meters before/after apex for the inside
+// curb and past the apex for the outside exit curb), positioned against the
+// aerial photos in docs/corners: long wrap-around curbs at the hairpins
+// (Tarzan, Hugenholtz, the Bocht 10 loop, Kumho) and curbs along both edges
+// through the Hans Ernst chicane.
+const CURB_TUNING: Record<number, { backM: number; fwdInM: number; fwdOutM: number }> = {
+  1: { backM: 75, fwdInM: 55, fwdOutM: 75 },
+  3: { backM: 70, fwdInM: 50, fwdOutM: 70 },
+  10: { backM: 65, fwdInM: 45, fwdOutM: 65 },
+  11: { backM: 55, fwdInM: 60, fwdOutM: 65 },
+  12: { backM: 55, fwdInM: 60, fwdOutM: 65 },
+  13: { backM: 55, fwdInM: 40, fwdOutM: 60 },
+};
+
+// Screen-space offsets for the round name labels, so they clear each other on
+// small (portrait) canvases - Gerlach & Hugenholtz and Hans Ernst sit close
+// together on the map.
+const LABEL_OFFSETS: Record<string, { dx: number; dy: number }> = {
+  tarzan: { dx: 0, dy: 26 },
+  hugenholtz: { dx: -6, dy: -20 },
+  'bocht9-10': { dx: 10, dy: 28 },
+  hansernst: { dx: 4, dy: 30 },
+};
+
 const PHASE_COLOR: Record<DrivingPhase, string> = {
   flat: '#12a37f',
   coast: '#f2a11c',
@@ -82,6 +106,8 @@ export function CircuitScene(props: CircuitSceneProps) {
   // corner slices for curbs/gravel then never wrap the array boundary.
   const outline = useMemo(() => rotateOutline(fixture.trackOutline, fixture.startFinish), [fixture]);
   const cornerIndices = useMemo(() => fixture.corners.map((c) => nearestIndex(outline, c)), [fixture, outline]);
+  // Corners the game visits get prominent badges; the rest render minor.
+  const roundCornerNumbers = useMemo(() => new Set(fixture.rounds.flatMap((r) => r.cornerNumbers)), [fixture]);
 
   // Pre-split the whole lap into phase segments once; per round we clip by t.
   const roundSegments = useMemo(
@@ -118,7 +144,9 @@ export function CircuitScene(props: CircuitSceneProps) {
         if (trap) drawGravelTrap(ctx, outline, cornerIndices[i], projection, trap);
       }
       drawTrackRibbon(ctx, outline, projection);
-      for (const index of cornerIndices) drawCornerCurbs(ctx, outline, index, projection);
+      for (let i = 0; i < cornerIndices.length; i++) {
+        drawCornerCurbs(ctx, outline, cornerIndices[i], projection, CURB_TUNING[fixture.corners[i].number]);
+      }
       drawStartFinish(ctx, fixture.startFinish.x, fixture.startFinish.y, fixture.startFinish.headingDeg, projection);
 
       // --- run/result overlays ---
@@ -164,6 +192,7 @@ export function CircuitScene(props: CircuitSceneProps) {
       });
 
       // --- map chrome: corner badges + labels, fading out as we zoom in ---
+      const compact = w < 520;
       const badgeAlpha = Math.max(0, Math.min(1, (0.85 - projection.scale) / 0.35));
       if (badgeAlpha > 0) {
         // Anchor on the last corner number: for combined rounds that is the
@@ -173,14 +202,19 @@ export function CircuitScene(props: CircuitSceneProps) {
         fixture.corners.forEach((corner) => {
           const [x, y] = projection.toScreen(corner.x, corner.y);
           const isPulse = corner.number === pulseCornerNumber;
-          drawCornerBadge(ctx, x, y, String(corner.number), { highlight: isPulse, alpha: badgeAlpha });
+          drawCornerBadge(ctx, x, y, String(corner.number), {
+            highlight: isPulse,
+            minor: !roundCornerNumbers.has(corner.number),
+            alpha: badgeAlpha,
+            compact,
+          });
           if (isPulse) {
             const pulse = (now % 1600) / 1600;
             ctx.save();
             ctx.globalAlpha = badgeAlpha * (1 - pulse);
             ctx.beginPath();
             ctx.arc(x, y, 13 + pulse * 22, 0, Math.PI * 2);
-            ctx.strokeStyle = '#e10600';
+            ctx.strokeStyle = '#e61e14';
             ctx.lineWidth = 3;
             ctx.stroke();
             ctx.restore();
@@ -191,7 +225,8 @@ export function CircuitScene(props: CircuitSceneProps) {
           const corner = fixture.corners.find((c) => c.number === r.cornerNumbers.at(-1));
           if (!corner) return;
           const [x, y] = projection.toScreen(corner.x, corner.y);
-          drawMapLabel(ctx, x, y + 30, r.label, badgeAlpha);
+          const offset = LABEL_OFFSETS[r.id] ?? { dx: 0, dy: 28 };
+          drawMapLabel(ctx, x + offset.dx, y + offset.dy, r.label, badgeAlpha, compact ? 11 : 13);
         });
       }
 
@@ -200,7 +235,7 @@ export function CircuitScene(props: CircuitSceneProps) {
 
     raf = requestAnimationFrame(render);
     return () => cancelAnimationFrame(raf);
-  }, [fixture, outline, cornerIndices, roundSegments]);
+  }, [fixture, outline, cornerIndices, roundSegments, roundCornerNumbers]);
 
   return (
     <div ref={containerRef} className="relative h-full w-full">

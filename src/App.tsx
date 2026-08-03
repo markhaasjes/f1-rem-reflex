@@ -258,15 +258,27 @@ function App() {
               )}
             </div>
 
-            {/* intro copy */}
+            {/* intro modal */}
             <div
-              className={`absolute inset-x-3 bottom-3 mx-auto flex max-w-lg items-center gap-4 rounded-2xl bg-[#dbe7fb] p-3 text-left shadow-lg transition-all duration-500 sm:gap-6 sm:p-4 ${phase === 'intro' && !hideIntroChrome ? 'opacity-100 translate-y-0' : 'pointer-events-none opacity-0 translate-y-2'}`}
+              className={`absolute inset-0 grid place-items-center bg-ink/70 p-4 backdrop-blur-[3px] transition-all duration-500 ${phase === 'intro' && !hideIntroChrome ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
             >
-              <HeroCar className="h-6 w-auto shrink-0 sm:h-9" />
-              <p className="text-sm font-bold leading-snug text-ink sm:text-base">
-                Rem jij net zo laat als <span className="text-[#E10600]">Max Verstappen</span>? Rijd zijn echte
-                poleronde: eerst oefenen in de Tarzanbocht, daarna drie bochten voor de punten.
-              </p>
+              <div className="w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:p-7">
+                <HeroCar className="mx-auto h-9 w-auto sm:h-11" />
+                <h1 className="mt-4 text-xl font-extrabold leading-tight sm:text-2xl">
+                  Rem jij net zo laat als <span className="text-[#e61e14]">Max Verstappen</span>?
+                </h1>
+                <p className="mt-2 text-sm font-bold leading-snug text-ink/70 sm:text-base">
+                  Rijd zijn echte poleronde over Zandvoort. Eerst oefenen in de Tarzanbocht, daarna drie bochten voor de
+                  punten: rem en geef weer gas op precies het juiste moment.
+                </p>
+                <button
+                  type="button"
+                  onClick={startGame}
+                  className="mt-5 w-full select-none touch-manipulation rounded-full bg-[#e61e14] px-6 py-4 text-lg font-extrabold text-white shadow-lg transition hover:scale-[1.02] active:scale-95"
+                >
+                  Naar de Tarzanbocht
+                </button>
+              </div>
             </div>
 
             {/* final score card */}
@@ -331,17 +343,25 @@ function App() {
 
           {/* info row */}
           <div className="grid min-h-14 place-items-center py-1 text-center sm:min-h-16">
-            <p className={layerClass(phase === 'intro' && !hideIntroChrome, 'text-sm text-white/85 sm:text-lg')}>
-              Rem en geef weer gas op het juiste moment, bocht voor bocht - net als Max. Klaar?
-            </p>
             <p className={layerClass(phase === 'flying', 'text-sm font-extrabold text-white/85 sm:text-lg')}>
               Onderweg naar de {round.label}...
             </p>
-            <p className={layerClass(phase === 'ready', 'text-sm text-white/85 sm:text-lg')}>
-              {round.events.length / 2 === 1
-                ? 'Eén rempunt en één gaspunt. Let op de bocht!'
-                : `${round.events.length / 2} rempunten en ${round.events.length / 2} gaspunten in deze combinatie!`}
-            </p>
+            <div className={layerClass(phase === 'ready', 'flex flex-col items-center gap-1.5')}>
+              <div className="flex items-center gap-2 rounded-full bg-white px-4 py-1.5 shadow-lg">
+                <span className="rounded-full bg-[#e61e14] px-3 py-0.5 text-sm font-extrabold text-white sm:text-base">
+                  {round.events.length / 2}&times; REM
+                </span>
+                <span className="font-extrabold text-ink/40">&middot;</span>
+                <span className="rounded-full bg-emerald-500 px-3 py-0.5 text-sm font-extrabold text-white sm:text-base">
+                  {round.events.length / 2}&times; GAS
+                </span>
+              </div>
+              <p className="text-sm font-bold text-white/85 sm:text-base">
+                {round.events.length / 2 === 1
+                  ? 'Let op de bocht en druk op het juiste moment!'
+                  : 'Een dubbele: let goed op waar Max remt en weer gas geeft!'}
+              </p>
+            </div>
             <p className={layerClass(phase === 'running', 'text-base font-extrabold sm:text-xl')}>{runningHint}</p>
             <div className={layerClass(showRoundResult, 'flex flex-wrap items-center justify-center gap-2 sm:gap-3')}>
               {lastResult?.eventResults.map((er) => (
@@ -357,16 +377,6 @@ function App() {
 
           {/* action row */}
           <div className="grid h-20 place-items-center sm:h-24">
-            <button
-              type="button"
-              onClick={startGame}
-              className={layerClass(
-                phase === 'intro' && !hideIntroChrome,
-                'w-full max-w-sm select-none touch-manipulation rounded-full bg-white px-8 py-4 text-lg font-extrabold text-ink shadow-lg transition hover:scale-[1.02] active:scale-95 sm:text-xl',
-              )}
-            >
-              Naar de Tarzanbocht
-            </button>
             <button
               type="button"
               onClick={game.startRun}

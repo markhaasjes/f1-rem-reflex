@@ -203,6 +203,14 @@ sand + dunes (screen space) -> green corridor + striped infield -> paddock
   the curb wherever the bend is tighter than the offset reaches instead of
   bridging a line across the apex. Gravel is a wide butt-capped stroke of an
   offset centerline (a filled near/far polygon self-intersects on hairpins).
+- **Palette + curb realism come from photos**: `PALETTE` in scene.ts is
+  sampled from the aerial/broadcast screenshots in `docs/corners` (medium-gray
+  asphalt, paved beige-gray run-offs, khaki dunes with olive scrub, muted
+  grass); curbs are white + `redNosRood` from `docs/colors.ts`, with
+  per-corner extents in `CURB_TUNING` (CircuitScene) positioned against those
+  photos. Corner badges split into prominent (playable corners) and `minor`
+  (everything else); round-label screen offsets live in `LABEL_OFFSETS` so
+  they clear each other on narrow portrait canvases.
 - **Visual QA per corner**: `?corner=N` starts the camera zoomed on corner N
   with the intro chrome hidden — used by the Playwright corner-snapshot sweep
   when comparing against the official F1 TV map.
