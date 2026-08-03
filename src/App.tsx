@@ -183,8 +183,8 @@ function App() {
               <div className="relative min-h-0 flex-1 p-2">
                 <CircuitMiniMap fixture={fixture} />
               </div>
-              <div className="mx-3 mb-3 flex items-center gap-3 rounded-2xl bg-[#dbe7fb] p-3 sm:mx-6 sm:mb-5 sm:gap-5 sm:p-4">
-                <HeroCar className="h-14 w-auto shrink-0 sm:h-20" />
+              <div className="mx-3 mb-3 flex items-center gap-6 rounded-2xl bg-[#dbe7fb] p-3 sm:mx-6 sm:mb-5 sm:gap-10 sm:p-4">
+                <HeroCar className="h-5 w-auto shrink-0 sm:h-10" />
                 <p className="text-sm font-bold leading-snug text-ink sm:text-lg">
                   Rem jij net zo laat als <span className="text-[#E10600]">Max Verstappen</span>? Dit is zijn echte
                   poleronde door de Tarzanbocht.
