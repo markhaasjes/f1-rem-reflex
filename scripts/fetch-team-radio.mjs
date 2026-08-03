@@ -26,7 +26,15 @@ const SESSIONS = [
   { sessionKey: 9920, name: 'race' },
 ];
 
-/** Which downloaded clip becomes public/audio/radio-positive.mp3. */
+/**
+ * Direct URL for the positive clip. When set, this is downloaded straight to
+ * public/audio/radio-positive.mp3 and POSITIVE_CLIP below is ignored.
+ * Currently: Verstappen's radio from the 2026 Hungarian GP race.
+ */
+const POSITIVE_CLIP_URL =
+  'https://livetiming.formula1.com/static/2026/2026-07-26_Hungarian_Grand_Prix/2026-07-26_Race/TeamRadio/VER_3_20260726_164505.mp3';
+
+/** Fallback: which downloaded weekend clip becomes radio-positive.mp3. */
 const POSITIVE_CLIP = { sessionKey: 9920, index: 0 };
 
 const AUDIO_DIR = new URL('../public/audio/', import.meta.url);
@@ -64,7 +72,15 @@ async function main() {
     }
   }
 
-  if (positivePath) {
+  if (POSITIVE_CLIP_URL) {
+    const res = await fetch(POSITIVE_CLIP_URL);
+    if (!res.ok) throw new Error(`${POSITIVE_CLIP_URL} -> HTTP ${res.status}`);
+    const bytes = Buffer.from(await res.arrayBuffer());
+    await writeFile(new URL('radio-positive.mp3', AUDIO_DIR), bytes);
+    console.log(
+      `\npositive clip (direct URL) -> public/audio/radio-positive.mp3 (${(bytes.length / 1024).toFixed(0)} KB)`,
+    );
+  } else if (positivePath) {
     await copyFile(positivePath, new URL('radio-positive.mp3', AUDIO_DIR));
     console.log(`\npositive clip -> public/audio/radio-positive.mp3`);
   } else {
