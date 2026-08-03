@@ -53,16 +53,15 @@ const MODEL_CACHE = new WeakMap<LapSample[], PathModel>();
 // them so they don't leave a kink the heading tangent would trip over.
 const MIN_SEGMENT_M = 0.4;
 
-// The GPS trace can drift laterally from the fitted track geometry (the
-// similarity fit averages ~7m error, locally worse), which lets the drawn
-// line cut visibly across a rendered corner. Keep the car within the asphalt.
-const MAX_LATERAL_M = 4.5;
-
-// Pulls each path point toward the track centerline whenever it sits further
-// off it than the road allows. The projection walks the closed outline
-// monotonically (bounded look-ahead window) so nearby parallel track
-// sections - the chicane legs, the pit straight - can never capture a point.
-function clampToTrack(pts: Point[], outline: Point[]): Point[] {
+// The GPS trace drifts laterally from the fitted track geometry (the
+// similarity fit averages ~7m error, locally 10m+), so its lateral position
+// is not trustworthy: kept raw it cuts across corners, clamped it glues to
+// one track edge. Project the path fully onto the track centerline instead -
+// the phase colors and pins carry the story; the line itself follows the
+// road. The projection walks the closed outline monotonically (bounded
+// look-ahead window) so nearby parallel track sections - the chicane legs,
+// the pit straight - can never capture a point.
+function projectToTrack(pts: Point[], outline: Point[]): Point[] {
   const n = outline.length;
   let gi = 0;
   let best = Infinity;
@@ -73,6 +72,14 @@ function clampToTrack(pts: Point[], outline: Point[]): Point[] {
       gi = i;
     }
   }
+
+  const footOnSegment = (p: Point, a: Point, b: Point): Point => {
+    const abx = b.x - a.x;
+    const aby = b.y - a.y;
+    const len2 = abx * abx + aby * aby || 1;
+    const t = Math.max(0, Math.min(1, ((p.x - a.x) * abx + (p.y - a.y) * aby) / len2));
+    return { x: a.x + abx * t, y: a.y + aby * t };
+  };
 
   return pts.map((p) => {
     let bestJ = gi;
@@ -86,10 +93,12 @@ function clampToTrack(pts: Point[], outline: Point[]): Point[] {
       }
     }
     gi = bestJ;
-    if (bestD <= MAX_LATERAL_M) return p;
-    const base = outline[bestJ];
-    const k = MAX_LATERAL_M / bestD;
-    return { x: base.x + (p.x - base.x) * k, y: base.y + (p.y - base.y) * k };
+    // exact foot point on the better of the two segments around the vertex
+    const prev = outline[(bestJ - 1 + n) % n];
+    const next = outline[(bestJ + 1) % n];
+    const f1 = footOnSegment(p, prev, outline[bestJ]);
+    const f2 = footOnSegment(p, outline[bestJ], next);
+    return Math.hypot(f1.x - p.x, f1.y - p.y) <= Math.hypot(f2.x - p.x, f2.y - p.y) ? f1 : f2;
   });
 }
 
@@ -101,7 +110,15 @@ function buildModel(samples: LapSample[], trackOutline?: Point[]): PathModel {
     if (Math.hypot(raw[i].x - prev.x, raw[i].y - prev.y) >= MIN_SEGMENT_M) pts.push(raw[i]);
   }
   pts.push(raw.at(-1)!);
-  if (trackOutline) pts = clampToTrack(pts, trackOutline);
+  if (trackOutline) {
+    const projected = projectToTrack(pts, trackOutline);
+    // re-dedupe: laterally-moving raw points can collapse onto the same spot
+    pts = [projected[0]];
+    for (let i = 1; i < projected.length; i++) {
+      const prev = pts.at(-1)!;
+      if (Math.hypot(projected[i].x - prev.x, projected[i].y - prev.y) >= MIN_SEGMENT_M) pts.push(projected[i]);
+    }
+  }
 
   const cumLen = [0];
   for (let i = 1; i < pts.length; i++) {
