@@ -65,9 +65,9 @@ Separate from the state machine: when the URL carries `?s=<total>&r=<r0.r1.r2.r3
 
 Things worth knowing before changing the flow:
 
-- **The four rounds all count.** The Tarzanbocht round is _labeled_ practice
-  (`practice: true` controls labels/styling only) but its score is included
-  in the total, by design — one attempt per corner, everything counts.
+- **Practice does not count.** The Tarzanbocht round (`practice: true`) is
+  played and scored like any other and shown on the final card, but
+  `totalScore` excludes practice rounds from the overall 0-100.
 - **Two pedals.** REM! and GAS! are separate buttons (keyboard: R and G;
   Space presses whichever pedal Max needs next). Each press is typed by its
   pedal; scoring pairs the k-th brake press with Max's k-th brake event and
@@ -235,6 +235,20 @@ future fixture makes the car jitter or spin, it's GPS stalls again — look at
 
 Marks pair to events strictly by order (press #i answers event #i). If you
 ever allow more presses than events, revisit that pairing.
+
+## Team radio on the score screen
+
+`scripts/fetch-team-radio.mjs` downloads Max's onboard radio clips for the
+2025 Dutch GP weekend from OpenF1's `team_radio` endpoint into
+`public/audio/team-radio/` and copies the configured positive clip (default:
+the race clip at 14:26 UTC — the post-victory radio of his home win) to
+`public/audio/radio-positive.mp3`. On the score reveal, App plays
+`radio-positive.mp3` when the total is >= `RADIO_POSITIVE_THRESHOLD` (60)
+and `radio-negative.mp3` otherwise. The negative clip is not fetched by the
+script — drop a file at `public/audio/radio-negative.mp3` when one is found;
+until then a weak score simply stays silent (playback errors are swallowed).
+The audio starts inside the click handler that finishes the game, so
+browser autoplay policies count it as user-initiated.
 
 ## Share flow
 

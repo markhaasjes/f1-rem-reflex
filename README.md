@@ -14,11 +14,12 @@ production code.
 
 1. **Overview**: the full circuit, oriented like Google Maps, drawn in the
    F1 TV map style (green surroundings, dark asphalt, corner badges).
-2. **Tarzanbocht** — practice corner (still counts): one brake, one gas.
+2. **Tarzanbocht** — practice corner (does not count): one brake, one gas.
 3. **Gerlach & Hugenholtz** — a double: brake, gas, brake, gas.
 4. **Bocht 9 & 10** — the slow double after Mastersbocht.
 5. **Hans Ernstbocht** — the chicane, one deep braking zone.
-6. **Eindscore** — 0–100 across all brake/gas moments, with a share link
+6. **Eindscore** — 0–100 across the three scoring corners, revealed with
+   Max's real team radio (positive clip for a good score), plus a share link
    that renders the same score card for whoever opens it.
 
 Between rounds the camera zooms back to the overview and flies to the next
@@ -61,6 +62,7 @@ updating the `DRIVER` lap reference in the script and re-running it.
 
 ```
 scripts/build-game-fixture.mjs   data pipeline: OpenF1 + official geometry -> the fixture
+scripts/fetch-team-radio.mjs     downloads Max's team-radio mp3s for the score screen
 src/data/zandvoort2025.json      the one fixture: circuit, full lap, rounds + target events
 src/lib/canvas.ts                projection math + devicePixelRatio-aware canvas setup
 src/lib/scene.ts                 illustrated scene: sand, green corridor, paddock, track, curbs, gravel, badges

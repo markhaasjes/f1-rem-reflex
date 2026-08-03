@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pill } from './components/Brand';
 import { CircuitScene } from './components/CircuitScene';
 import { HeroCar } from './components/HeroCar';
@@ -21,6 +21,13 @@ const TONE_STYLES = {
 
 const OVERVIEW_PAD_M = 90;
 const ROUND_PAD_M = 55;
+
+// Max's real team radio, played once on the final score screen (fetched by
+// scripts/fetch-team-radio.mjs). The negative clip is optional: until a file
+// exists at that path the weak-score result simply stays silent.
+const RADIO_POSITIVE_SRC = '/audio/radio-positive.mp3';
+const RADIO_NEGATIVE_SRC = '/audio/radio-negative.mp3';
+const RADIO_POSITIVE_THRESHOLD = 60;
 
 // A player mark phrased against Max's matching point. Positive delta = the
 // player was later than Max. Dutch decimal comma.
@@ -109,17 +116,31 @@ function App() {
     camera.fly([{ box: overviewBox, ms: 1200 }, { ms: 300 }, { box: roundBoxes[next], ms: 1500 }], game.arm);
   }, [game, camera, roundIndex, overviewBox, roundBoxes]);
 
+  // Max's real radio on the score reveal. Launched from the same click that
+  // finishes the game, so autoplay policies treat it as user-initiated; a
+  // missing file (negative clip pending) or blocked playback just stays quiet.
+  const radioRef = useRef<HTMLAudioElement | null>(null);
+  const stopRadio = useCallback(() => {
+    radioRef.current?.pause();
+    radioRef.current = null;
+  }, []);
+
   const showFinal = useCallback(() => {
     game.finish();
     camera.fly([{ box: overviewBox, ms: 1400 }]);
+    const score = totalScore(game.results);
+    const audio = new Audio(score >= RADIO_POSITIVE_THRESHOLD ? RADIO_POSITIVE_SRC : RADIO_NEGATIVE_SRC);
+    radioRef.current = audio;
+    audio.play().catch(() => {});
   }, [game, camera, overviewBox]);
 
   const restart = useCallback(() => {
+    stopRadio();
     setShowShared(false);
     history.replaceState(null, '', location.pathname);
     game.restart();
     camera.fly([{ box: overviewBox, ms: 900 }]);
-  }, [game, camera, overviewBox]);
+  }, [game, camera, overviewBox, stopRadio]);
 
   // Space advances the flow; while running it presses the pedal Max needs
   // next. R and G hit a specific pedal (like the on-screen buttons).
@@ -261,7 +282,7 @@ function App() {
                   {results.map((r) => (
                     <li key={r.round.id} className="flex justify-between gap-3">
                       <span className={r.round.practice ? 'text-ink/50' : ''}>
-                        {r.round.practice ? `${r.round.label} (oefening)` : r.round.label}
+                        {r.round.practice ? `${r.round.label} (oefening, telt niet mee)` : r.round.label}
                       </span>
                       <span className="tabular-nums">{r.score}/100</span>
                     </li>

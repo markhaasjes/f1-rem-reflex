@@ -146,9 +146,11 @@ export function scoreRound(round: GameRound, marks: PlayerMark[]): RoundResult {
   return { round, eventResults, score };
 }
 
-/** Overall 0-100: every event across every round weighs equally. */
+/** Overall 0-100 across the scoring rounds only - practice rounds (the
+ * Tarzan warm-up) are shown on the card but do not count. Every event in the
+ * counted rounds weighs equally. */
 export function totalScore(results: RoundResult[]): number {
-  const events = results.flatMap((r) => r.eventResults);
+  const events = results.filter((r) => !r.round.practice).flatMap((r) => r.eventResults);
   if (events.length === 0) return 0;
   return Math.round(events.reduce((sum, r) => sum + r.score, 0) / events.length);
 }
