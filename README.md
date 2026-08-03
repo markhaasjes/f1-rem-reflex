@@ -75,6 +75,14 @@ src/components/Brand.tsx         shared pill/badge chrome
 src/App.tsx                      layout shell, phase transitions, copy
 ```
 
+## Development notes
+
+[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) covers the internals for anyone
+extending the game: the fixture data shape, why the car uses two different
+position models, the round/state machine, the canvas rendering pipeline,
+scoring thresholds, and a checklist for swapping in new SVG hero art or
+regenerating the share image.
+
 ## Known limitations (POC scope)
 
 - One corner, one driver, by design.
