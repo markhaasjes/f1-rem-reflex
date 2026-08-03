@@ -1,0 +1,213 @@
+import { useEffect, useMemo, useRef } from 'react';
+import { useElementSize } from '../hooks/useElementSize';
+import { viewBoxFromCam, type CamBox } from '../hooks/useCameraFlight';
+import { fitProjection, prepareCanvas } from '../lib/canvas';
+import { drawF1Car } from '../lib/canvasCar';
+import { headingAt, positionAt, sampleAt, smoothPathPoints } from '../lib/corner';
+import { buildPhaseSegments, type DrivingPhase } from '../lib/phases';
+import {
+  drawCornerBadge,
+  drawCornerCurbs,
+  drawGravelTrap,
+  drawGreenSurroundings,
+  drawMapLabel,
+  drawPaddock,
+  drawPin,
+  drawRibbon,
+  drawSandBackground,
+  drawScaleBar,
+  drawStartFinish,
+  drawTrackRibbon,
+  nearestIndex,
+  rotateOutline,
+} from '../lib/scene';
+import { VERSTAPPEN_LIVERY } from '../lib/teamLivery';
+import type { GamePhase, GameRound, PlayerMark, ZandvoortFixture } from '../types';
+
+interface CircuitSceneProps {
+  fixture: ZandvoortFixture;
+  camBox: CamBox;
+  phase: GamePhase;
+  round: GameRound;
+  roundIndex: number;
+  elapsedT: number;
+  marks: PlayerMark[];
+  /** Reveal Max's line, phase colors and brake/gas pins (round result). */
+  showReference: boolean;
+}
+
+const CAR_SCALE = 13 / 22;
+const CAR_MIN_LENGTH_PX = 15; // keep the car spottable at overview zoom
+const CAR_ART_LENGTH_UNITS = 37;
+
+// Gravel traps per corner number, sized to match the real run-off areas as
+// drawn on the official F1 TV circuit map (backM/fwdM = meters of trap
+// before/after the apex along the track; side is picked automatically from
+// the corner's curvature). Corners without an entry are bordered by grass.
+const GRAVEL_TRAPS: Record<number, { backM: number; fwdM: number }> = {
+  1: { backM: 95, fwdM: 85 }, // Tarzan: the big one at the end of the straight
+  2: { backM: 35, fwdM: 45 }, // Gerlach
+  3: { backM: 40, fwdM: 60 }, // Hugenholtz, outside of the banked hairpin
+  7: { backM: 85, fwdM: 95 }, // Scheivlak: long strip through the dunes
+  8: { backM: 70, fwdM: 90 }, // Mastersbocht
+  9: { backM: 45, fwdM: 55 },
+  10: { backM: 70, fwdM: 90 }, // the loop at the east end
+  11: { backM: 45, fwdM: 70 }, // Hans Ernst chicane, outside
+  13: { backM: 60, fwdM: 85 }, // Kumhobocht
+  14: { backM: 45, fwdM: 60 }, // Arie Luyendijk banking entry
+};
+
+const PHASE_COLOR: Record<DrivingPhase, string> = {
+  flat: '#12a37f',
+  coast: '#f2a11c',
+  brake: '#e10600',
+};
+
+// The scene renders on its own requestAnimationFrame loop, reading the
+// latest props from a ref: the camera, the run clock and the badge pulse all
+// animate every frame anyway, and this keeps React out of the hot path.
+export function CircuitScene(props: CircuitSceneProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { width, height } = useElementSize(containerRef);
+
+  const propsRef = useRef(props);
+  propsRef.current = props;
+  const sizeRef = useRef({ width, height });
+  sizeRef.current = { width, height };
+
+  const { fixture } = props;
+
+  // Rotate the closed outline so index 0 sits at start/finish (on a straight):
+  // corner slices for curbs/gravel then never wrap the array boundary.
+  const outline = useMemo(() => rotateOutline(fixture.trackOutline, fixture.startFinish), [fixture]);
+  const cornerIndices = useMemo(() => fixture.corners.map((c) => nearestIndex(outline, c)), [fixture, outline]);
+
+  // Pre-split the whole lap into phase segments once; per round we clip by t.
+  const roundSegments = useMemo(
+    () =>
+      fixture.rounds.map((round) =>
+        buildPhaseSegments(fixture.lap.samples, round.tStart, round.tEnd).filter(
+          (segment) => segment.points.length >= 2,
+        ),
+      ),
+    [fixture],
+  );
+
+  useEffect(() => {
+    let raf = 0;
+
+    const render = (now: number) => {
+      raf = requestAnimationFrame(render);
+      const { width: w, height: h } = sizeRef.current;
+      const canvas = canvasRef.current;
+      if (!canvas || w === 0 || h === 0) return;
+      const ctx = prepareCanvas(canvas, w, h);
+      if (!ctx) return;
+
+      const { camBox, phase, round, roundIndex, elapsedT, marks, showReference } = propsRef.current;
+      const projection = fitProjection(viewBoxFromCam(camBox), w, h);
+      const samples = fixture.lap.samples;
+
+      // --- environment ---
+      drawSandBackground(ctx, w, h);
+      drawGreenSurroundings(ctx, outline, projection);
+      drawPaddock(ctx, outline, 0, projection);
+      for (let i = 0; i < fixture.corners.length; i++) {
+        const trap = GRAVEL_TRAPS[fixture.corners[i].number];
+        if (trap) drawGravelTrap(ctx, outline, cornerIndices[i], projection, trap);
+      }
+      drawTrackRibbon(ctx, outline, projection);
+      for (const index of cornerIndices) drawCornerCurbs(ctx, outline, index, projection);
+      drawStartFinish(ctx, fixture.startFinish.x, fixture.startFinish.y, fixture.startFinish.headingDeg, projection);
+
+      // --- run/result overlays ---
+      if (phase === 'running' && elapsedT > round.tStart) {
+        drawRibbon(ctx, smoothPathPoints(samples, round.tStart, elapsedT), 'rgba(225, 6, 0, 0.85)', projection);
+      }
+
+      if (showReference) {
+        for (const segment of roundSegments[roundIndex]) {
+          drawRibbon(ctx, segment.points, PHASE_COLOR[segment.phase], projection);
+        }
+        for (const event of round.events) {
+          const s = sampleAt(samples, event.t);
+          const [x, y] = projection.toScreen(s.x, s.y);
+          drawPin(ctx, x, y, '#0b7a43', event.type === 'brake' ? 'Max rem' : 'Max gas');
+        }
+        for (const mark of marks) {
+          const s = sampleAt(samples, mark.t);
+          const [x, y] = projection.toScreen(s.x, s.y);
+          drawPin(ctx, x, y, '#1a2c8f', mark.type === 'brake' ? 'Jij rem' : 'Jij gas', true);
+        }
+      }
+
+      // --- car ---
+      // Parked on the grid during the intro, waiting at the window start while
+      // the camera flies in / the round is armed, driving while running, and
+      // resting at the window end on the result.
+      let carT = round.tStart;
+      if (phase === 'intro') carT = fixture.meta.lapStartT;
+      else if (phase === 'running') carT = elapsedT;
+      else if (phase === 'roundResult' || phase === 'finished') carT = round.tEnd;
+      const carState = sampleAt(samples, carT);
+      const carPos = positionAt(samples, carT);
+      const minScale = CAR_MIN_LENGTH_PX / (CAR_ART_LENGTH_UNITS * projection.scale);
+      drawF1Car(ctx, {
+        x: carPos.x,
+        y: carPos.y,
+        headingDeg: headingAt(samples, carT),
+        livery: VERSTAPPEN_LIVERY,
+        sizeScale: Math.max(CAR_SCALE, minScale),
+        projection,
+        dynamics: phase === 'running' ? { speedKph: carState.speedKph } : undefined,
+      });
+
+      // --- map chrome: corner badges + labels, fading out as we zoom in ---
+      const badgeAlpha = Math.max(0, Math.min(1, (0.85 - projection.scale) / 0.35));
+      if (badgeAlpha > 0) {
+        // Anchor on the last corner number: for combined rounds that is the
+        // corner the round is named after (Hugenholtz for 2+3, etc.).
+        const nextRound = fixture.rounds[roundIndex];
+        const pulseCornerNumber = phase === 'intro' || phase === 'flying' ? nextRound.cornerNumbers.at(-1) : null;
+        fixture.corners.forEach((corner) => {
+          const [x, y] = projection.toScreen(corner.x, corner.y);
+          const isPulse = corner.number === pulseCornerNumber;
+          drawCornerBadge(ctx, x, y, String(corner.number), { highlight: isPulse, alpha: badgeAlpha });
+          if (isPulse) {
+            const pulse = (now % 1600) / 1600;
+            ctx.save();
+            ctx.globalAlpha = badgeAlpha * (1 - pulse);
+            ctx.beginPath();
+            ctx.arc(x, y, 13 + pulse * 22, 0, Math.PI * 2);
+            ctx.strokeStyle = '#e10600';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            ctx.restore();
+          }
+        });
+        // name labels for the four game corners
+        fixture.rounds.forEach((r) => {
+          const corner = fixture.corners.find((c) => c.number === r.cornerNumbers.at(-1));
+          if (!corner) return;
+          const [x, y] = projection.toScreen(corner.x, corner.y);
+          drawMapLabel(ctx, x, y + 30, r.label, badgeAlpha);
+        });
+      }
+
+      drawScaleBar(ctx, projection, h);
+    };
+
+    raf = requestAnimationFrame(render);
+    return () => cancelAnimationFrame(raf);
+  }, [fixture, outline, cornerIndices, roundSegments]);
+
+  return (
+    <div ref={containerRef} className="relative h-full w-full">
+      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
+      <div className="sr-only">
+        Kaart van Circuit Zandvoort met de raceauto van Max Verstappen, ingezoomd op de actieve bocht
+      </div>
+    </div>
+  );
+}

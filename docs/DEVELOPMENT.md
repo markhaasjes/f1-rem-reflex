@@ -2,260 +2,301 @@
 
 Internal knowledge for extending this game: how the pieces fit together, the
 non-obvious design decisions behind them, and what to watch out for when
-adding features. The [README](../README.md) is the pitch and the file map;
-this is the "how do I change X without breaking Y" reference.
+adding features. The [README](../README.md) is the pitch; this is the
+"how do I change X without breaking Y" reference.
 
 ## Mental model
 
-Everything hangs off one fixture object (`TarzanFixture`, see
+Everything hangs off one fixture object (`ZandvoortFixture`, see
 [types.ts](../src/types.ts)) loaded once at module scope in
-[App.tsx](../src/App.tsx):
+[App.tsx](../src/App.tsx). It contains the full circuit geometry, Max
+Verstappen's entire pole lap at 20 Hz, and the four game rounds — all in one
+shared coordinate space (meters, north-up like Google Maps). There is no data
+fetching, no loading state, and no backend anywhere in the app. Every module
+is a pure function of `(fixture, t)` or `(fixture, playerInput)`; the only
+side effects are `requestAnimationFrame`, `ResizeObserver` and the share
+button (Web Share API / clipboard). Keep it that way: most new features fit
+as a new pure function over the fixture.
 
-```ts
-const fixture = fixtureJson as TarzanFixture;
+The fixture is produced by
+[scripts/build-game-fixture.mjs](../scripts/build-game-fixture.mjs) — see
+"Data pipeline" below. Never hand-edit `src/data/zandvoort2025.json`; change
+the script and re-run it.
+
+## Game flow
+
+The flow is a state machine in
+[useCircuitGame.ts](../src/hooks/useCircuitGame.ts) plus a
+camera owned by App ([useCameraFlight.ts](../src/hooks/useCameraFlight.ts)).
+Game state and camera stay in lockstep because every transition handler in
+App does both (e.g. `flyToRound(2)` + `camera.fly(...)`, with `game.arm` as
+the flight-completion callback).
+
+```
+intro                overview map, all 14 corner badges, pulsing badge on the
+  |                  next round's corner, hero strip, "Naar de Tarzanbocht"
+  | startGame()      camera: overview -> round 0 box (1.7s)
+  v
+flying               "Onderweg naar de <bocht>..." — no interactive controls
+  | camera done -> game.arm()
+  v
+ready                car waits at the window start; "Start de oefenbocht" /
+  |                  "Start bocht N"
+  | startRun()
+  v
+running              rAF clock plays lap.samples from round.tStart to tEnd in
+  |                  real time; one button (REM! / VOL GAS!) answers Max's
+  |                  events in order; Space = same button
+  | t >= tEnd        round is scored (scoreRound) and appended to results
+  v
+roundResult          Max's phase-colored line + brake/gas pins + player pins,
+  |                  verdict banner, per-event delta chips
+  | nextRound()      camera: corner -> overview (1.2s) -> hold -> next corner
+  |                  (1.5s); back to `flying` above ... repeat for 4 rounds
+  | showFinal()      after the last round: camera drifts back to overview
+  v
+finished             score card overlay: total /100, per-round breakdown,
+                     "Deel je score" (Web Share / clipboard), "Nog een keer"
 ```
 
-There is no data fetching, no loading state, and no error state anywhere in
-the app, because the fixture is a static JSON import baked into the bundle.
-Every other module is a pure function of `(fixture, t)` or `(fixture,
-playerInput)` — the game has no persistence and no side effects beyond
-`requestAnimationFrame` and `ResizeObserver`. That constraint is what makes
-the whole thing ~75 KB gzip and trivially static-hostable; keep it in mind
-before reaching for a backend, a data-fetch, or global state for a new
-feature — most things fit as a new pure function over the fixture instead.
+Separate from the state machine: when the URL carries `?s=<total>&r=<r0.r1.r2.r3>`
+(a shared link), App renders a "Gedeelde score" landing card over the intro;
+"Speel zelf" strips the params (`history.replaceState`) and restarts.
+
+Things worth knowing before changing the flow:
+
+- **The four rounds all count.** The Tarzanbocht round is _labeled_ practice
+  (`practice: true` controls labels/styling only) but its score is included
+  in the total, by design — one attempt per corner, everything counts.
+- **Two pedals.** REM! and GAS! are separate buttons (keyboard: R and G;
+  Space presses whichever pedal Max needs next). Each press is typed by its
+  pedal; scoring pairs the k-th brake press with Max's k-th brake event and
+  the k-th gas press with his k-th gas event (`scoreRound`). A pedal stops
+  registering (and dims) once used as often as Max uses it in the round.
+- **Marks are mirrored in a ref** (`marksRef`) because two presses can land
+  within one frame; never read the React state inside `press()`.
+- **A round always plays to `tEnd`.** There is no early exit and no crash
+  state; missing events simply score 0 ("Niet geremd" / "Geen gas gegeven").
 
 ## The fixture shape
 
 ```
-meta          driver/session/circuit labels, all display-only
-samples[]     20 Hz array: t, x, y, distanceM, speedKph, brakeActive, throttle, gear
-brakePoint    { t, distanceM, speedKph } - Max's real brake point
-apexPoint     { t, distanceM, speedKph } - used as the coast/brake -> accel cutover
-durationS     length of the lap slice (6.8s for the Tarzanbocht)
-totalDistanceM
-roadPath[]    162-point centerline slice through the corner, for the scene's track/curb/gravel geometry
-map           { outline[] (450pt full-circuit shape), startFinish (oriented point), corner (point) } - intro mini-map only
+meta           session/driver labels + lapStartT (t of the S/F crossing) etc.
+trackOutline   1400 pts, official circuit centerline, closed loop, ~3m spacing
+startFinish    { x, y, headingDeg }
+corners[14]    { number, name, x, y, distanceM } - map badges + curb/gravel anchors
+lap.samples    ~1670 x { t, x, y, distanceM, speedKph, throttle, brakeActive, gear }
+               continuous 20 Hz, t=0 ten seconds BEFORE the lap starts
+               (lead pad), distanceM rebased to meters-into-lap
+rounds[4]      { id, label, cornerNumbers, practice, tStart, tEnd,
+                 events: [{ type: 'brake'|'gas', t, distanceM, speedKph }],
+                 bounds: {minX,minY,maxX,maxY} }  - the camera zoom box
 ```
 
-`samples` is the single source of truth for both the physics (distance/speed
-scoring) and the visuals (car position/heading). `roadPath` is a _separate_,
-smoother polyline used only for drawing track/curb/gravel — it does not need
-to line up sample-for-sample with `samples`, only geometrically.
+All coordinates live in one frame: the official geometry's, north-up
+(y = south), meters. `t` is global across the whole file — a round is just a
+`[tStart, tEnd]` window over `lap.samples`, and `rounds[].events[].t` indexes
+into the same clock. That single shared frame/clock is what makes the camera
+able to fly anywhere and the car able to drive any window with no
+re-basing math anywhere in the app.
 
-There is no schema validation on this JSON. If you hand-edit or regenerate
-the fixture, a shape mistake will surface as a runtime NaN/undefined
-somewhere in `corner.ts` or `scene.ts`, not a helpful error. Sanity-check a
-new fixture by loading the app and watching the console, not by reading the
-JSON diff.
+There is no schema validation on this JSON. If you regenerate it, sanity
+check by playing a full game, not by reading the diff.
 
-### Why the car has two different position models
+## Data pipeline (scripts/)
 
-`sampleAt()` in [corner.ts](../src/lib/corner.ts) does plain linear
-interpolation over `samples` — this feeds the _scoring_ math (distance/speed
-at the moment of a brake/gas press) and must track the recorded telemetry
-exactly.
+`node scripts/build-game-fixture.mjs` rebuilds the fixture from two sources:
 
-`positionAt()`/`headingAt()` feed the _drawing_ of the car and do something
-more involved: OpenF1's GPS trace has short stalls where recorded x/y barely
-move while the speed channel still reads ~200 km/h, which makes a
-linearly-interpolated car visually freeze and its heading spin. The fix
-(discovered the hard way, see commit `2be865c`) is to decouple shape from
-pace: build a smoothed geometric path from `samples.x/y` (dropping points
-closer than `MIN_SEGMENT_M = 0.4`m as GPS jitter, then Catmull-Rom through
-what's left), separately integrate the speed channel into a travelled-distance
-curve, rescale that curve to span exactly the geometric path length, and walk
-the car along the path by arc length using the rescaled travel curve. The
-model is cached per `samples` array in a `WeakMap` (`MODEL_CACHE`) since
-building it involves a binary-searchable cumulative-length table.
+1. **OpenF1** (free tier, historical only): `car_data` + `location` for VER's
+   pole lap (session 9916, lap 17), resampled onto a uniform 20 Hz grid.
+   Raw OpenF1 x/y are mirrored (`MIRROR_X`) to fix chirality.
+2. **bacinger/f1-circuits GeoJSON**: the official Zandvoort centerline,
+   projected to flat meters **north-up** — this is what makes the map match
+   Google Maps orientation. The coarse control points are densified with
+   **centripetal** Catmull-Rom (alpha 0.5): the uniform variant overshoots
+   into cusps/loops at tight corners, which rendered as knots in the track
+   edge at Kumhobocht and Arie Luyendijk and polluted the telemetry fit. The telemetry is fitted onto it with a
+   similarity transform (complex Procrustes over 360 arc-length-resampled
+   points, searching all index rotations). The old pipeline re-rotated the
+   result to put Tarzan at the bottom; this script deliberately does not.
 
-**If you add a new corner/driver fixture and the car looks jittery or spins
-its heading**, this is almost certainly GPS-stall data again — check
-`MIN_SEGMENT_M` before assuming something else broke.
+Round windows (`ROUND_DEFINITIONS`, meters-into-lap) were chosen by hand
+against the printed telemetry timeline (`printTimeline` output) so each
+window starts on a clean flat-out approach and ends after Max commits back
+to full throttle. Target events are derived by `detectEvents`:
 
-## Game state machine
+- a **brake** event opens at the first brake application; further brake
+  re-applications merge into the same zone (Max trail-brakes through
+  Gerlach into Hugenholtz — one zone, one target);
+- a **gas** event closes the zone only at _sustained_ full throttle
+  (>= 95% for 0.3s), so one-sample upshift blips don't count.
 
-[useBrakeGame.ts](../src/hooks/useBrakeGame.ts) is the only place game
-progression logic lives. Phases: `ready -> running -> result -> ready (or
-back to running for the next round)`.
+What the telemetry actually says about the four rounds (2025 pole lap):
 
-Key details worth knowing before changing round structure:
+| Round                         | Window (m into lap) | Events                                     |
+| ----------------------------- | ------------------- | ------------------------------------------ |
+| Tarzanbocht (practice)        | 90–480              | brake@232, gas@391                         |
+| Gerlach & Hugenholtz (double) | 460–1010            | brake@614, gas@717, brake@741, gas@860     |
+| Bocht 9 & 10 (double)         | 2030–2660           | brake@2141, gas@2287, brake@2357, gas@2530 |
+| Hans Ernstbocht (chicane)     | 2700–3300           | brake@2972, gas@3172                       |
 
-- **`PRACTICE_ROUNDS = 1`, `TOTAL_ROUNDS = 2`** — one blind practice lap,
-  then one scoring lap. `attempt` counts from 1. `isScoring = attempt >
-PRACTICE_ROUNDS`. Changing these two constants is the intended way to add
-  more practice laps; nothing else needs to change, because `isScoring` and
-  `roundLabel` in App.tsx are already derived from them.
-- **One button does two jobs.** `press()` is wired to both the REM! button
-  and Space. The _first_ press of a running lap sets the brake mark; the
-  _second_ sets the gas mark and ends the lap. There's no separate "gas"
-  control — this was a deliberate simplification (see commit history around
-  `feature/practice-rounds`) so the player only ever has one thing to react
-  to at a time.
-- **Refs mirror state synchronously.** `brakeRef`/`gasRef` exist because two
-  presses can land within the same frame (fast double-tap), and reading
-  `brakeAttempt` (state) inside `press()` before React re-renders would miss
-  the first mark. Any new "did the player already do X" check inside a
-  frame-scale callback should follow the same ref-mirror pattern, not trust
-  React state alone.
-- **Never braking still ends the lap.** The animation loop's own timeout
-  (`t >= corner.durationS`) sets `crashed = true` if `brakeRef.current` is
-  still null — this is what produces "je hebt niet geremd, het grind in".
-  There's no separate crash-detection system to hook into.
+Gotchas encoded in the window choices: Gerlach+Hugenholtz is split into a
+double via a per-round `gasSustainSamples: 1` override - Max touches full
+throttle for a single 20 Hz sample between the two corners, which the default
+0.3s sustain filter would (correctly) ignore elsewhere; Bocht 9 & 10 is the slow double after
+Mastersbocht (8, the fast ~236 km/u right at ~2000m — do not confuse them);
+Hans Ernst (11/12) is the chicane before Kumhobocht, taken as one deep
+braking zone. The corner `expectedIntoLapM` anchors are calibrated against
+the official F1 TV circuit map: its badge positions were projected into our
+frame with a similarity transform anchored on corners 1 and 3, snapped to
+the track, and cross-checked against curvature clusters and speed minima.
+Two earlier anchor sets were wrong (hand-interpolated: up to 160m drift;
+curvature-only: misnumbered the whole 7–13 sequence). If badges ever look
+off again, redo the F1 TV projection — never nudge numbers by eye.
 
-## Rendering pipeline (CornerScene)
+## Rendering (CircuitScene)
 
-[CornerScene.tsx](../src/components/CornerScene.tsx) is a single `<canvas>`
-redrawn from scratch every relevant state change (not a persistent scene
-graph). Draw order matters and is layered back-to-front in one effect:
+[CircuitScene.tsx](../src/components/CircuitScene.tsx) is one `<canvas>`
+running its **own rAF loop** (unlike the old per-state-change redraw): the
+camera, the run clock, and the badge pulse animate every frame anyway, so
+the loop reads the latest props from a ref and React stays out of the hot
+path. Draw order, back to front:
 
 ```
-sand background -> grass infield (clipped to roadPath) -> gravel trap
-  -> track ribbon (checker + asphalt) -> apex/exit curbs
-  -> [running] player's driven line so far
-  -> [result] Max's phase-colored line + pins (scoring lap only) + player's pins
-  -> car sprite (+ motion streaks if running)
-  -> scale bar
+sand + dunes (screen space) -> green corridor + striped infield -> paddock
+  -> gravel traps (GRAVEL_CORNERS) -> track ribbon (white edge, dark asphalt,
+  center sheen) -> red/white curbs at all 14 corners -> start/finish checker
+  -> [running] driven line so far -> [result] phase ribbons + pins
+  -> car -> corner badges + labels (fade out as you zoom in) -> scale bar
 ```
 
-- **Projection**: `fitProjection()` in [canvas.ts](../src/lib/canvas.ts) maps
-  real-world meters to canvas pixels once per resize, `object-fit: contain`
-  style, via `computeViewBox(roadPath + samples, 30m padding)`. Anything with
-  a physical size (track width, curb width, car length) is defined in meters
-  and multiplied by `projection.scale`; UI chrome (labels, pin dots) stays in
-  fixed screen pixels. Keep new drawing code on the correct side of that
-  line, or it will resize incorrectly on different screen sizes.
-- **DPR handling**: `prepareCanvas()` caps `devicePixelRatio` at 2 and resets
-  the context transform so all drawing code writes CSS-pixel coordinates.
-  Never read `canvas.width`/`canvas.height` directly in drawing code — use
-  the CSS `width`/`height` from `useElementSize`.
-- **Deterministic speckle**: sand/gravel speckle decoration uses a seeded
-  `mulberry32` PRNG (fixed seeds `7` and `23`), not `Math.random()` — a
-  redraw must not visually shimmer while the car animates. If you add more
-  decorative noise, seed it too.
-- **Phase segmentation**: [phases.ts](../src/lib/phases.ts) turns the
-  telemetry into `coast`/`brake`/`accel` runs by throttle/brake-active/apex-t
-  thresholds (`COAST_THROTTLE_THRESHOLD = 95`, apex cutover for `accel`).
-  This only classifies Max's real line for the reference overlay — it never
-  touches the player's own marks.
-- **Outside-of-corner sign**: `outsideSignAt()` in
-  [scene.ts](../src/lib/scene.ts) uses a 3-point cross product on the
-  roadPath to decide which side is "outside" at a given index, so gravel and
-  curbs land on the correct side automatically for corners of either
-  handedness. This means a new corner fixture with an opposite-direction
-  turn should Just Work without a manual flip flag.
+- **One scene, every zoom.** There are no separate overview/corner
+  renderings: everything physical is specified in meters and multiplied by
+  `projection.scale`, so the same draw calls hold up from the 4km overview
+  to a 300m corner box. UI chrome (badges, pins, labels) stays in screen
+  pixels and _fades out_ by scale (`badgeAlpha`) instead of scaling.
+- **The camera is just a projection.** `useCameraFlight` animates a
+  `CamBox {cx, cy, w, h}` (center linear, size in **log space** — that's
+  what makes zoom rate feel constant); `fitProjection(viewBoxFromCam(box))`
+  turns it into meter→pixel mapping per frame. Flights are step queues
+  (`fly([{box, ms}, {ms: pause}, {box, ms}])`), giving the
+  corner → overview → next corner two-stage move the user sees.
+- **The outline is rotated at load** (`rotateOutline`) so index 0 sits at
+  start/finish; corner slices for curbs/gravel then never wrap the closed
+  loop's array boundary.
+- **Deterministic decoration**: all speckles use seeded `mulberry32` PRNGs
+  (per-corner seeds for gravel) — `Math.random()` would shimmer at 60fps.
+  Grass stripes are drawn in world space for the same reason.
+- **Corner handedness is automatic**: `outsideSignAt` (3-point cross
+  product) puts gravel outside and curbs on the right sides for either
+  corner direction; `interiorSign` (point-in-polygon probe) finds the
+  infield for the paddock. No per-corner flip flags.
+- **Car sizing**: the sprite is deliberately oversized (~22m) for
+  readability; at overview zoom a minimum pixel length kicks in
+  (`CAR_MIN_LENGTH_PX`), so it stays spottable when parked on the grid.
+- **Ribbons are drawn from the smoothed car path**, never from raw samples:
+  `smoothPathPoints`/`buildPhaseSegments` sample `positionAt` at 0.05s steps,
+  so the driven line and Max's phase-colored line carry none of the 20 Hz GPS
+  jitter that used to show through slow corners.
+- **Offset geometry self-protects on hairpins**: `offsetPolyline` prunes
+  folded/bunched points, and curbs use `offsetPolylineRuns`, which _splits_
+  the curb wherever the bend is tighter than the offset reaches instead of
+  bridging a line across the apex. Gravel is a wide butt-capped stroke of an
+  offset centerline (a filled near/far polygon self-intersects on hairpins).
+- **Visual QA per corner**: `?corner=N` starts the camera zoomed on corner N
+  with the intro chrome hidden — used by the Playwright corner-snapshot sweep
+  when comparing against the official F1 TV map.
 
-The top-down car in `canvasCar.ts` and the intro's flat side-view car in
-[HeroCar.tsx](../src/components/HeroCar.tsx) are drawn independently (Canvas
-Path2D vs. inline SVG) and are not kept in sync on purpose — they're
-different art styles for different contexts (in-scene sprite vs. hero
-illustration), both driven by the same `VERSTAPPEN_LIVERY` palette in
-[teamLivery.ts](../src/lib/teamLivery.ts) so a livery change only needs to
-happen in one place.
+### Why the car has two position models
+
+`sampleAt()` ([corner.ts](../src/lib/corner.ts)) linearly interpolates the
+20 Hz samples — it feeds _scoring_ (distance at the moment of a press) and
+must track recorded telemetry exactly. `positionAt()`/`headingAt()` feed
+_drawing_: OpenF1's GPS trace has stalls (x/y freezes while speed reads
+200+ km/h) that make a linearly-driven car freeze and its heading spin. The
+fix: build a jitter-filtered, Catmull-Rom-smoothed geometric path once per
+samples array (WeakMap-cached), integrate the speed channel into a travel
+curve rescaled to the path length, and walk the car by arc length. If a
+future fixture makes the car jitter or spin, it's GPS stalls again — look at
+`MIN_SEGMENT_M` before anything else.
 
 ## Scoring
 
-[scoring.ts](../src/lib/scoring.ts) buckets the _distance_ delta (not time
-delta — meters is the more meaningful yardstick to a viewer, per the
-README) between the player's mark and Max's, at fixed thresholds (3/10/25m
-for braking, 5/14/30m for the gas point — asymmetric because braking has a
-tighter real-world tolerance than throttle application). `combineResults()`
-takes the worse of the two tones so the headline verdict is honest. If you
-add a third markable point (e.g. turn-in), follow this same pattern: a pure
-`describeXAttempt(deltaM | null)` function returning `{title, detail, tone}`,
-folded into `combineResults` by extending `TONE_RANK` comparison to N
-descriptions instead of two.
+[scoring.ts](../src/lib/scoring.ts). Two layers:
+
+- **Numeric**: `scoreEvent(deltaM)` — 100 points within 2m of Max, linear to
+  0 at 50m, 0 for a missed event. `scoreRound` averages a round's events;
+  `totalScore` averages **all events across all rounds** (so the Hans Ernst
+  double, with 4 events, weighs twice a 2-event round — intentional: more
+  moments, more weight).
+- **Verbal (Dutch)**: `describeBrakeAttempt` / `describeGasAttempt` bucket
+  the same delta into tones (perfect ≤3m/≤5m, good, okay, bad) for the
+  verdict banner; `combineResults` takes the _worst_ tone of a round.
+
+Marks pair to events strictly by order (press #i answers event #i). If you
+ever allow more presses than events, revisit that pairing.
+
+## Share flow
+
+No backend: the score is encoded in the URL
+(`?s=<total>&r=<r0.r1.r2.r3>`). `share()` tries `navigator.share`, falls
+back to clipboard + a "Link gekopieerd!" flash. `parseSharedScore()` renders
+the landing card for incoming links; it validates against
+`fixture.rounds.length` so malformed links fall through to the normal game.
+Anyone can forge a score URL — it's a social share, not a leaderboard; don't
+build trust on it.
 
 ## Extension points, roughly in order of effort
 
-- **New driver on the same corner**: swap `VERSTAPPEN_LIVERY` for a
-  per-driver livery and add a driver picker; the fixture's `meta.teamColor`
-  is already per-driver, `teamLivery.ts` is the only hardcoded one.
-- **New corner, same driver**: needs a new fixture JSON with the same shape
-  (see "Data provenance" in the README for how `tarzanbocht.json` was
-  produced) and a fixture-selector one level above `useBrakeGame`. Everything
-  downstream is corner-agnostic already — no corner-specific logic exists
-  outside the fixture itself, `outsideSignAt` handles handedness, and
-  `computeViewBox` handles framing.
-- **More rounds / different practice structure**: change
-  `PRACTICE_ROUNDS`/`TOTAL_ROUNDS` in `useBrakeGame.ts`; see the state
-  machine notes above.
-- **Leaderboard/persistence**: currently the entire app has zero storage of
-  any kind (no localStorage, no backend). Adding this means introducing the
-  project's first side effect and first async state — do it as an isolated
-  hook, not inline in `useBrakeGame`, so the core game logic stays pure and
-  testable.
-- **A third markable point (e.g. turn-in point)**: extend `BrakeAttempt`
-  handling in `useBrakeGame.ts` (currently hardcoded to exactly two presses
-  via `brakeRef`/`gasRef`) to a small ordered list instead, and add a matching
-  `describeXAttempt` in `scoring.ts`.
+- **Tune a round window or add a round**: edit `ROUND_DEFINITIONS` in the
+  build script, re-run it, and check the printed timeline + events. The app
+  adapts to any number of rounds and any (alternating) event count; only the
+  "Bocht N van 3" copy in App.tsx assumes three scoring rounds.
+- **New driver**: add a `DRIVER` entry (lap start timestamp + duration from
+  OpenF1's `laps` endpoint), emit a second fixture, add a picker. Liveries
+  live in [teamLivery.ts](../src/lib/teamLivery.ts).
+- **Different circuit**: the pipeline generalizes (another f1-circuits
+  GeoJSON + session key + corner anchors), but `CORNER_DEFINITIONS`
+  meters-into-lap anchors are hand-tuned per circuit — budget time with the
+  timeline printout.
+- **Leaderboard/persistence**: would be the app's first backend/storage.
+  Keep it out of `useCircuitGame`; wrap it around the `results` array at
+  `finished`.
+- **Ghost car / duel mode**: everything needed (full lap, one clock) is in
+  the fixture already — a second `drawF1Car` at a time-shifted `t` is the
+  core of it.
 
-## Working with SVG hero art (lessons from this session)
+## Working with the hero/share art
 
-`HeroCar.tsx` is a hand-colored recreation of a Noun Project line-icon
-(nose-left convention for the game, but source icons are usually drawn
-facing right). Workflow used twice now for swapping in a new source icon:
+- [HeroCar.tsx](../src/components/HeroCar.tsx) is a recolored Noun Project
+  icon. When swapping the source SVG: measure the real bbox in a headless
+  browser (`getBBox()` — Noun Project viewBoxes lie), mirror via a single
+  `<g transform>` if it faces right (game convention is nose-left), recolor
+  by fill only, and verify by screenshotting the rendered app, not the raw
+  file.
+- `public/images/share.png` is flat art: `magick -strip -colors 64 PNG8:`
+  gives ~80% size reduction with no visible loss; compare candidates before
+  going lower (32 colors banded on the car shading).
 
-1. **Never trust the source `viewBox`.** Noun Project icons often ship a
-   viewBox far larger than the actual artwork (e.g. `0 0 100 125` for art
-   that only occupies `y 40–60`). Measure the _real_ bounding box instead of
-   guessing:
-   ```js
-   // via Playwright, with the Noun Project attribution <text> elements stripped first
-   const svg = page.querySelector('svg');
-   const g = svg.querySelector('g') ?? svg; // some icons wrap paths in <g>, some don't
-   const box = g.getBBox(); // { x, y, width, height }
-   ```
-   Set the component's `viewBox` from that box (plus a hair of margin) or the
-   car renders tiny and off-center inside its container.
-2. **Check facing direction before recoloring.** If the source faces the
-   wrong way for this game's nose-left convention, wrap the paths in a single
-   `<g transform="translate(<viewBoxWidth> 0) scale(-1 1)">` rather than
-   editing every path's coordinates by hand.
-3. **Recolor by fill, not by replacing path data.** Keep the original path
-   `d` strings verbatim and only change `fill`/`stroke` per shape to the
-   livery palette (`body`, `accent`, `cockpit` from `teamLivery.ts`) — this
-   keeps the diff reviewable against the source icon and makes swapping the
-   palette later a one-line change.
-4. **Always verify by screenshotting the actual rendered app**, not just the
-   raw SVG file — cropped/zoomed on the hero car region. A viewBox that looks
-   fine as a standalone file can still clip when the component's container
-   has a different aspect ratio: run `npm run dev`, screenshot the page with
-   Playwright, crop to the region of interest with ImageMagick, then look at
-   it.
+## Verification workflow
 
-## Working with the share/OG image
-
-`public/images/share.png` is flat vector-style art (solid fills, no photo
-gradients), which makes PNG palette reduction a safe, large win with zero
-visible loss:
-
-```bash
-magick share.png -strip -colors 64 PNG8:share.png   # ~212KB -> ~45KB on this file
-```
-
-Always visually diff a couple of color-count candidates (64 vs 32 vs original)
-before picking one — flat art degrades gracefully down to a point, then
-bands visibly on soft shadows/gradients. 64 colors was clean on this image;
-32 introduced faint banding on the car's shading.
+For any change to the flow or scene: drive the real app, don't trust the
+build. The pattern that works (see the session scratchpad's
+`playthrough.mjs`): start `npm run dev`, script Playwright to click through
+all four rounds **reading press timings from the fixture JSON**
+(`event.t - round.tStart` + ~150ms), screenshot each phase, and look at
+the screenshots. Two traps: layered UI keeps hidden buttons in the DOM
+(`opacity-0` + `pointer-events-none`), so Playwright's `visible` check
+passes early — gate on _clickability_, not visibility; and a Space press
+after a round ends advances the flow, so mistimed presses silently skip
+phases.
 
 ## Deployment (Vercel)
 
-This is a 100%-static SPA — no `/api` directory, no serverless/edge
-functions, `Function Invocations` in the Vercel dashboard is always 0. That
-means most of Vercel's per-project runtime dials (Fluid Compute, Function
-CPU, Function Region, Cold Start Prevention) are inert here; don't spend
-time tuning them. What actually matters for this project:
-
-- **`vercel.json`** carries an explicit SPA rewrite (`/(.*) -> /index.html`)
-  plus `Cache-Control` headers: hashed `/assets/*` (Vite's content-hashed JS/
-  CSS) are `immutable, max-age=31536000` since a change always produces a new
-  filename; `/images/*` are capped at 1 hour (`max-age=3600,
-must-revalidate`) specifically so replacing an image under the same
-  filename (like `share.png`) propagates quickly instead of being cached for
-  a year.
-- **Skew Protection** is worth enabling in Project Settings for a
-  content-hashed SPA: without it, a user with an old tab open after a
-  redeploy can request a chunk hash that no longer exists on the CDN and hit
-  a blank screen.
-- **Node version** (`.nvmrc`, currently `v24.17.0`) only affects the build
-  step, not runtime — there's no server runtime to version.
+Still a 100%-static SPA — no functions, so Vercel's runtime dials (Fluid
+Compute, Function CPU/Region, Cold Start Prevention) are inert; don't tune
+them. `vercel.json` has the SPA rewrite + cache headers: hashed `/assets/*`
+immutable for a year, `/images/*` 1 hour (`must-revalidate`) so replacing an
+image under the same filename propagates fast. Skew Protection (Project
+Settings) is worth enabling so an open tab doesn't 404 on old chunk hashes
+after a redeploy. Node version (`.nvmrc`) only affects the build.

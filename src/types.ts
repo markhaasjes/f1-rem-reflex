@@ -7,7 +7,7 @@ export interface OrientedPoint extends Point {
   headingDeg: number;
 }
 
-export interface CornerSample extends Point {
+export interface LapSample extends Point {
   t: number;
   distanceM: number;
   speedKph: number;
@@ -16,49 +16,78 @@ export interface CornerSample extends Point {
   gear: number;
 }
 
-export interface CornerPoint {
+export interface CornerMarker extends Point {
+  number: number;
+  name: string;
+  distanceM: number;
+}
+
+/** One of Max's brake/gas moments the player has to match. */
+export interface TargetEvent {
+  type: 'brake' | 'gas';
   t: number;
   distanceM: number;
   speedKph: number;
 }
 
+export interface Bounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+/** One game round: a window of the lap around one corner (or a combination). */
+export interface GameRound {
+  id: string;
+  label: string;
+  cornerNumbers: number[];
+  practice: boolean;
+  tStart: number;
+  tEnd: number;
+  events: TargetEvent[];
+  bounds: Bounds;
+}
+
 // The one baked fixture the whole app runs on: Max Verstappen's pole lap
-// through the Tarzanbocht (2025 Dutch GP qualifying), plus the schematic
-// circuit outline for the intro map. See README for how it was produced.
-export interface TarzanFixture {
+// (2025 Dutch GP qualifying) over the full circuit, the official track
+// geometry oriented north-up (like Google Maps), and the four game rounds.
+// Produced by scripts/build-game-fixture.mjs.
+export interface ZandvoortFixture {
   meta: {
-    corner: string;
-    cornerNumber: number;
     circuit: string;
     meetingName: string;
     year: number;
     sessionName: string;
-    lapNumber: number;
+    sessionKey: number;
+    lapLengthM: number;
     driverNumber: number;
     driverName: string;
     driverAcronym: string;
     teamName: string;
     teamColor: string;
+    lapNumber: number;
+    lapDurationS: number;
+    /** t of the start/finish crossing inside lap.samples. */
+    lapStartT: number;
+    lapStartDistanceM: number;
     source: string;
+    trackOutlineSource: string;
   };
-  samples: CornerSample[];
-  brakePoint: CornerPoint;
-  apexPoint: CornerPoint;
-  durationS: number;
-  totalDistanceM: number;
-  /** Slice of the track centerline through the corner - what the scene draws. */
-  roadPath: Point[];
-  /** Schematic full-circuit geometry for the intro map. */
-  map: {
-    outline: Point[];
-    startFinish: OrientedPoint;
-    corner: Point;
+  trackOutline: Point[];
+  startFinish: OrientedPoint;
+  corners: CornerMarker[];
+  lap: {
+    samples: LapSample[];
   };
+  rounds: GameRound[];
 }
 
-export type GamePhase = 'ready' | 'running' | 'result';
+export type GamePhase = 'intro' | 'flying' | 'ready' | 'running' | 'roundResult' | 'finished';
 
-export interface BrakeAttempt {
+/** A player press during a run, matched to a target event by order. */
+export interface PlayerMark {
+  type: 'brake' | 'gas';
   t: number;
   distanceM: number;
   speedKph: number;

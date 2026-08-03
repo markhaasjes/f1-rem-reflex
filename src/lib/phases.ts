@@ -1,46 +1,45 @@
-import type { CornerSample } from '../types';
+import { positionAt, sampleAt } from './corner';
+import type { LapSample, Point } from '../types';
 
-export type DrivingPhase = 'flatout' | 'coast' | 'brake' | 'accel';
+export type DrivingPhase = 'flat' | 'coast' | 'brake';
 
 export interface PhaseSegment {
   phase: DrivingPhase;
-  points: { x: number; y: number }[];
-}
-
-export type VisiblePhaseSegment = PhaseSegment & { phase: Exclude<DrivingPhase, 'flatout'> };
-
-export function isVisiblePhase(segment: PhaseSegment): segment is VisiblePhaseSegment {
-  return segment.phase !== 'flatout';
+  points: Point[];
 }
 
 const COAST_THROTTLE_THRESHOLD = 95;
+const STEP_S = 0.05;
 
-function classifySample(sample: CornerSample, apexT: number): DrivingPhase {
-  if (sample.t >= apexT) return 'accel';
-  if (sample.brakeActive) return 'brake';
-  if (sample.throttle < COAST_THROTTLE_THRESHOLD) return 'coast';
-  return 'flatout';
+function classifyAt(samples: LapSample[], t: number): DrivingPhase {
+  const s = sampleAt(samples, t);
+  if (s.brakeActive) return 'brake';
+  if (s.throttle < COAST_THROTTLE_THRESHOLD) return 'coast';
+  return 'flat';
 }
 
-// Groups samples into contiguous same-phase runs for rendering as separate
-// colored polylines. Each new segment repeats the previous segment's last
-// point so the colored lines connect with no visual gap at the boundary.
-export function buildPhaseSegments(samples: CornerSample[], apexT: number): PhaseSegment[] {
+// Splits a window of the lap into contiguous same-phase runs for rendering as
+// colored polylines (flat = vol gas, coast = gas los, brake = remmen). Points
+// come from the smoothed car-path model (positionAt), not raw samples, so the
+// drawn line has none of the 20 Hz GPS jitter. Each new segment repeats the
+// previous segment's last point so the colors connect with no visual gap.
+export function buildPhaseSegments(samples: LapSample[], tStart: number, tEnd: number): PhaseSegment[] {
   const segments: PhaseSegment[] = [];
   let currentPhase: DrivingPhase | null = null;
-  let currentPoints: { x: number; y: number }[] = [];
+  let currentPoints: Point[] = [];
 
-  for (const sample of samples) {
-    const phase = classifySample(sample, apexT);
+  for (let t = tStart; t <= tEnd; t += STEP_S) {
+    const point = positionAt(samples, t);
+    const phase = classifyAt(samples, t);
     if (phase !== currentPhase) {
       if (currentPhase !== null) {
-        currentPoints.push({ x: sample.x, y: sample.y });
+        currentPoints.push(point);
         segments.push({ phase: currentPhase, points: currentPoints });
       }
       currentPhase = phase;
-      currentPoints = [{ x: sample.x, y: sample.y }];
+      currentPoints = [point];
     } else {
-      currentPoints.push({ x: sample.x, y: sample.y });
+      currentPoints.push(point);
     }
   }
   if (currentPhase !== null) segments.push({ phase: currentPhase, points: currentPoints });

@@ -1,4 +1,4 @@
-import type { CornerPoint, CornerSample } from '../types';
+import type { LapSample, Point } from '../types';
 
 const SAMPLE_RATE_HZ = 20;
 
@@ -7,12 +7,13 @@ export interface InterpolatedState {
   y: number;
   distanceM: number;
   speedKph: number;
+  throttle: number;
   brakeActive: boolean;
 }
 
 // Samples are baked onto a uniform 20 Hz grid, so we can index directly
 // instead of scanning the array on every animation frame.
-export function sampleAt(samples: CornerSample[], t: number): InterpolatedState {
+export function sampleAt(samples: LapSample[], t: number): InterpolatedState {
   const clampedT = Math.min(Math.max(t, 0), samples.at(-1)!.t);
   const rawIndex = clampedT * SAMPLE_RATE_HZ;
   const lowerIndex = Math.floor(rawIndex);
@@ -27,6 +28,7 @@ export function sampleAt(samples: CornerSample[], t: number): InterpolatedState 
     y: lower.y + (upper.y - lower.y) * ratio,
     distanceM: lower.distanceM + (upper.distanceM - lower.distanceM) * ratio,
     speedKph: lower.speedKph + (upper.speedKph - lower.speedKph) * ratio,
+    throttle: lower.throttle + (upper.throttle - lower.throttle) * ratio,
     brakeActive: lower.brakeActive,
   };
 }
@@ -45,13 +47,13 @@ interface PathModel {
   totalLen: number;
 }
 
-const MODEL_CACHE = new WeakMap<CornerSample[], PathModel>();
+const MODEL_CACHE = new WeakMap<LapSample[], PathModel>();
 
 // Points closer together than this (metres) are GPS jitter, not shape - drop
 // them so they don't leave a kink the heading tangent would trip over.
 const MIN_SEGMENT_M = 0.4;
 
-function buildModel(samples: CornerSample[]): PathModel {
+function buildModel(samples: LapSample[]): PathModel {
   const raw = samples.map((s) => ({ x: s.x, y: s.y }));
   const pts = [raw[0]];
   for (let i = 1; i < raw.length - 1; i++) {
@@ -82,7 +84,7 @@ function buildModel(samples: CornerSample[]): PathModel {
   return { pts, cumLen, travel, totalLen };
 }
 
-function getModel(samples: CornerSample[]): PathModel {
+function getModel(samples: LapSample[]): PathModel {
   let model = MODEL_CACHE.get(samples);
   if (!model) {
     model = buildModel(samples);
@@ -98,7 +100,7 @@ function catmullRom(p0: number, p1: number, p2: number, p3: number, ratio: numbe
 }
 
 // Distance the car has travelled along the line at time t (metres).
-function travelledAt(model: PathModel, samples: CornerSample[], t: number): number {
+function travelledAt(model: PathModel, samples: LapSample[], t: number): number {
   const clampedT = Math.min(Math.max(t, 0), samples.at(-1)!.t);
   const rawIndex = clampedT * SAMPLE_RATE_HZ;
   const lo = Math.floor(rawIndex);
@@ -138,7 +140,7 @@ function pointAtArc(model: PathModel, s: number): { x: number; y: number } {
 // Smooth visual position of the car, paced by the real speed trace. Only used
 // for drawing - scalar telemetry (distance, speed) stays linear in sampleAt so
 // the brake-scoring math keeps reading exact recorded values.
-export function positionAt(samples: CornerSample[], t: number): { x: number; y: number } {
+export function positionAt(samples: LapSample[], t: number): { x: number; y: number } {
   const model = getModel(samples);
   return pointAtArc(model, travelledAt(model, samples, t));
 }
@@ -146,7 +148,7 @@ export function positionAt(samples: CornerSample[], t: number): { x: number; y: 
 // Heading from the path tangent over a fixed arc-length window. Because the
 // window is measured in metres along the line (not in noisy per-sample deltas)
 // the nose stays steady even where the raw position data stalls.
-export function headingAt(samples: CornerSample[], t: number): number {
+export function headingAt(samples: LapSample[], t: number): number {
   const model = getModel(samples);
   const s = travelledAt(model, samples, t);
   const ds = 1.5;
@@ -155,12 +157,13 @@ export function headingAt(samples: CornerSample[], t: number): number {
   return (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
 }
 
-const GAS_THROTTLE_THRESHOLD = 95;
-
-// Where Max gets back to full throttle out of the corner - the player's second
-// target. Defined as the first sample past the apex where throttle is committed
-// (>= 95%), i.e. the start of the "vol gas" phase.
-export function computeGasPoint(samples: CornerSample[], apexT: number): CornerPoint {
-  const sample = samples.find((s) => s.t > apexT && s.throttle >= GAS_THROTTLE_THRESHOLD) ?? samples.at(-1)!;
-  return { t: sample.t, distanceM: sample.distanceM, speedKph: sample.speedKph };
+// Smoothed polyline for a stretch of the lap, sampled from the same
+// jitter-filtered Catmull-Rom path model that drives the car - use this for
+// drawing driven lines/ribbons instead of raw sample points, which carry
+// visible 20 Hz GPS jitter through slow corners.
+export function smoothPathPoints(samples: LapSample[], t0: number, t1: number, stepS = 0.05): Point[] {
+  const points: Point[] = [];
+  for (let t = t0; t < t1; t += stepS) points.push(positionAt(samples, t));
+  points.push(positionAt(samples, t1));
+  return points;
 }
