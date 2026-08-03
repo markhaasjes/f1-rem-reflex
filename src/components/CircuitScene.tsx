@@ -3,7 +3,7 @@ import { useElementSize } from '../hooks/useElementSize';
 import { viewBoxFromCam, type CamBox } from '../hooks/useCameraFlight';
 import { fitProjection, prepareCanvas } from '../lib/canvas';
 import { drawF1Car } from '../lib/canvasCar';
-import { headingAt, positionAt, primePathModel, sampleAt, smoothPathPoints } from '../lib/corner';
+import { headingAt, positionAt, sampleAt, smoothPathPoints } from '../lib/corner';
 import { buildPhaseSegments, type DrivingPhase } from '../lib/phases';
 import {
   drawCornerBadge,
@@ -103,14 +103,8 @@ export function CircuitScene(props: CircuitSceneProps) {
   const { fixture } = props;
 
   // Rotate the closed outline so index 0 sits at start/finish (on a straight):
-  // corner slices for curbs/gravel then never wrap the array boundary. Priming
-  // the path model here (before the segments memo below) clamps the car path
-  // to the rendered asphalt, so locally drifting GPS can't cut across corners.
-  const outline = useMemo(() => {
-    const rotated = rotateOutline(fixture.trackOutline, fixture.startFinish);
-    primePathModel(fixture.lap.samples, rotated);
-    return rotated;
-  }, [fixture]);
+  // corner slices for curbs/gravel then never wrap the array boundary.
+  const outline = useMemo(() => rotateOutline(fixture.trackOutline, fixture.startFinish), [fixture]);
   const cornerIndices = useMemo(() => fixture.corners.map((c) => nearestIndex(outline, c)), [fixture, outline]);
   // Corners the game visits get prominent badges; the rest render minor.
   const roundCornerNumbers = useMemo(() => new Set(fixture.rounds.flatMap((r) => r.cornerNumbers)), [fixture]);
