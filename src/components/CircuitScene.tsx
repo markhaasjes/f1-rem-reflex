@@ -15,6 +15,8 @@ import {
   drawPin,
   drawRibbon,
   drawSandBackground,
+  drawSea,
+  drawLakes,
   drawScaleBar,
   drawStartFinish,
   drawTrackRibbon,
@@ -143,8 +145,10 @@ export function CircuitScene(props: CircuitSceneProps) {
 
       // --- environment ---
       drawSandBackground(ctx, w, h);
+      drawSea(ctx, projection, h);
       drawGreenSurroundings(ctx, outline, projection);
       drawPaddock(ctx, outline, 0, projection);
+      drawLakes(ctx, projection);
       for (let i = 0; i < fixture.corners.length; i++) {
         const trap = GRAVEL_TRAPS[fixture.corners[i].number];
         if (trap) drawGravelTrap(ctx, outline, cornerIndices[i], projection, trap);

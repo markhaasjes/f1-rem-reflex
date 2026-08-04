@@ -20,6 +20,7 @@ const TONE_STYLES = {
 } as const;
 
 const OVERVIEW_PAD_M = 90;
+const OVERVIEW_SEA_PAD_M = 190;
 const ROUND_PAD_M = 55;
 
 // Max's real team radio, played once on the final score screen (fetched by
@@ -220,8 +221,15 @@ function App() {
   const overviewBox = useMemo<CamBox>(() => {
     const xs = fixture.trackOutline.map((p) => p.x);
     const ys = fixture.trackOutline.map((p) => p.y);
+    // extra room on the west so the sea and beach show at the overview,
+    // like the satellite view with the coast on the left edge
     return boxFromBounds(
-      { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) },
+      {
+        minX: Math.min(...xs) - OVERVIEW_SEA_PAD_M,
+        minY: Math.min(...ys),
+        maxX: Math.max(...xs),
+        maxY: Math.max(...ys),
+      },
       OVERVIEW_PAD_M,
     );
   }, []);

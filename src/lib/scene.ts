@@ -28,6 +28,9 @@ export const PALETTE = {
   paddock: '#aaa8a4',
   white: '#ffffff',
   curbRed: '#e61e14', // redNosRood
+  water: '#8fb8d4',
+  waterEdge: '#7aa6c4',
+  beach: '#efe4c3',
 };
 
 // Deterministic PRNG so decorative speckles land in the same spots on every
@@ -173,7 +176,7 @@ export function drawSandBackground(ctx: CanvasRenderingContext2D, width: number,
   ctx.fillRect(0, 0, width, height);
 
   // lighter dune patches
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 8; i++) {
     ctx.beginPath();
     ctx.ellipse(
       rand() * width,
@@ -219,6 +222,83 @@ export function drawSandBackground(ctx: CanvasRenderingContext2D, width: number,
     ctx.roundRect(-w / 2, -1.5, w, 3, 1.5);
     ctx.fill();
     ctx.restore();
+  }
+}
+
+// The North Sea along the west edge with a beach strip, parallel to the main
+// straight's tilt like on the satellite view (positions stylized closer so
+// the water is visible at the overview zoom).
+const COAST_X_AT_Y0 = -235; // waterline x where y = 0
+const COAST_SLOPE = -0.25; // follows the coast's SSW-NNE direction
+const BEACH_WIDTH_M = 70;
+
+export function drawSea(ctx: CanvasRenderingContext2D, projection: ScreenProjection, height: number) {
+  const coastAt = (y: number) => COAST_X_AT_Y0 + COAST_SLOPE * y;
+  const [, yTop] = projection.toData(0, -60);
+  const [, yBottom] = projection.toData(0, height + 60);
+
+  const beach = [
+    projection.toScreen(coastAt(yTop) + BEACH_WIDTH_M, yTop),
+    projection.toScreen(coastAt(yBottom) + BEACH_WIDTH_M, yBottom),
+    projection.toScreen(coastAt(yBottom), yBottom),
+    projection.toScreen(coastAt(yTop), yTop),
+  ];
+  ctx.beginPath();
+  beach.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+  ctx.closePath();
+  ctx.fillStyle = PALETTE.beach;
+  ctx.fill();
+
+  const [wTopX, wTopY] = projection.toScreen(coastAt(yTop), yTop);
+  const [wBotX, wBotY] = projection.toScreen(coastAt(yBottom), yBottom);
+  ctx.beginPath();
+  ctx.moveTo(wTopX, wTopY);
+  ctx.lineTo(wBotX, wBotY);
+  ctx.lineTo(-60, height + 60);
+  ctx.lineTo(-60, -60);
+  ctx.closePath();
+  ctx.fillStyle = PALETTE.water;
+  ctx.fill();
+
+  // two lines of surf just off the shore
+  const s = projection.scale;
+  for (const [offsetM, alpha] of [
+    [10, 0.55],
+    [24, 0.3],
+  ] as const) {
+    ctx.beginPath();
+    const [ax, ay] = projection.toScreen(coastAt(yTop) - offsetM, yTop);
+    const [bx, by] = projection.toScreen(coastAt(yBottom) - offsetM, yBottom);
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(bx, by);
+    ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+    ctx.lineWidth = Math.max(1.2, 3.5 * s);
+    ctx.setLineDash([26 * s, 14 * s]);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+}
+
+// The dune lakes, placed against the satellite view: one enclosed by the
+// eastern loop, the bigger ones in the south, a small one in the NE dunes.
+const LAKES = [
+  { x: 775, y: 70, rx: 48, ry: 36, rot: 0.45 },
+  { x: 330, y: 300, rx: 80, ry: 50, rot: -0.2 },
+  { x: 560, y: 295, rx: 55, ry: 40, rot: 0.3 },
+  { x: 745, y: -285, rx: 30, ry: 20, rot: 0.15 },
+];
+
+export function drawLakes(ctx: CanvasRenderingContext2D, projection: ScreenProjection) {
+  const s = projection.scale;
+  for (const lake of LAKES) {
+    const [cx, cy] = projection.toScreen(lake.x, lake.y);
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, lake.rx * s, lake.ry * s, lake.rot, 0, Math.PI * 2);
+    ctx.fillStyle = PALETTE.water;
+    ctx.fill();
+    ctx.lineWidth = Math.max(1, 2.5 * s);
+    ctx.strokeStyle = PALETTE.waterEdge;
+    ctx.stroke();
   }
 }
 
