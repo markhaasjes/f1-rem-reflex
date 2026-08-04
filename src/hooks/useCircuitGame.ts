@@ -75,16 +75,15 @@ export function useCircuitGame(fixture: ZandvoortFixture) {
     setPhase('running');
   }, [round.tStart]);
 
-  // Two pedals: each press is typed by the pedal (REM/GAS). A pedal stops
-  // registering once the player has used it as often as Max does in this
-  // round's window; scoring later pairs the k-th brake press with Max's k-th
-  // brake event (same for gas).
+  // Two pedals: each press is typed by the pedal (REM/GAS), and only the
+  // pedal matching Max's next event registers - play-testing showed players
+  // don't read instructions, so the game enforces the brake/gas order and the
+  // UI disables the other pedal. Scoring pairs the k-th brake press with
+  // Max's k-th brake event (same for gas), which alternation guarantees.
   const press = useCallback(
     (type: PlayerMark['type']) => {
       if (phase !== 'running') return;
-      const eventsOfType = round.events.filter((e) => e.type === type).length;
-      const marksOfType = marksRef.current.filter((m) => m.type === type).length;
-      if (marksOfType >= eventsOfType) return;
+      if (round.events[marksRef.current.length]?.type !== type) return;
       const t = Math.min(round.tStart + (performance.now() - startTimeRef.current) / 1000, round.tEnd);
       const state = sampleAt(fixture.lap.samples, t);
       const mark: PlayerMark = { type, t, distanceM: state.distanceM, speedKph: state.speedKph };

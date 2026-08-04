@@ -102,7 +102,7 @@ function Pedal({
       aria-keyshortcuts={isBrake ? 'r arrowleft' : 'g arrowright'}
       aria-label={isBrake ? 'Rempedaal (toets R)' : 'Gaspedaal (toets G)'}
       className={`group flex-1 select-none touch-manipulation rounded-2xl pb-1 pt-2 transition-all duration-150 focus-ring focus-ring-white ${
-        disabled ? 'opacity-35' : 'hover:-translate-y-0.5'
+        disabled ? 'opacity-50 saturate-50' : 'hover:-translate-y-0.5'
       } ${highlight ? 'ring-4 ring-white/80' : ''}`}
     >
       <svg
@@ -188,6 +188,10 @@ function Pedal({
         style={{ color: accent }}
       >
         {isBrake ? 'REM!' : 'GAS!'}
+      </span>
+      <span aria-hidden="true" className="mt-1 hidden items-center justify-center gap-1 sm:flex">
+        <Key>{isBrake ? 'R' : 'G'}</Key>
+        <Key>{isBrake ? '\u2190' : '\u2192'}</Key>
       </span>
     </button>
   );
@@ -362,11 +366,6 @@ function App() {
   if (nextEvent?.type === 'brake') runningHint = 'Wachten... rem op het juiste moment';
   else if (nextEvent?.type === 'gas') runningHint = 'Nu weer op het gas!';
 
-  // A pedal dims (and truly disables) once the player has used it as often as
-  // Max does this round.
-  const pedalLeft = (type: 'brake' | 'gas') =>
-    round.events.filter((e) => e.type === type).length - marks.filter((m) => m.type === type).length;
-
   // Crossfading layers stay mounted for the animation, so hidden ones must be
   // `inert`: otherwise invisible buttons stay in the Tab order and invisible
   // text keeps getting read by screen readers.
@@ -382,7 +381,7 @@ function App() {
           <NOSLogo className="w-12 h-auto text-white fill-current" />
         </div>
       </div>
-      <div className="flex h-svh flex-col items-center gap-3 overflow-hidden bg-track-blue px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-white sm:gap-4 sm:px-8 sm:pt-5 wide:px-10">
+      <div className="bg-carbon flex h-svh flex-col items-center gap-3 overflow-hidden px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-white sm:gap-4 sm:px-8 sm:pt-5 wide:px-10">
         <Pill className="gap-3 text-sm sm:text-base">{fixture.meta.circuit}</Pill>
 
         <div
@@ -447,9 +446,11 @@ function App() {
                   </span>
                 </div>
                 <p className="text-sm font-bold text-white/85 sm:text-base">
-                  {round.events.length / 2 === 1
-                    ? 'Let op de bocht en druk op het juiste moment!'
-                    : 'Een dubbele: let goed op waar Max remt en weer gas geeft!'}
+                  {round.practice && 'Rem bij het rode punt en geef weer gas bij het groene punt!'}
+                  {!round.practice &&
+                    (round.events.length / 2 === 1
+                      ? 'Let op de bocht en druk op het juiste moment!'
+                      : 'Een dubbele: let goed op waar Max remt en weer gas geeft!')}
                 </p>
               </div>
               <p {...layer(phase === 'running', 'text-base font-extrabold sm:text-xl')}>{runningHint}</p>
@@ -479,13 +480,13 @@ function App() {
                 <Pedal
                   variant="brake"
                   onPress={() => game.press('brake')}
-                  disabled={phase === 'running' && pedalLeft('brake') === 0}
+                  disabled={nextEvent?.type !== 'brake'}
                   highlight={phase === 'running' && nextEvent?.type === 'brake'}
                 />
                 <Pedal
                   variant="gas"
                   onPress={() => game.press('gas')}
-                  disabled={phase === 'running' && pedalLeft('gas') === 0}
+                  disabled={nextEvent?.type !== 'gas'}
                   highlight={phase === 'running' && nextEvent?.type === 'gas'}
                 />
               </div>
@@ -514,7 +515,7 @@ function App() {
           aria-modal="true"
           aria-labelledby="intro-title"
           inert={!(phase === 'intro' && !hideIntroChrome) || undefined}
-          className={`fixed inset-0 z-40 flex overflow-y-auto bg-ink/70 p-4 backdrop-blur-[3px] transition-all duration-500 ${phase === 'intro' && !hideIntroChrome ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+          className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-ink/70 p-4 backdrop-blur-[3px] transition-all duration-500 ${phase === 'intro' && !hideIntroChrome ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
           <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:p-7">
             <HeroCar className="mx-auto h-9 w-auto sm:h-11" />
@@ -577,7 +578,7 @@ function App() {
           aria-modal="true"
           aria-labelledby="final-title"
           inert={!(phase === 'finished' && !showShared) || undefined}
-          className={`fixed inset-0 z-40 flex overflow-y-auto bg-ink/60 p-4 backdrop-blur-[2px] transition-all duration-700 ${phase === 'finished' && !showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+          className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-ink/60 p-4 backdrop-blur-[2px] transition-all duration-700 ${phase === 'finished' && !showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
           <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl">
             <h2 id="final-title" className="text-sm font-extrabold uppercase tracking-wide text-[#e61e14]">
@@ -613,7 +614,7 @@ function App() {
           aria-modal="true"
           aria-labelledby="shared-title"
           inert={!showShared || undefined}
-          className={`fixed inset-0 z-40 flex overflow-y-auto bg-ink/60 p-4 backdrop-blur-[2px] transition-all duration-500 ${showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+          className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-ink/60 p-4 backdrop-blur-[2px] transition-all duration-500 ${showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
           <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl">
             <h2 id="shared-title" className="text-sm font-extrabold uppercase tracking-wide text-[#e61e14]">

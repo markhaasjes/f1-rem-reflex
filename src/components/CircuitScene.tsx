@@ -155,6 +155,28 @@ export function CircuitScene(props: CircuitSceneProps) {
       }
       drawStartFinish(ctx, fixture.startFinish.x, fixture.startFinish.y, fixture.startFinish.headingDeg, projection);
 
+      // --- practice coaching: pulsing markers where Max brakes and gets
+      // back on the gas, so first-time players see what to do without
+      // reading anything ---
+      if (round.practice && (phase === 'ready' || phase === 'running')) {
+        for (const event of round.events) {
+          const s = sampleAt(samples, event.t);
+          const [x, y] = projection.toScreen(s.x, s.y);
+          const isBrake = event.type === 'brake';
+          const color = isBrake ? '#e61e14' : '#0b7a43';
+          const pulse = (now % 1400) / 1400;
+          ctx.save();
+          ctx.globalAlpha = 1 - pulse;
+          ctx.beginPath();
+          ctx.arc(x, y, 8 + pulse * 16, 0, Math.PI * 2);
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 3;
+          ctx.stroke();
+          ctx.restore();
+          drawPin(ctx, x, y, color, isBrake ? 'Rem hier!' : 'Gas hier!', !isBrake);
+        }
+      }
+
       // --- run/result overlays ---
       if (phase === 'running' && elapsedT > round.tStart) {
         drawRibbon(ctx, smoothPathPoints(samples, round.tStart, elapsedT), 'rgba(225, 6, 0, 0.85)', projection);
@@ -201,7 +223,11 @@ export function CircuitScene(props: CircuitSceneProps) {
 
       // --- map chrome: corner badges + labels, fading out as we zoom in ---
       const compact = w < 520;
-      const badgeAlpha = Math.max(0, Math.min(1, (0.85 - projection.scale) / 0.35));
+      // Fade on world zoom (camera box width in meters), not pixel scale:
+      // the full-viewport stage renders the overview at a much larger pixel
+      // scale than a phone does, and a scale threshold made badges vanish on
+      // big screens. Fully visible at the ~1200m overview, gone below ~700m.
+      const badgeAlpha = Math.max(0, Math.min(1, (camBox.w - 700) / 300));
       if (badgeAlpha > 0) {
         // Anchor on the last corner number: for combined rounds that is the
         // corner the round is named after (Hugenholtz for 2+3, etc.).

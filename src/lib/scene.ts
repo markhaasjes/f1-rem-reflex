@@ -499,7 +499,8 @@ export function drawCornerBadge(
   ctx.globalAlpha = minor ? alpha * 0.55 : alpha;
   ctx.beginPath();
   ctx.arc(screenX, screenY, r, 0, Math.PI * 2);
-  ctx.fillStyle = highlight ? '#e61e14' : '#2f6fed';
+  // Black circle, white number, white ring - the NOS WK-stand graphic style.
+  ctx.fillStyle = '#1f1f1f';
   ctx.strokeStyle = PALETTE.white;
   ctx.lineWidth = minor ? 1.5 : 2.5;
   ctx.fill();

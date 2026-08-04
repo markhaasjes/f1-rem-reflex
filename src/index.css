@@ -25,6 +25,39 @@ body {
   color-scheme: dark;
 }
 
+/* Interactive elements always advertise themselves (Tailwind v4 resets
+   buttons to cursor: default). */
+button:not(:disabled) {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+
+/* NOS F1 graphics carbon: a fine diagonal hatch over the brand blue, same as
+   the broadcast/WK-stand visuals. */
+.bg-carbon {
+  background-color: var(--color-track-blue);
+  background-image: repeating-linear-gradient(
+    115deg,
+    rgba(255, 255, 255, 0.055) 0px,
+    rgba(255, 255, 255, 0.055) 2px,
+    transparent 2px,
+    transparent 8px
+  );
+}
+
+/* The same hatch woven into modal backdrops, on top of the dark blur. */
+.backdrop-carbon {
+  background-image: repeating-linear-gradient(
+    115deg,
+    rgba(255, 255, 255, 0.045) 0px,
+    rgba(255, 255, 255, 0.045) 2px,
+    transparent 2px,
+    transparent 8px
+  );
+}
+
 /* NOS-style keyboard focus (like nos.nl): 2px solid outline with 2px offset,
    red on light surfaces, overridable per surface via --ring. Only shows for
    keyboard/assistive focus, never on click. */
