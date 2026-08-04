@@ -65,13 +65,11 @@ const REPAIR_RANGES: { fromM: number; toM: number }[] = [
 ];
 const COLLINEAR_DEV_M = 0.06; // interior points this close to the chord are lerp fill
 const DENSIFY_STEP_M = 2;
-// A gap between real GPS vertices longer than this has missing shape (the
-// feed skips the entire 39m Hugenholtz hairpin arc, and 10-15m chords still
-// render as visible facets in a tight corner), so the in-between is
-// reconstructed along the track outline instead of guessed by the spline.
-const GUIDE_GAP_M = 9;
 const MIN_VERTEX_SPACING_M = 7;
 const LAP_LENGTH_M = 4218;
+// Half-width, in ~3m outline-grid anchors, of the moving average applied to
+// the lateral-offset field inside a repair range (so ~33m full window).
+const OFFSET_SMOOTH_WINDOW = 5;
 
 interface TracePoint extends Point {
   d: number; // meters into lap
@@ -164,35 +162,22 @@ function projectOnOutline(outline: Point[], p: TracePoint): number {
   return bestJ;
 }
 
-// Fills a long data gap between two real vertices by walking the track
-// outline from one to the other, blending Max's real lateral offset at the
-// start into his offset at the end - the reconstructed stretch follows the
-// road's curvature while staying anchored to the measured endpoints.
-function guidePointsBetween(outline: Point[], a: TracePoint, b: TracePoint): Point[] {
-  const n = outline.length;
-  const ja = projectOnOutline(outline, a);
-  const jb = projectOnOutline(outline, b);
-  const stepCount = (jb - ja + n) % n;
-  if (stepCount < 2 || stepCount > 60) return []; // degenerate projection: keep the chord
-  const offA = { x: a.x - outline[ja].x, y: a.y - outline[ja].y };
-  const offB = { x: b.x - outline[jb].x, y: b.y - outline[jb].y };
-  const points: Point[] = [];
-  for (let s = 1; s < stepCount; s++) {
-    const j = (ja + s) % n;
-    const f = s / stepCount;
-    points.push({
-      x: outline[j].x + offA.x * (1 - f) + offB.x * f,
-      y: outline[j].y + offA.y * (1 - f) + offB.y * f,
-    });
-  }
-  return points;
-}
-
 // Replaces kept[start..end] (a repair range plus one shared boundary point on
-// each side, for tangent continuity) with the reconstruction: collapse lerp
-// fill to real vertices, bridge long data gaps along the track outline, then
-// re-curve the result with centripetal Catmull-Rom.
+// each side, for tangent continuity) with the reconstruction:
+//
+//   1. collapse lerp fill to Max's real GPS vertices and thin jittery
+//      near-duplicates;
+//   2. re-express the whole slice on the track outline's ~3m grid: every
+//      vertex becomes (outline anchor, lateral offset), gaps get
+//      linearly-blended offsets;
+//   3. low-pass the offset field (endpoints pinned). This is what makes the
+//      hairpin genuinely curved: Max sweeps ~5m from the outside to the
+//      inside of the corner, and blending that swing linearly per segment
+//      visibly straightens the arc - smoothing the offsets lets the road's
+//      curvature dominate while his line still drifts out-to-in;
+//   4. re-curve with centripetal Catmull-Rom.
 function repairStraightFills(kept: TracePoint[], outline: Point[]): Point[] {
+  const n = outline.length;
   const spans = REPAIR_RANGES.map((range) => {
     const start = kept.findIndex((p) => p.d >= range.fromM);
     let end = start;
@@ -206,8 +191,7 @@ function repairStraightFills(kept: TracePoint[], outline: Point[]): Point[] {
     const sliceEnd = Math.min(end + 1, kept.length);
     const collapsed = collapseCollinearRuns(kept.slice(start - 1, sliceEnd)) as TracePoint[];
     // Thin near-duplicate vertices: real GPS points 2-5m apart carry ~1m of
-    // lateral jitter, which the spline turns into a visible wobble at the
-    // bridge junctions.
+    // lateral jitter, which the spline turns into a visible wobble.
     const sparse: TracePoint[] = [collapsed[0]];
     for (let i = 1; i < collapsed.length - 1; i++) {
       const prev = sparse.at(-1)!;
@@ -217,27 +201,50 @@ function repairStraightFills(kept: TracePoint[], outline: Point[]): Point[] {
     }
     sparse.push(collapsed.at(-1)!);
 
-    let bridged: Point[] = [sparse[0]];
+    // Anchor every vertex to the outline grid and fill the gaps with
+    // linearly-blended offsets, one anchor per outline point.
+    const anchors: { j: number; off: Point }[] = [];
+    const pushAnchor = (j: number, off: Point) => {
+      if (anchors.length === 0 || anchors.at(-1)!.j !== j) anchors.push({ j, off });
+    };
+    let prevJ = projectOnOutline(outline, sparse[0]);
+    pushAnchor(prevJ, { x: sparse[0].x - outline[prevJ].x, y: sparse[0].y - outline[prevJ].y });
     for (let i = 1; i < sparse.length; i++) {
-      const gap = Math.hypot(sparse[i].x - sparse[i - 1].x, sparse[i].y - sparse[i - 1].y);
-      if (gap > GUIDE_GAP_M && Number.isFinite(sparse[i - 1].d) && Number.isFinite(sparse[i].d)) {
-        bridged.push(...guidePointsBetween(outline, sparse[i - 1], sparse[i]));
+      const j = projectOnOutline(outline, sparse[i]);
+      const off = { x: sparse[i].x - outline[j].x, y: sparse[i].y - outline[j].y };
+      const stepCount = (j - prevJ + n) % n;
+      if (stepCount >= 2 && stepCount <= 60) {
+        const prevOff = anchors.at(-1)!.off;
+        for (let s = 1; s < stepCount; s++) {
+          const f = s / stepCount;
+          pushAnchor((prevJ + s) % n, {
+            x: prevOff.x * (1 - f) + off.x * f,
+            y: prevOff.y * (1 - f) + off.y * f,
+          });
+        }
       }
-      bridged.push(sparse[i]);
+      pushAnchor(j, off);
+      prevJ = j;
     }
-    // Two rounds of Chaikin corner-cutting soften what jitter remains
-    // (endpoints stay fixed), then the centripetal spline evens the spacing.
-    for (let round = 0; round < 2; round++) {
-      const smoothed: Point[] = [bridged[0]];
-      for (let i = 0; i < bridged.length - 1; i++) {
-        const a = bridged[i];
-        const b = bridged[i + 1];
-        smoothed.push({ x: a.x * 0.75 + b.x * 0.25, y: a.y * 0.75 + b.y * 0.25 });
-        smoothed.push({ x: a.x * 0.25 + b.x * 0.75, y: a.y * 0.25 + b.y * 0.75 });
+
+    // Low-pass the offset field with a tapered moving average: full window in
+    // the interior, shrinking to zero at the ends so the seams stay pinned to
+    // the measured boundary points.
+    const smoothedOffsets = anchors.map((_, i) => {
+      const w = Math.min(OFFSET_SMOOTH_WINDOW, i, anchors.length - 1 - i);
+      let sx = 0;
+      let sy = 0;
+      for (let k = i - w; k <= i + w; k++) {
+        sx += anchors[k].off.x;
+        sy += anchors[k].off.y;
       }
-      smoothed.push(bridged.at(-1)!);
-      bridged = smoothed;
-    }
+      return { x: sx / (2 * w + 1), y: sy / (2 * w + 1) };
+    });
+    const bridged = anchors.map((a, i) => ({
+      x: outline[a.j].x + smoothedOffsets[i].x,
+      y: outline[a.j].y + smoothedOffsets[i].y,
+    }));
+
     const curved = densifyCentripetal(bridged, DENSIFY_STEP_M);
     result.splice(start - 1, sliceEnd - (start - 1), ...curved);
   }
