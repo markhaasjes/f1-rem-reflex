@@ -74,6 +74,15 @@ function eventChipText(er: EventResult): string {
   });
 }
 
+// Visual keycap for the keyboard explainer in the intro modal.
+function Key({ children }: { children: React.ReactNode }) {
+  return (
+    <kbd className="inline-block min-w-7 rounded-md border border-ink/15 bg-white px-1.5 py-0.5 text-center text-xs font-extrabold text-ink shadow-[0_2px_0_rgba(11,20,64,0.15)]">
+      {children}
+    </kbd>
+  );
+}
+
 function scoreSentence(total: number): string {
   if (total >= 90) return 'Wereldklasse - jij remt als Max zelf!';
   if (total >= 70) return 'Sterke ronde, bijna kwalificatie-waardig.';
@@ -321,6 +330,41 @@ function App() {
                   Rijd zijn echte poleronde over Zandvoort. Eerst oefenen in de Tarzanbocht, daarna drie bochten voor de
                   punten: rem en geef weer gas op precies het juiste moment.
                 </p>
+                {/* keyboard explainer: desktop only - most players are on touch */}
+                <div className="mt-4 hidden rounded-2xl bg-[#f3f3f0] p-3.5 text-left sm:block">
+                  <p className="text-xs font-extrabold uppercase tracking-wide text-ink/50">Speel met je toetsenbord</p>
+                  <dl className="mt-2 flex flex-col gap-1.5 text-sm font-bold text-ink/80">
+                    <div className="flex items-center justify-between">
+                      <dt className="flex items-center gap-2">
+                        <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-[#e61e14]" />
+                        Remmen
+                      </dt>
+                      <dd className="flex gap-1">
+                        <Key>R</Key>
+                        <Key>&larr;</Key>
+                      </dd>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <dt className="flex items-center gap-2">
+                        <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                        Gas geven
+                      </dt>
+                      <dd className="flex gap-1">
+                        <Key>G</Key>
+                        <Key>&rarr;</Key>
+                      </dd>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <dt className="flex items-center gap-2">
+                        <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-badge-blue" />
+                        Verder / actie
+                      </dt>
+                      <dd>
+                        <Key>spatie</Key>
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
                 <button
                   ref={introBtnRef}
                   type="button"
