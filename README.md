@@ -63,6 +63,7 @@ updating the `DRIVER` lap reference in the script and re-running it.
 ```
 scripts/build-game-fixture.mjs   data pipeline: OpenF1 + official geometry -> the fixture
 scripts/fetch-team-radio.mjs     downloads Max's team-radio mp3s for the score screen
+scripts/analyze-race-line.mjs    diagnoses straight/faceted race-line corners (GPS data gaps)
 src/data/zandvoort2025.json      the one fixture: circuit, full lap, rounds + target events
 src/lib/canvas.ts                projection math + devicePixelRatio-aware canvas setup
 src/lib/scene.ts                 illustrated scene: sand, green corridor, paddock, track, curbs, gravel, badges

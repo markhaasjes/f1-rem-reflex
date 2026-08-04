@@ -223,10 +223,70 @@ must track recorded telemetry exactly. `positionAt()`/`headingAt()` feed
 _drawing_: OpenF1's GPS trace has stalls (x/y freezes while speed reads
 200+ km/h) that make a linearly-driven car freeze and its heading spin. The
 fix: build a jitter-filtered, Catmull-Rom-smoothed geometric path once per
-samples array (WeakMap-cached), integrate the speed channel into a travel
-curve rescaled to the path length, and walk the car by arc length. If a
-future fixture makes the car jitter or spin, it's GPS stalls again — look at
-`MIN_SEGMENT_M` before anything else.
+samples array (WeakMap-cached, repaired per REPAIR_RANGES — next section),
+integrate the speed channel into a travel curve rescaled to the path length,
+and walk the car by arc length. `primePathModel(samples, outline)` must run
+before first use so the repair has the road shape; CircuitScene does this in
+its outline memo. If a future fixture makes the car jitter or spin, it's GPS
+stalls again — look at `MIN_SEGMENT_M` before anything else.
+
+### Repairing a race line with GPS data gaps (the Hugenholtz playbook)
+
+Symptom: a corner's drawn line (driven ribbon / phase colors) renders as a
+straight or faceted segment where the road clearly curves. Gerlach &
+Hugenholtz had it worst; the machinery to fix it is generic and reusable.
+
+**Why it happens** — three stacked causes, all diagnosed on real data:
+
+1. OpenF1's location feed only updates every ~15–40m; the pipeline's 20 Hz
+   resample lerps between updates, so the trace is chains of _perfectly
+   collinear fill points_ — dense enough to pass any "missing data" check,
+   but carrying no shape.
+2. Some gaps skip an entire arc: through the Hugenholtz hairpin there are
+   real vertices at 791m and 830m and _nothing_ in between — the whole 180°
+   bowl is one 39m chord. No spline can invent that arc from neighbors; it
+   needs the road's shape.
+3. Subtler killers even after bridging along the road: Max's real ~5m
+   outside-to-inside sweep, blended linearly, mathematically cancels road
+   curvature (a changing lateral offset straightens a curve); and the
+   official outline itself has a brief zero-curvature dip mid-bowl that the
+   wide road band masks but a thin line exposes.
+
+**The repair** (`repairStraightFills` in corner.ts) runs only inside
+configured `REPAIR_RANGES` (meters into lap); every other meter of the lap
+uses Max's trace untouched. Per range: collapse collinear fill back to the
+real GPS vertices → thin jittery near-duplicates (`MIN_VERTEX_SPACING_M`)
+→ re-express the slice on the outline's ~3m grid with per-vertex lateral
+offsets, gaps filled by blending (`projectOnOutline` seeds by lap distance
+so parallel track sections can't capture points) → low-pass the offset field
+(`OFFSET_SMOOTH_WINDOW`, seams pinned) → even out the turn-angle profile
+(`smoothTurnProfile`, `TURN_SMOOTH_WINDOW`, endpoints pinned via
+rotation+scale) → densify with centripetal Catmull-Rom.
+
+**To re-apply on another corner:**
+
+1. `node scripts/analyze-race-line.mjs <fromM> <toM>` — it lists the
+   collinear fills, the data gaps, the stretches where the road turns but
+   the trace doesn't, and prints a suggested `REPAIR_RANGES` entry.
+   Treat section 3 as _candidates_: it also flags corners that already look
+   fine (a real racing line legitimately straightens corners); only repair
+   what actually renders wrong.
+2. Add the range to `REPAIR_RANGES` in [corner.ts](../src/lib/corner.ts),
+   with both ends trimmed onto clean straights (the boundary points become
+   the pinned seams).
+3. Verify like the original fix: play the round and screenshot the result
+   zoomed (`?corner=N` helps); check numerically if in doubt — the line's
+   turn rate should track the road's through the corner, stay within the
+   road half-width (6.5m) of the centerline, and stay within ~2m of Max's
+   real vertices.
+
+Tuning knobs, all in corner.ts: `COLLINEAR_DEV_M` (what counts as lerp
+fill), `MIN_VERTEX_SPACING_M` (jitter thinning), `OFFSET_SMOOTH_WINDOW`
+(how fast the line may drift across the road), `TURN_SMOOTH_WINDOW` (how
+aggressively curvature dips get filled). One hard-won spline lesson lives in
+`densifyCentripetal`: never fudge a degenerate knot interval with an epsilon
+divisor — it breaks the weights' partition of unity and shoots points to the
+origin; return the endpoint instead.
 
 ## Scoring
 
