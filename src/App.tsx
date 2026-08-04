@@ -39,15 +39,6 @@ const BTN_LIGHT = `${BTN_BASE} bg-white text-ink hover:bg-[#f3f3f0] hover:scale-
 const BTN_RED = `${BTN_BASE} focus-ring-ink bg-[#e61f15] text-white hover:bg-[#ca1a11] hover:scale-[1.02]`;
 const BTN_DARK = `${BTN_BASE} bg-ink text-white hover:bg-track-blue hover:scale-[1.02]`;
 
-// A player mark phrased against Max's matching point. Positive delta = the
-// player was later than Max. Dutch decimal comma.
-function deltaSentence(distDeltaM: number, opts: { verb: string; suffix: string; perfect: string }): string {
-  const meters = Math.round(distDeltaM);
-  if (meters === 0) return opts.perfect;
-  const direction = meters > 0 ? 'laat' : 'vroeg';
-  return `${opts.verb} ${Math.abs(meters)}m te ${direction}${opts.suffix}`;
-}
-
 function buildShareUrl(total: number, results: RoundResult[]): string {
   const rounds = results.map((r) => r.score).join('.');
   return `${location.origin}${location.pathname}?s=${total}&r=${rounds}`;
@@ -65,14 +56,66 @@ function parseSharedScore(): { total: number; rounds: number[] } | null {
   return { total: Math.round(s), rounds: rounds.map(Math.round) };
 }
 
-function eventChipText(er: EventResult): string {
+// How far the gauge scale reaches on either side of Max's point.
+const GAUGE_RANGE_M = 25;
+
+const TONE_DOT: Record<EventResult['description']['tone'], string> = {
+  perfect: '#10b981',
+  good: '#22c55e',
+  okay: '#f59e0b',
+  bad: '#e61f15',
+};
+
+// One brake/gas moment, visualized: a gauge with Max's point as the center
+// tick and the player's press as a colored dot early (left) or late (right)
+// of it, with the distance and time gaps spelled out.
+function EventResultCard({ er }: { er: EventResult }) {
   const isBrake = er.event.type === 'brake';
-  if (er.deltaM === null) return isBrake ? 'Niet geremd' : 'Geen gas gegeven';
-  return deltaSentence(er.deltaM, {
-    verb: isBrake ? 'Rem' : 'Gas',
-    suffix: '',
-    perfect: isBrake ? 'Rem: perfect!' : 'Gas: perfect!',
-  });
+  const label = isBrake ? 'REM' : 'GAS';
+  const accent = isBrake ? '#e61f15' : '#10b981';
+
+  if (er.deltaM === null || er.mark === null) {
+    return (
+      <div className="w-44 rounded-2xl bg-white px-3 py-2 text-left shadow-lg">
+        <span className="text-xs font-extrabold" style={{ color: accent }}>
+          {label}
+        </span>
+        <p className="text-xs font-extrabold text-[#1e1e1e]">{isBrake ? 'Niet geremd' : 'Geen gas gegeven'}</p>
+      </div>
+    );
+  }
+
+  const late = er.deltaM > 0;
+  const meters = Math.abs(Math.round(er.deltaM));
+  const seconds = Math.abs(er.mark.t - er.event.t)
+    .toFixed(2)
+    .replace('.', ',');
+  const dotPercent = 50 + (Math.max(-GAUGE_RANGE_M, Math.min(GAUGE_RANGE_M, er.deltaM)) / GAUGE_RANGE_M) * 50;
+
+  return (
+    <div className="w-44 rounded-2xl bg-white px-3 pb-2 pt-1.5 shadow-lg">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-xs font-extrabold" style={{ color: accent }}>
+          {label}
+        </span>
+        <span className="text-xs font-extrabold text-[#1e1e1e]">
+          {meters === 0 ? 'perfect!' : `${meters}m ${late ? 'te laat' : 'te vroeg'}`}
+        </span>
+      </div>
+      <div className="relative mt-1.5 h-2 rounded-full bg-[#ececec]">
+        <span className="absolute left-1/2 top-1/2 h-3.5 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded bg-[#1e1e1e]/50" />
+        <span
+          className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow"
+          style={{ left: `${dotPercent}%`, backgroundColor: TONE_DOT[er.description.tone] }}
+        />
+      </div>
+      <div className="mt-1 flex items-center justify-between text-[10px] font-bold text-[#1e1e1e]/45">
+        <span>te vroeg</span>
+        <span className="text-[11px] font-extrabold tabular-nums text-[#1e1e1e]/75">{seconds}s</span>
+        <span>te laat</span>
+      </div>
+    </div>
+  );
 }
 
 // A sim-racing style pedal (carbon face plate, metal pivot, spring on the
@@ -475,7 +518,10 @@ function App() {
           {/* control panel: below the stage in portrait, right column on wide */}
           <div className="contents wide:flex wide:min-h-0 wide:flex-col wide:justify-center wide:gap-7">
             <EventCard roundLabel={roundLabel} />
-            <div aria-live="polite" className="grid min-h-14 place-items-center py-1 text-center sm:min-h-16">
+            <div
+              aria-live="polite"
+              className="grid min-h-14 place-items-center py-1 text-center wide:min-h-0 wide:flex-1 sm:min-h-16"
+            >
               <p {...layer(phase === 'flying', 'text-sm font-extrabold text-white/85 sm:text-lg')}>
                 Onderweg naar de {round.label}...
               </p>
@@ -500,12 +546,7 @@ function App() {
               <p {...layer(phase === 'running', 'text-base font-extrabold sm:text-xl')}>{runningHint}</p>
               <div {...layer(showRoundResult, 'flex flex-wrap items-center justify-center gap-2 sm:gap-3')}>
                 {lastResult?.eventResults.map((er) => (
-                  <span
-                    key={er.event.t}
-                    className="rounded-full bg-badge-blue px-3 py-1.5 text-xs font-extrabold text-white sm:px-4 sm:text-sm"
-                  >
-                    {eventChipText(er)}
-                  </span>
+                  <EventResultCard key={er.event.t} er={er} />
                 ))}
               </div>
             </div>

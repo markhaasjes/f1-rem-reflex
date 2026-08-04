@@ -29,6 +29,7 @@ export const PALETTE = {
   white: '#ffffff',
   curbRed: '#e61f15', // redNosRood
   water: '#8fb8d4',
+  bush: '#4c7d46',
   waterEdge: '#7aa6c4',
   beach: '#efe4c3',
 };
@@ -279,47 +280,35 @@ export function drawSea(ctx: CanvasRenderingContext2D, projection: ScreenProject
   ctx.setLineDash([]);
 }
 
-// The dune lakes, with outlines traced from the satellite view: the curved
-// pond enclosed by the eastern loop, the big kidney-shaped one and its
-// neighbor in the south, and a small one in the NE dunes.
+// The dune lakes, outlines traced from the satellite view: angular polygons
+// (one Chaikin round keeps the corners crisp like the real shorelines). The
+// eastern pond sits fully inside the loop, clear of the asphalt.
 const LAKES: Point[][] = [
   [
-    { x: 715, y: 105 },
-    { x: 738, y: 72 },
-    { x: 768, y: 54 },
-    { x: 800, y: 58 },
-    { x: 818, y: 78 },
-    { x: 812, y: 102 },
-    { x: 786, y: 118 },
-    { x: 750, y: 122 },
-    { x: 726, y: 118 },
+    { x: 655, y: 95 },
+    { x: 700, y: 85 },
+    { x: 730, y: 105 },
+    { x: 735, y: 140 },
+    { x: 710, y: 170 },
+    { x: 670, y: 175 },
+    { x: 645, y: 150 },
+    { x: 642, y: 115 },
   ],
   [
-    { x: 245, y: 295 },
-    { x: 262, y: 268 },
-    { x: 295, y: 252 },
-    { x: 340, y: 250 },
-    { x: 362, y: 262 },
-    { x: 355, y: 275 },
-    { x: 378, y: 268 },
-    { x: 408, y: 282 },
-    { x: 418, y: 305 },
-    { x: 405, y: 330 },
-    { x: 372, y: 342 },
-    { x: 345, y: 352 },
-    { x: 305, y: 352 },
-    { x: 268, y: 338 },
-    { x: 250, y: 318 },
+    { x: 250, y: 290 },
+    { x: 300, y: 255 },
+    { x: 370, y: 258 },
+    { x: 415, y: 295 },
+    { x: 400, y: 340 },
+    { x: 330, y: 358 },
+    { x: 265, y: 340 },
   ],
   [
-    { x: 505, y: 300 },
-    { x: 528, y: 278 },
-    { x: 560, y: 268 },
-    { x: 592, y: 276 },
-    { x: 606, y: 294 },
-    { x: 596, y: 314 },
-    { x: 566, y: 323 },
-    { x: 530, y: 318 },
+    { x: 505, y: 295 },
+    { x: 555, y: 262 },
+    { x: 600, y: 285 },
+    { x: 595, y: 320 },
+    { x: 540, y: 325 },
   ],
   [
     { x: 722, y: -296 },
@@ -331,8 +320,8 @@ const LAKES: Point[][] = [
   ],
 ];
 
-// Two rounds of closed-loop Chaikin corner-cutting turn the traced polygon
-// into a natural-looking shoreline.
+// One round of closed-loop Chaikin corner-cutting: softens the vertices just
+// enough while keeping the angular satellite-like shoreline.
 function chaikinClosed(points: Point[], rounds: number): Point[] {
   let pts = points;
   for (let r = 0; r < rounds; r++) {
@@ -350,14 +339,31 @@ function chaikinClosed(points: Point[], rounds: number): Point[] {
 
 export function drawLakes(ctx: CanvasRenderingContext2D, projection: ScreenProjection) {
   const s = projection.scale;
-  for (const lake of LAKES) {
-    tracePath(ctx, chaikinClosed(lake, 2), projection, true);
+  for (const [lakeIndex, lake] of LAKES.entries()) {
+    tracePath(ctx, chaikinClosed(lake, 1), projection, true);
     ctx.fillStyle = PALETTE.water;
     ctx.fill();
     ctx.lineJoin = 'round';
     ctx.lineWidth = Math.max(1, 2.5 * s);
     ctx.strokeStyle = PALETTE.waterEdge;
     ctx.stroke();
+
+    // clusters of bushes hugging the shoreline, like the satellite view
+    const rand = mulberry32(90 + lakeIndex);
+    ctx.fillStyle = PALETTE.bush;
+    for (let i = 0; i < lake.length; i++) {
+      if (rand() < 0.35) continue;
+      const vertex = lake[i];
+      const next = lake[(i + 1) % lake.length];
+      const outX = vertex.x - (next.y - vertex.y) * 0.15;
+      const outY = vertex.y + (next.x - vertex.x) * 0.15;
+      for (let b = 0; b < 3; b++) {
+        const [bx, by] = projection.toScreen(outX + (rand() - 0.5) * 16, outY + (rand() - 0.5) * 16);
+        ctx.beginPath();
+        ctx.arc(bx, by, Math.max(1.2, (4 + rand() * 5) * s), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
   }
 }
 
