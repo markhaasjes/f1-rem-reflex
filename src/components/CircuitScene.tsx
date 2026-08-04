@@ -3,7 +3,7 @@ import { useElementSize } from '../hooks/useElementSize';
 import { viewBoxFromCam, type CamBox } from '../hooks/useCameraFlight';
 import { fitProjection, prepareCanvas } from '../lib/canvas';
 import { drawF1Car } from '../lib/canvasCar';
-import { headingAt, positionAt, sampleAt, smoothPathPoints } from '../lib/corner';
+import { headingAt, positionAt, primePathModel, sampleAt, smoothPathPoints } from '../lib/corner';
 import { buildPhaseSegments, type DrivingPhase } from '../lib/phases';
 import {
   drawCornerBadge,
@@ -103,8 +103,14 @@ export function CircuitScene(props: CircuitSceneProps) {
   const { fixture } = props;
 
   // Rotate the closed outline so index 0 sits at start/finish (on a straight):
-  // corner slices for curbs/gravel then never wrap the array boundary.
-  const outline = useMemo(() => rotateOutline(fixture.trackOutline, fixture.startFinish), [fixture]);
+  // corner slices for curbs/gravel then never wrap the array boundary. Priming
+  // the path model here (before the segments memo below) enables the
+  // Gerlach/Hugenholtz data-gap repair, which needs the road shape.
+  const outline = useMemo(() => {
+    const rotated = rotateOutline(fixture.trackOutline, fixture.startFinish);
+    primePathModel(fixture.lap.samples, rotated);
+    return rotated;
+  }, [fixture]);
   const cornerIndices = useMemo(() => fixture.corners.map((c) => nearestIndex(outline, c)), [fixture, outline]);
   // Corners the game visits get prominent badges; the rest render minor.
   const roundCornerNumbers = useMemo(() => new Set(fixture.rounds.flatMap((r) => r.cornerNumbers)), [fixture]);
@@ -158,14 +164,16 @@ export function CircuitScene(props: CircuitSceneProps) {
         for (const segment of roundSegments[roundIndex]) {
           drawRibbon(ctx, segment.points, PHASE_COLOR[segment.phase], projection);
         }
+        // Pins are placed via the path model (not raw samples) so they sit on
+        // the drawn line, also inside the repaired Gerlach/Hugenholtz stretch.
         for (const event of round.events) {
-          const s = sampleAt(samples, event.t);
-          const [x, y] = projection.toScreen(s.x, s.y);
+          const p = positionAt(samples, event.t);
+          const [x, y] = projection.toScreen(p.x, p.y);
           drawPin(ctx, x, y, '#0b7a43', event.type === 'brake' ? 'Max rem' : 'Max gas');
         }
         for (const mark of marks) {
-          const s = sampleAt(samples, mark.t);
-          const [x, y] = projection.toScreen(s.x, s.y);
+          const p = positionAt(samples, mark.t);
+          const [x, y] = projection.toScreen(p.x, p.y);
           drawPin(ctx, x, y, '#1a2c8f', mark.type === 'brake' ? 'Jij rem' : 'Jij gas', true);
         }
       }
