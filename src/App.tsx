@@ -74,6 +74,125 @@ function eventChipText(er: EventResult): string {
   });
 }
 
+// A sim-racing style pedal (carbon face plate, metal pivot, spring on the
+// throttle), modeled on real F1 pedal sets. Pressing tilts the pedal like the
+// real thing; the pedal Max needs next gets a white ring.
+function Pedal({
+  variant,
+  onPress,
+  disabled,
+  highlight,
+}: {
+  variant: 'brake' | 'gas';
+  onPress: () => void;
+  disabled: boolean;
+  highlight: boolean;
+}) {
+  const isBrake = variant === 'brake';
+  const accent = isBrake ? '#e61e14' : '#10b981';
+  const face = isBrake ? { x: 10, y: 26, w: 100, h: 72 } : { x: 24, y: 10, w: 72, h: 92 };
+  const gripYs = isBrake ? [48, 62, 76] : [36, 52, 68, 84];
+  const id = `pedal-${variant}`;
+
+  return (
+    <button
+      type="button"
+      onClick={onPress}
+      disabled={disabled}
+      aria-keyshortcuts={isBrake ? 'r arrowleft' : 'g arrowright'}
+      aria-label={isBrake ? 'Rempedaal (toets R)' : 'Gaspedaal (toets G)'}
+      className={`group flex-1 select-none touch-manipulation rounded-2xl pb-1 pt-2 transition-all duration-150 focus-ring focus-ring-white ${
+        disabled ? 'opacity-35' : 'hover:-translate-y-0.5'
+      } ${highlight ? 'ring-4 ring-white/80' : ''}`}
+    >
+      <svg
+        viewBox="0 0 120 200"
+        aria-hidden="true"
+        className={`mx-auto h-24 w-auto drop-shadow-[0_6px_10px_rgba(6,12,60,0.5)] transition-transform duration-100 sm:h-28 wide:h-[clamp(6rem,30vh,10rem)] ${
+          disabled ? '' : 'group-active:[transform:perspective(360px)_rotateX(22deg)] group-active:origin-bottom'
+        }`}
+      >
+        <defs>
+          <pattern id={`${id}-carbon`} width="6" height="6" patternUnits="userSpaceOnUse">
+            <rect width="6" height="6" fill="#1e1f24" />
+            <rect width="3" height="3" fill="#2a2b31" />
+            <rect x="3" y="3" width="3" height="3" fill="#2a2b31" />
+          </pattern>
+          <linearGradient id={`${id}-metal`} x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor="#b9bcc4" />
+            <stop offset="0.5" stopColor="#eef0f4" />
+            <stop offset="1" stopColor="#8f939c" />
+          </linearGradient>
+        </defs>
+
+        {/* base bracket */}
+        <rect x="26" y="178" width="68" height="16" rx="4" fill="#26272c" />
+        <rect x="26" y="178" width="68" height="4" rx="2" fill="#3a3b42" />
+        <circle cx="37" cy="186" r="2.6" fill={`url(#${id}-metal)`} />
+        <circle cx="83" cy="186" r="2.6" fill={`url(#${id}-metal)`} />
+
+        {/* throttle spring + linkage, like the real assembly */}
+        {!isBrake && (
+          <g>
+            <rect x="99" y="112" width="5" height="54" rx="2.5" fill={`url(#${id}-metal)`} />
+            <path
+              d="M 96 118 h 11 M 95 126 h 13 M 94 134 h 15 M 95 142 h 13 M 96 150 h 11 M 97 158 h 9"
+              stroke="#6b6e77"
+              strokeWidth="3"
+              strokeLinecap="round"
+              fill="none"
+            />
+          </g>
+        )}
+
+        {/* arm */}
+        <path
+          d={isBrake ? 'M 46 92 L 74 92 L 80 180 L 40 180 Z' : 'M 49 98 L 71 98 L 77 180 L 43 180 Z'}
+          fill={`url(#${id}-carbon)`}
+          stroke="#111216"
+          strokeWidth="2"
+        />
+        {/* pivot */}
+        <circle cx="60" cy={isBrake ? 132 : 136} r="8" fill={`url(#${id}-metal)`} stroke="#43454c" strokeWidth="1.5" />
+        <circle cx="60" cy={isBrake ? 132 : 136} r="3" fill="#565962" />
+
+        {/* face plate */}
+        <rect
+          x={face.x}
+          y={face.y}
+          width={face.w}
+          height={face.h}
+          rx="10"
+          fill={`url(#${id}-carbon)`}
+          stroke="#0d0e12"
+          strokeWidth="2.5"
+        />
+        {/* accent strip along the top edge */}
+        <rect x={face.x + 7} y={face.y + 6} width={face.w - 14} height="5" rx="2.5" fill={accent} />
+        {/* grip bars */}
+        {gripYs.map((y) => (
+          <rect key={y} x={face.x + 12} y={y} width={face.w - 24} height="6" rx="3" fill="#3b3d45" />
+        ))}
+        {/* corner bolts */}
+        {[
+          [face.x + 9, face.y + 9],
+          [face.x + face.w - 9, face.y + 9],
+          [face.x + 9, face.y + face.h - 9],
+          [face.x + face.w - 9, face.y + face.h - 9],
+        ].map(([cx, cy]) => (
+          <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="3" fill={`url(#${id}-metal)`} stroke="#43454c" />
+        ))}
+      </svg>
+      <span
+        className="mt-1 block text-center text-sm font-extrabold tracking-widest wide:text-base"
+        style={{ color: accent }}
+      >
+        {isBrake ? 'REM!' : 'GAS!'}
+      </span>
+    </button>
+  );
+}
+
 // Visual keycap for the keyboard explainer in the intro modal.
 function Key({ children }: { children: React.ReactNode }) {
   return (
@@ -247,10 +366,6 @@ function App() {
   // Max does this round.
   const pedalLeft = (type: 'brake' | 'gas') =>
     round.events.filter((e) => e.type === type).length - marks.filter((m) => m.type === type).length;
-  const pedalClass = (type: 'brake' | 'gas', color: string) =>
-    `flex-1 select-none touch-manipulation rounded-full px-4 py-5 text-2xl font-extrabold tracking-wide shadow-lg transition-all duration-150 hover:brightness-110 active:scale-95 focus-ring focus-ring-white sm:text-3xl ${color} ${
-      phase === 'running' && pedalLeft(type) === 0 ? 'opacity-30' : ''
-    } ${phase === 'running' && nextEvent?.type === type ? 'ring-4 ring-white/80' : ''}`;
 
   // Crossfading layers stay mounted for the animation, so hidden ones must be
   // `inert`: otherwise invisible buttons stay in the Tab order and invisible
@@ -276,9 +391,9 @@ function App() {
           {roundLabel || '·'}
         </div>
 
-        <main className="flex w-full max-w-md flex-col gap-3 sm:max-w-2xl lg:max-w-4xl">
+        <main className="flex w-full max-w-md flex-col gap-3 sm:max-w-2xl lg:max-w-4xl wide:grid wide:min-h-0 wide:w-full wide:max-w-none wide:flex-1 wide:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)] wide:items-stretch wide:gap-6">
           {/* Stage */}
-          <div className="relative h-[24rem] w-full overflow-hidden rounded-3xl sm:h-[30rem] lg:h-[36rem]">
+          <div className="relative h-[24rem] w-full overflow-hidden rounded-3xl sm:h-[30rem] lg:h-[36rem] wide:h-full wide:min-h-[22rem]">
             <CircuitScene
               fixture={fixture}
               camBox={camera.box}
@@ -437,91 +552,83 @@ function App() {
           </div>
 
           {/* info row */}
-          <div aria-live="polite" className="grid min-h-14 place-items-center py-1 text-center sm:min-h-16">
-            <p {...layer(phase === 'flying', 'text-sm font-extrabold text-white/85 sm:text-lg')}>
-              Onderweg naar de {round.label}...
-            </p>
-            <div {...layer(phase === 'ready', 'flex flex-col items-center gap-1.5')}>
-              <div className="flex items-center gap-2 rounded-full bg-white px-4 py-1.5 shadow-lg">
-                <span className="rounded-full bg-[#e61e14] px-3 py-0.5 text-sm font-extrabold text-white sm:text-base">
-                  {round.events.length / 2}&times; REM
-                </span>
-                <span className="font-extrabold text-ink/40">&middot;</span>
-                <span className="rounded-full bg-emerald-500 px-3 py-0.5 text-sm font-extrabold text-white sm:text-base">
-                  {round.events.length / 2}&times; GAS
-                </span>
-              </div>
-              <p className="text-sm font-bold text-white/85 sm:text-base">
-                {round.events.length / 2 === 1
-                  ? 'Let op de bocht en druk op het juiste moment!'
-                  : 'Een dubbele: let goed op waar Max remt en weer gas geeft!'}
+          {/* control panel: below the stage in portrait, right column on wide */}
+          <div className="contents wide:flex wide:min-h-0 wide:flex-col wide:justify-center wide:gap-8">
+            <div aria-live="polite" className="grid min-h-14 place-items-center py-1 text-center sm:min-h-16">
+              <p {...layer(phase === 'flying', 'text-sm font-extrabold text-white/85 sm:text-lg')}>
+                Onderweg naar de {round.label}...
               </p>
+              <div {...layer(phase === 'ready', 'flex flex-col items-center gap-1.5')}>
+                <div className="flex items-center gap-2 rounded-full bg-white px-4 py-1.5 shadow-lg">
+                  <span className="rounded-full bg-[#e61e14] px-3 py-0.5 text-sm font-extrabold text-white sm:text-base">
+                    {round.events.length / 2}&times; REM
+                  </span>
+                  <span className="font-extrabold text-ink/40">&middot;</span>
+                  <span className="rounded-full bg-emerald-500 px-3 py-0.5 text-sm font-extrabold text-white sm:text-base">
+                    {round.events.length / 2}&times; GAS
+                  </span>
+                </div>
+                <p className="text-sm font-bold text-white/85 sm:text-base">
+                  {round.events.length / 2 === 1
+                    ? 'Let op de bocht en druk op het juiste moment!'
+                    : 'Een dubbele: let goed op waar Max remt en weer gas geeft!'}
+                </p>
+              </div>
+              <p {...layer(phase === 'running', 'text-base font-extrabold sm:text-xl')}>{runningHint}</p>
+              <div {...layer(showRoundResult, 'flex flex-wrap items-center justify-center gap-2 sm:gap-3')}>
+                {lastResult?.eventResults.map((er) => (
+                  <span
+                    key={er.event.t}
+                    className="rounded-full bg-badge-blue px-3 py-1.5 text-xs font-extrabold text-white sm:px-4 sm:text-sm"
+                  >
+                    {eventChipText(er)}
+                  </span>
+                ))}
+              </div>
             </div>
-            <p {...layer(phase === 'running', 'text-base font-extrabold sm:text-xl')}>{runningHint}</p>
-            <div {...layer(showRoundResult, 'flex flex-wrap items-center justify-center gap-2 sm:gap-3')}>
-              {lastResult?.eventResults.map((er) => (
-                <span
-                  key={er.event.t}
-                  className="rounded-full bg-badge-blue px-3 py-1.5 text-xs font-extrabold text-white sm:px-4 sm:text-sm"
-                >
-                  {eventChipText(er)}
-                </span>
-              ))}
-            </div>
-          </div>
 
-          {/* action row */}
-          <div className="grid h-20 place-items-center sm:h-24">
-            <button
-              {...layer(phase === 'ready', `${BTN_LIGHT} w-full max-w-sm px-8 py-4 text-lg sm:text-xl`)}
-              ref={startBtnRef}
-              type="button"
-              onClick={game.startRun}
-            >
-              {round.practice ? 'Start de oefenbocht' : `Start bocht ${scoringRoundNumber}`}
-            </button>
-            <div {...layer(phase === 'running', 'flex w-full max-w-sm gap-3')}>
+            {/* action row */}
+            <div className="grid min-h-20 place-items-center sm:min-h-24 wide:min-h-56">
               <button
+                {...layer(phase === 'ready', `${BTN_LIGHT} w-full max-w-sm px-8 py-4 text-lg sm:text-xl`)}
+                ref={startBtnRef}
                 type="button"
-                onClick={() => game.press('brake')}
-                disabled={phase === 'running' && pedalLeft('brake') === 0}
-                aria-keyshortcuts="r arrowleft"
-                className={pedalClass('brake', 'bg-red-600')}
+                onClick={game.startRun}
               >
-                REM!
+                {round.practice ? 'Start de oefenbocht' : `Start bocht ${scoringRoundNumber}`}
               </button>
+              <div {...layer(phase === 'running', 'flex w-full max-w-sm gap-4 wide:gap-6')}>
+                <Pedal
+                  variant="brake"
+                  onPress={() => game.press('brake')}
+                  disabled={phase === 'running' && pedalLeft('brake') === 0}
+                  highlight={phase === 'running' && nextEvent?.type === 'brake'}
+                />
+                <Pedal
+                  variant="gas"
+                  onPress={() => game.press('gas')}
+                  disabled={phase === 'running' && pedalLeft('gas') === 0}
+                  highlight={phase === 'running' && nextEvent?.type === 'gas'}
+                />
+              </div>
               <button
+                {...layer(showRoundResult, `${BTN_LIGHT} w-full max-w-sm px-8 py-4 text-lg sm:text-xl`)}
+                ref={nextBtnRef}
                 type="button"
-                onClick={() => game.press('gas')}
-                disabled={phase === 'running' && pedalLeft('gas') === 0}
-                aria-keyshortcuts="g arrowright"
-                className={pedalClass('gas', 'bg-emerald-500')}
+                onClick={isLastRound ? showFinal : nextRound}
               >
-                GAS!
+                {isLastRound ? 'Bekijk je eindscore' : 'Naar de volgende bocht'}
               </button>
             </div>
-            <button
-              {...layer(showRoundResult, `${BTN_LIGHT} w-full max-w-sm px-8 py-4 text-lg sm:text-xl`)}
-              ref={nextBtnRef}
-              type="button"
-              onClick={isLastRound ? showFinal : nextRound}
-            >
-              {isLastRound ? 'Bekijk je eindscore' : 'Naar de volgende bocht'}
-            </button>
-          </div>
 
-          {/* keyboard hint (pointer-fine devices only) */}
-          <p className="hidden text-center text-xs font-bold text-white/40 sm:block">
-            Toetsenbord: <kbd className="rounded bg-white/10 px-1.5 py-0.5">spatie</kbd> = actie ·{' '}
-            <kbd className="rounded bg-white/10 px-1.5 py-0.5">R</kbd> = rem ·{' '}
-            <kbd className="rounded bg-white/10 px-1.5 py-0.5">G</kbd> = gas
-          </p>
+            {/* keyboard hint (pointer-fine devices only) */}
+            <p className="hidden text-center text-xs font-bold text-white/40 sm:block">
+              Toetsenbord: <kbd className="rounded bg-white/10 px-1.5 py-0.5">spatie</kbd> = actie ·{' '}
+              <kbd className="rounded bg-white/10 px-1.5 py-0.5">R</kbd> = rem ·{' '}
+              <kbd className="rounded bg-white/10 px-1.5 py-0.5">G</kbd> = gas
+            </p>
+          </div>
         </main>
-
-        <p className="text-center text-xs text-white/50">
-          Echte data via OpenF1: {fixture.meta.sessionName} {fixture.meta.meetingName} {fixture.meta.year}, ronde{' '}
-          {fixture.meta.lapNumber} van {fixture.meta.driverName}
-        </p>
       </div>
     </>
   );

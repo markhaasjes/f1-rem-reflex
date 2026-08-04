@@ -7,6 +7,10 @@
   font-display: swap;
 }
 
+/* Side-by-side game layout: circuit left, controls right. Applies to laptops
+   and landscape tablets/phones; portrait keeps the stacked layout. */
+@custom-variant wide (@media (orientation: landscape) and (min-width: 48rem));
+
 @theme {
   --font-sans: 'Effra', 'Helvetica Neue', Helvetica, Arial, sans-serif;
 
