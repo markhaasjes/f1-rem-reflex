@@ -215,15 +215,20 @@ function App() {
   const share = useCallback(async () => {
     const url = buildShareUrl(total, results);
     const text = `Ik scoorde ${total}/100 in NOS Rem Reflex - rem jij net zo laat als Max Verstappen op Zandvoort?`;
-    try {
-      if (navigator.share) {
+    if (navigator.share) {
+      try {
         await navigator.share({ title: 'NOS Rem Reflex', text, url });
         return;
+      } catch (err) {
+        // Cancelling the native share sheet is not a failure - and must not
+        // fall through to the clipboard and falsely claim "gekopieerd".
+        if (err instanceof Error && err.name === 'AbortError') return;
       }
-    } catch {
-      /* fall through to clipboard */
     }
-    await navigator.clipboard.writeText(`${text} ${url}`);
+    // Copy ONLY the URL: with the message text prepended, pasting into an
+    // address bar triggered a web search instead of navigation, landing
+    // people on the start screen without the ?s=..&r=.. score params.
+    await navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   }, [total, results]);

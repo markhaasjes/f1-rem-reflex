@@ -344,8 +344,12 @@ browser autoplay policies count it as user-initiated.
 ## Share flow
 
 No backend: the score is encoded in the URL
-(`?s=<total>&r=<r0.r1.r2.r3>`). `share()` tries `navigator.share`, falls
-back to clipboard + a "Link gekopieerd!" flash. `parseSharedScore()` renders
+(`?s=<total>&r=<r0.r1.r2.r3>`). `share()` tries `navigator.share` (a
+cancelled share sheet is not a failure and must not fall through), falls
+back to clipboard + a "Link gekopieerd!" flash. The clipboard gets the URL
+and nothing else: prepending the message text made address-bar pastes run a
+web search instead of navigating, which dropped the score params and landed
+recipients on the default start screen. `parseSharedScore()` renders
 the landing card for incoming links; it validates against
 `fixture.rounds.length` so malformed links fall through to the normal game.
 Anyone can forge a score URL — it's a social share, not a leaderboard; don't
