@@ -70,6 +70,9 @@ const LAP_LENGTH_M = 4218;
 // Half-width, in ~3m outline-grid anchors, of the moving average applied to
 // the lateral-offset field inside a repair range (so ~33m full window).
 const OFFSET_SMOOTH_WINDOW = 5;
+// Half-width, in segments, of the moving average applied to the turn-angle
+// profile inside a repair range (~24m full window).
+const TURN_SMOOTH_WINDOW = 4;
 
 interface TracePoint extends Point {
   d: number; // meters into lap
@@ -162,6 +165,61 @@ function projectOnOutline(outline: Point[], p: TracePoint): number {
   return bestJ;
 }
 
+// Evens out the curvature profile of a polyline. The official outline has a
+// brief zero-curvature dip in the middle of the Hugenholtz bowl (the real
+// corner is one continuous arc); the wide road band masks it, but the thin
+// race line exposes it as a straight facet. Smoothing the per-segment turn
+// angles fills such dips, and the rebuilt polyline is pinned back onto both
+// endpoints with a tiny rotation+scale about the start, so the seams stay on
+// measured data.
+function smoothTurnProfile(pts: Point[], window: number): Point[] {
+  if (pts.length < 4) return pts;
+  const headings: number[] = [];
+  const lengths: number[] = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    headings.push(Math.atan2(pts[i + 1].y - pts[i].y, pts[i + 1].x - pts[i].x));
+    lengths.push(Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].y - pts[i].y));
+  }
+  const turns: number[] = [0];
+  for (let i = 1; i < headings.length; i++) {
+    let t = headings[i] - headings[i - 1];
+    while (t > Math.PI) t -= 2 * Math.PI;
+    while (t < -Math.PI) t += 2 * Math.PI;
+    turns.push(t);
+  }
+  const smoothTurns = turns.map((_, i) => {
+    const w = Math.min(window, i, turns.length - 1 - i);
+    let sum = 0;
+    for (let k = i - w; k <= i + w; k++) sum += turns[k];
+    return sum / (2 * w + 1);
+  });
+
+  const rebuilt: Point[] = [pts[0]];
+  let heading = headings[0];
+  for (let i = 0; i < lengths.length; i++) {
+    if (i > 0) heading += smoothTurns[i];
+    rebuilt.push({
+      x: rebuilt[i].x + Math.cos(heading) * lengths[i],
+      y: rebuilt[i].y + Math.sin(heading) * lengths[i],
+    });
+  }
+
+  // pin the rebuilt end back onto the measured end point
+  const startPt = pts[0];
+  const target = pts.at(-1)!;
+  const got = rebuilt.at(-1)!;
+  const va = { x: target.x - startPt.x, y: target.y - startPt.y };
+  const vb = { x: got.x - startPt.x, y: got.y - startPt.y };
+  const rot = Math.atan2(va.y, va.x) - Math.atan2(vb.y, vb.x);
+  const scale = Math.hypot(va.x, va.y) / (Math.hypot(vb.x, vb.y) || 1);
+  const cos = Math.cos(rot) * scale;
+  const sin = Math.sin(rot) * scale;
+  return rebuilt.map((p) => ({
+    x: startPt.x + (p.x - startPt.x) * cos - (p.y - startPt.y) * sin,
+    y: startPt.y + (p.x - startPt.x) * sin + (p.y - startPt.y) * cos,
+  }));
+}
+
 // Replaces kept[start..end] (a repair range plus one shared boundary point on
 // each side, for tangent continuity) with the reconstruction:
 //
@@ -245,7 +303,8 @@ function repairStraightFills(kept: TracePoint[], outline: Point[]): Point[] {
       y: outline[a.j].y + smoothedOffsets[i].y,
     }));
 
-    const curved = densifyCentripetal(bridged, DENSIFY_STEP_M);
+    const shaped = smoothTurnProfile(bridged, TURN_SMOOTH_WINDOW);
+    const curved = densifyCentripetal(shaped, DENSIFY_STEP_M);
     result.splice(start - 1, sliceEnd - (start - 1), ...curved);
   }
   return result;
