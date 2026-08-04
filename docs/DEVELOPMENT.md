@@ -294,9 +294,16 @@ origin; return the endpoint instead.
 
 - **Numeric**: `scoreEvent(deltaM)` — 100 points within 2m of Max, linear to
   0 at 50m, 0 for a missed event. `scoreRound` averages a round's events;
-  `totalScore` averages **all events across all rounds** (so the Hans Ernst
-  double, with 4 events, weighs twice a 2-event round — intentional: more
-  moments, more weight).
+  `totalScore` averages the **scoring rounds' rounded scores** (equal round
+  weight, practice excluded). It used to be event-weighted, which made the
+  total unverifiable from the card's listed round scores — players read that
+  as a calculation bug. Note the deliberate property that distance-based
+  scoring is stricter at higher speed (0.15s late = ~13m at Tarzan but ~5m
+  at a slow gas point); the result gauges surface both meters and seconds.
+- **History**: [storage.ts](../src/lib/storage.ts) persists the last attempt
+  and the best run in localStorage (key `nos-rem-reflex:scores`); the intro
+  shows the stored bests, the score card compares against them and tips the
+  weakest corner of the current run.
 - **Verbal (Dutch)**: `describeBrakeAttempt` / `describeGasAttempt` bucket
   the same delta into tones (perfect ≤3m/≤5m, good, okay, bad) for the
   verdict banner; `combineResults` takes the _worst_ tone of a round.

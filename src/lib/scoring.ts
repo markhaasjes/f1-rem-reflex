@@ -146,11 +146,13 @@ export function scoreRound(round: GameRound, marks: PlayerMark[]): RoundResult {
   return { round, eventResults, score };
 }
 
-/** Overall 0-100 across the scoring rounds only - practice rounds (the
- * Tarzan warm-up) are shown on the card but do not count. Every event in the
- * counted rounds weighs equally. */
+/** Overall 0-100: the average of the scoring rounds' (rounded) scores;
+ * practice rounds are shown on the card but do not count. Averaging at the
+ * round level keeps the total verifiable from the score card - the earlier
+ * event-weighted average (double corners counting twice as heavy) produced
+ * totals that looked like calculation mistakes next to the listed rounds. */
 export function totalScore(results: RoundResult[]): number {
-  const events = results.filter((r) => !r.round.practice).flatMap((r) => r.eventResults);
-  if (events.length === 0) return 0;
-  return Math.round(events.reduce((sum, r) => sum + r.score, 0) / events.length);
+  const scoring = results.filter((r) => !r.round.practice);
+  if (scoring.length === 0) return 0;
+  return Math.round(scoring.reduce((sum, r) => sum + r.score, 0) / scoring.length);
 }
