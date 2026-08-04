@@ -9,7 +9,7 @@ export interface TeamLivery {
 // logos/marks) - used for the top-down car in the scene and the hero car.
 export const VERSTAPPEN_LIVERY: TeamLivery = {
   body: '#1B2A5B',
-  accent: '#E10600',
+  accent: '#e61f15',
   highlight: '#F2C744',
   cockpit: '#0A1230',
 };

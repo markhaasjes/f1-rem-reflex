@@ -16,10 +16,11 @@ const TONE_STYLES = {
   perfect: 'bg-emerald-500',
   good: 'bg-emerald-600',
   okay: 'bg-amber-500',
-  bad: 'bg-red-600',
+  bad: 'bg-[#e61f15]',
 } as const;
 
 const OVERVIEW_PAD_M = 90;
+const OVERVIEW_SEA_PAD_M = 190;
 const ROUND_PAD_M = 55;
 
 // Max's real team radio, played once on the final score screen (fetched by
@@ -35,17 +36,8 @@ const RADIO_POSITIVE_THRESHOLD = 60;
 const BTN_BASE =
   'select-none touch-manipulation rounded-full font-extrabold shadow-lg transition-all duration-150 active:scale-95 focus-ring';
 const BTN_LIGHT = `${BTN_BASE} bg-white text-ink hover:bg-[#f3f3f0] hover:scale-[1.02]`;
-const BTN_RED = `${BTN_BASE} focus-ring-ink bg-[#e61e14] text-white hover:bg-[#ca1a11] hover:scale-[1.02]`;
+const BTN_RED = `${BTN_BASE} focus-ring-ink bg-[#e61f15] text-white hover:bg-[#ca1a11] hover:scale-[1.02]`;
 const BTN_DARK = `${BTN_BASE} bg-ink text-white hover:bg-track-blue hover:scale-[1.02]`;
-
-// A player mark phrased against Max's matching point. Positive delta = the
-// player was later than Max. Dutch decimal comma.
-function deltaSentence(distDeltaM: number, opts: { verb: string; suffix: string; perfect: string }): string {
-  const meters = Math.round(distDeltaM);
-  if (meters === 0) return opts.perfect;
-  const direction = meters > 0 ? 'laat' : 'vroeg';
-  return `${opts.verb} ${Math.abs(meters)}m te ${direction}${opts.suffix}`;
-}
 
 function buildShareUrl(total: number, results: RoundResult[]): string {
   const rounds = results.map((r) => r.score).join('.');
@@ -64,14 +56,66 @@ function parseSharedScore(): { total: number; rounds: number[] } | null {
   return { total: Math.round(s), rounds: rounds.map(Math.round) };
 }
 
-function eventChipText(er: EventResult): string {
+// How far the gauge scale reaches on either side of Max's point.
+const GAUGE_RANGE_M = 25;
+
+const TONE_DOT: Record<EventResult['description']['tone'], string> = {
+  perfect: '#10b981',
+  good: '#22c55e',
+  okay: '#f59e0b',
+  bad: '#e61f15',
+};
+
+// One brake/gas moment, visualized: a gauge with Max's point as the center
+// tick and the player's press as a colored dot early (left) or late (right)
+// of it, with the distance and time gaps spelled out.
+function EventResultCard({ er }: { er: EventResult }) {
   const isBrake = er.event.type === 'brake';
-  if (er.deltaM === null) return isBrake ? 'Niet geremd' : 'Geen gas gegeven';
-  return deltaSentence(er.deltaM, {
-    verb: isBrake ? 'Rem' : 'Gas',
-    suffix: '',
-    perfect: isBrake ? 'Rem: perfect!' : 'Gas: perfect!',
-  });
+  const label = isBrake ? 'REM' : 'GAS';
+  const accent = isBrake ? '#e61f15' : '#10b981';
+
+  if (er.deltaM === null || er.mark === null) {
+    return (
+      <div className="w-44 rounded-2xl bg-white px-3 py-2 text-left shadow-lg">
+        <span className="text-xs font-extrabold" style={{ color: accent }}>
+          {label}
+        </span>
+        <p className="text-xs font-extrabold text-[#1e1e1e]">{isBrake ? 'Niet geremd' : 'Geen gas gegeven'}</p>
+      </div>
+    );
+  }
+
+  const late = er.deltaM > 0;
+  const meters = Math.abs(Math.round(er.deltaM));
+  const seconds = Math.abs(er.mark.t - er.event.t)
+    .toFixed(2)
+    .replace('.', ',');
+  const dotPercent = 50 + (Math.max(-GAUGE_RANGE_M, Math.min(GAUGE_RANGE_M, er.deltaM)) / GAUGE_RANGE_M) * 50;
+
+  return (
+    <div className="w-44 rounded-2xl bg-white px-3 pb-2 pt-1.5 shadow-lg">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-xs font-extrabold" style={{ color: accent }}>
+          {label}
+        </span>
+        <span className="text-xs font-extrabold text-[#1e1e1e]">
+          {meters === 0 ? 'perfect!' : `${meters}m ${late ? 'te laat' : 'te vroeg'}`}
+        </span>
+      </div>
+      <div className="relative mt-1.5 h-2 rounded-full bg-[#ececec]">
+        <span className="absolute left-1/2 top-1/2 h-3.5 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded bg-[#1e1e1e]/50" />
+        <span
+          className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow"
+          style={{ left: `${dotPercent}%`, backgroundColor: TONE_DOT[er.description.tone] }}
+        />
+      </div>
+      <div className="mt-1 flex items-center justify-between text-[10px] font-bold text-[#1e1e1e]/45">
+        <span>te vroeg</span>
+        <span className="text-[11px] font-extrabold tabular-nums text-[#1e1e1e]/75">{seconds}s</span>
+        <span>te laat</span>
+      </div>
+    </div>
+  );
 }
 
 // A sim-racing style pedal (carbon face plate, metal pivot, spring on the
@@ -89,7 +133,7 @@ function Pedal({
   highlight: boolean;
 }) {
   const isBrake = variant === 'brake';
-  const accent = isBrake ? '#e61e14' : '#10b981';
+  const accent = isBrake ? '#e61f15' : '#10b981';
   const face = isBrake ? { x: 10, y: 26, w: 100, h: 72 } : { x: 24, y: 10, w: 72, h: 92 };
   const gripYs = isBrake ? [48, 62, 76] : [36, 52, 68, 84];
   const id = `pedal-${variant}`;
@@ -102,7 +146,7 @@ function Pedal({
       aria-keyshortcuts={isBrake ? 'r arrowleft' : 'g arrowright'}
       aria-label={isBrake ? 'Rempedaal (toets R)' : 'Gaspedaal (toets G)'}
       className={`group flex-1 select-none touch-manipulation rounded-2xl pb-1 pt-2 transition-all duration-150 focus-ring focus-ring-white ${
-        disabled ? 'opacity-35' : 'hover:-translate-y-0.5'
+        disabled ? 'opacity-50 saturate-50' : 'hover:-translate-y-0.5'
       } ${highlight ? 'ring-4 ring-white/80' : ''}`}
     >
       <svg
@@ -189,7 +233,46 @@ function Pedal({
       >
         {isBrake ? 'REM!' : 'GAS!'}
       </span>
+      <span aria-hidden="true" className="mt-1 hidden items-center justify-center gap-1 sm:flex">
+        <Key>{isBrake ? 'R' : 'G'}</Key>
+        <Key>{isBrake ? '\u2190' : '\u2192'}</Key>
+      </span>
     </button>
+  );
+}
+
+// Circular Dutch flag, like the country flags in the NOS GP graphics.
+function DutchFlag({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 60 60" aria-hidden="true" className={className}>
+      <circle cx="30" cy="30" r="30" fill="#ffffff" />
+      <clipPath id="flag-clip">
+        <circle cx="30" cy="30" r="26" />
+      </clipPath>
+      <g clipPath="url(#flag-clip)">
+        <rect x="4" y="4" width="52" height="17.4" fill="#ae1c28" />
+        <rect x="4" y="21.4" width="52" height="17.4" fill="#ffffff" />
+        <rect x="4" y="38.8" width="52" height="17.4" fill="#21468b" />
+      </g>
+    </svg>
+  );
+}
+
+// Event header in the NOS GP-graphic style (flag, white title pill, dark
+// sub-pill). Lives in the control panel on wide screens.
+function EventCard({ roundLabel }: { roundLabel: string }) {
+  return (
+    <div className="hidden flex-col items-center gap-3 wide:flex">
+      <DutchFlag className="h-14 w-14 drop-shadow-[0_4px_10px_rgba(0,0,0,0.35)]" />
+      <div className="rounded-full bg-white px-7 py-2 text-xl font-extrabold text-[#1e1e1e] shadow-lg xl:text-2xl">
+        Circuit Zandvoort
+      </div>
+      <div
+        className={`rounded-full bg-[#1e1e1e] px-5 py-1.5 text-sm font-extrabold text-white shadow transition-opacity ${roundLabel ? 'opacity-100' : 'opacity-0'}`}
+      >
+        {roundLabel || '\u00b7'}
+      </div>
+    </div>
   );
 }
 
@@ -216,8 +299,15 @@ function App() {
   const overviewBox = useMemo<CamBox>(() => {
     const xs = fixture.trackOutline.map((p) => p.x);
     const ys = fixture.trackOutline.map((p) => p.y);
+    // extra room on the west so the sea and beach show at the overview,
+    // like the satellite view with the coast on the left edge
     return boxFromBounds(
-      { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) },
+      {
+        minX: Math.min(...xs) - OVERVIEW_SEA_PAD_M,
+        minY: Math.min(...ys),
+        maxX: Math.max(...xs),
+        maxY: Math.max(...ys),
+      },
       OVERVIEW_PAD_M,
     );
   }, []);
@@ -362,11 +452,6 @@ function App() {
   if (nextEvent?.type === 'brake') runningHint = 'Wachten... rem op het juiste moment';
   else if (nextEvent?.type === 'gas') runningHint = 'Nu weer op het gas!';
 
-  // A pedal dims (and truly disables) once the player has used it as often as
-  // Max does this round.
-  const pedalLeft = (type: 'brake' | 'gas') =>
-    round.events.filter((e) => e.type === type).length - marks.filter((m) => m.type === type).length;
-
   // Crossfading layers stay mounted for the animation, so hidden ones must be
   // `inert`: otherwise invisible buttons stay in the Tab order and invisible
   // text keeps getting read by screen readers.
@@ -382,11 +467,11 @@ function App() {
           <NOSLogo className="w-12 h-auto text-white fill-current" />
         </div>
       </div>
-      <div className="flex h-svh flex-col items-center gap-3 overflow-hidden bg-track-blue px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-white sm:gap-4 sm:px-8 sm:pt-5 wide:px-10">
-        <Pill className="gap-3 text-sm sm:text-base">{fixture.meta.circuit}</Pill>
+      <div className="bg-carbon flex h-svh flex-col items-center gap-3 overflow-hidden px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-white sm:gap-4 sm:px-8 sm:pt-5 wide:px-10">
+        <Pill className="gap-3 text-sm wide:hidden sm:text-base">{fixture.meta.circuit}</Pill>
 
         <div
-          className={`rounded-full px-4 py-1 text-xs font-extrabold tracking-wide transition-opacity sm:text-sm ${roundLabel ? 'opacity-100' : 'opacity-0'} ${round?.practice ? 'bg-white/15 text-white/90' : 'bg-red-600 text-white'}`}
+          className={`rounded-full px-4 py-1 text-xs font-extrabold tracking-wide transition-opacity wide:hidden sm:text-sm ${roundLabel ? 'opacity-100' : 'opacity-0'} ${round?.practice ? 'bg-white/15 text-white/90' : 'bg-[#e61f15] text-white'}`}
         >
           {roundLabel || '·'}
         </div>
@@ -431,14 +516,18 @@ function App() {
 
           {/* info row */}
           {/* control panel: below the stage in portrait, right column on wide */}
-          <div className="contents wide:flex wide:min-h-0 wide:flex-col wide:justify-center wide:gap-8">
-            <div aria-live="polite" className="grid min-h-14 place-items-center py-1 text-center sm:min-h-16">
+          <div className="contents wide:flex wide:min-h-0 wide:flex-col wide:justify-center wide:gap-7">
+            <EventCard roundLabel={roundLabel} />
+            <div
+              aria-live="polite"
+              className="grid min-h-14 place-items-center py-1 text-center wide:min-h-0 wide:flex-1 sm:min-h-16"
+            >
               <p {...layer(phase === 'flying', 'text-sm font-extrabold text-white/85 sm:text-lg')}>
                 Onderweg naar de {round.label}...
               </p>
               <div {...layer(phase === 'ready', 'flex flex-col items-center gap-1.5')}>
                 <div className="flex items-center gap-2 rounded-full bg-white px-4 py-1.5 shadow-lg">
-                  <span className="rounded-full bg-[#e61e14] px-3 py-0.5 text-sm font-extrabold text-white sm:text-base">
+                  <span className="rounded-full bg-[#e61f15] px-3 py-0.5 text-sm font-extrabold text-white sm:text-base">
                     {round.events.length / 2}&times; REM
                   </span>
                   <span className="font-extrabold text-ink/40">&middot;</span>
@@ -447,20 +536,17 @@ function App() {
                   </span>
                 </div>
                 <p className="text-sm font-bold text-white/85 sm:text-base">
-                  {round.events.length / 2 === 1
-                    ? 'Let op de bocht en druk op het juiste moment!'
-                    : 'Een dubbele: let goed op waar Max remt en weer gas geeft!'}
+                  {round.practice && 'Rem bij het rode punt en geef weer gas bij het groene punt!'}
+                  {!round.practice &&
+                    (round.events.length / 2 === 1
+                      ? 'Let op de bocht en druk op het juiste moment!'
+                      : 'Een dubbele: let goed op waar Max remt en weer gas geeft!')}
                 </p>
               </div>
               <p {...layer(phase === 'running', 'text-base font-extrabold sm:text-xl')}>{runningHint}</p>
               <div {...layer(showRoundResult, 'flex flex-wrap items-center justify-center gap-2 sm:gap-3')}>
                 {lastResult?.eventResults.map((er) => (
-                  <span
-                    key={er.event.t}
-                    className="rounded-full bg-badge-blue px-3 py-1.5 text-xs font-extrabold text-white sm:px-4 sm:text-sm"
-                  >
-                    {eventChipText(er)}
-                  </span>
+                  <EventResultCard key={er.event.t} er={er} />
                 ))}
               </div>
             </div>
@@ -479,13 +565,13 @@ function App() {
                 <Pedal
                   variant="brake"
                   onPress={() => game.press('brake')}
-                  disabled={phase === 'running' && pedalLeft('brake') === 0}
+                  disabled={nextEvent?.type !== 'brake'}
                   highlight={phase === 'running' && nextEvent?.type === 'brake'}
                 />
                 <Pedal
                   variant="gas"
                   onPress={() => game.press('gas')}
-                  disabled={phase === 'running' && pedalLeft('gas') === 0}
+                  disabled={nextEvent?.type !== 'gas'}
                   highlight={phase === 'running' && nextEvent?.type === 'gas'}
                 />
               </div>
@@ -514,12 +600,12 @@ function App() {
           aria-modal="true"
           aria-labelledby="intro-title"
           inert={!(phase === 'intro' && !hideIntroChrome) || undefined}
-          className={`fixed inset-0 z-40 flex overflow-y-auto bg-ink/70 p-4 backdrop-blur-[3px] transition-all duration-500 ${phase === 'intro' && !hideIntroChrome ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+          className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-ink/70 p-4 backdrop-blur-[3px] transition-all duration-500 ${phase === 'intro' && !hideIntroChrome ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
           <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:p-7">
             <HeroCar className="mx-auto h-9 w-auto sm:h-11" />
-            <h1 id="intro-title" className="mt-4 text-xl font-extrabold leading-tight sm:text-2xl">
-              Rem jij net zo laat als <span className="text-[#e61e14]">Max Verstappen</span>?
+            <h1 id="intro-title" className="mt-4 text-xl font-normal leading-tight text-[#1e1e1e] sm:text-2xl">
+              Rem jij net zo laat als <span className="font-extrabold">Max Verstappen</span>?
             </h1>
             <p className="mt-2 text-sm font-bold leading-snug text-ink/70 sm:text-base">
               Rijd zijn echte poleronde over Zandvoort. Eerst oefenen in de Tarzanbocht, daarna drie bochten voor de
@@ -531,7 +617,7 @@ function App() {
               <dl className="mt-2 flex flex-col gap-1.5 text-sm font-bold text-ink/80">
                 <div className="flex items-center justify-between">
                   <dt className="flex items-center gap-2">
-                    <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-[#e61e14]" />
+                    <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-[#e61f15]" />
                     Remmen
                   </dt>
                   <dd className="flex gap-1">
@@ -577,10 +663,10 @@ function App() {
           aria-modal="true"
           aria-labelledby="final-title"
           inert={!(phase === 'finished' && !showShared) || undefined}
-          className={`fixed inset-0 z-40 flex overflow-y-auto bg-ink/60 p-4 backdrop-blur-[2px] transition-all duration-700 ${phase === 'finished' && !showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+          className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-ink/60 p-4 backdrop-blur-[2px] transition-all duration-700 ${phase === 'finished' && !showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
           <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl">
-            <h2 id="final-title" className="text-sm font-extrabold uppercase tracking-wide text-[#e61e14]">
+            <h2 id="final-title" className="text-sm font-extrabold uppercase tracking-wide text-[#e61f15]">
               Jouw eindscore
             </h2>
             <p className="text-6xl font-extrabold tabular-nums">{total}</p>
@@ -613,10 +699,10 @@ function App() {
           aria-modal="true"
           aria-labelledby="shared-title"
           inert={!showShared || undefined}
-          className={`fixed inset-0 z-40 flex overflow-y-auto bg-ink/60 p-4 backdrop-blur-[2px] transition-all duration-500 ${showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+          className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-ink/60 p-4 backdrop-blur-[2px] transition-all duration-500 ${showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
           <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl">
-            <h2 id="shared-title" className="text-sm font-extrabold uppercase tracking-wide text-[#e61e14]">
+            <h2 id="shared-title" className="text-sm font-extrabold uppercase tracking-wide text-[#e61f15]">
               Gedeelde score
             </h2>
             <p className="text-6xl font-extrabold tabular-nums">{shared?.total}</p>

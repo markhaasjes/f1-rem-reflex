@@ -27,7 +27,11 @@ export const PALETTE = {
   asphaltLight: '#5f6268',
   paddock: '#aaa8a4',
   white: '#ffffff',
-  curbRed: '#e61e14', // redNosRood
+  curbRed: '#e61f15', // redNosRood
+  water: '#8fb8d4',
+  bush: '#4c7d46',
+  waterEdge: '#7aa6c4',
+  beach: '#efe4c3',
 };
 
 // Deterministic PRNG so decorative speckles land in the same spots on every
@@ -173,7 +177,7 @@ export function drawSandBackground(ctx: CanvasRenderingContext2D, width: number,
   ctx.fillRect(0, 0, width, height);
 
   // lighter dune patches
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 8; i++) {
     ctx.beginPath();
     ctx.ellipse(
       rand() * width,
@@ -220,6 +224,190 @@ export function drawSandBackground(ctx: CanvasRenderingContext2D, width: number,
     ctx.fill();
     ctx.restore();
   }
+}
+
+// The North Sea along the west edge with a beach strip, parallel to the main
+// straight's tilt like on the satellite view (positions stylized closer so
+// the water is visible at the overview zoom).
+const COAST_X_AT_Y0 = -235; // waterline x where y = 0
+const COAST_SLOPE = -0.25; // follows the coast's SSW-NNE direction
+const BEACH_WIDTH_M = 70;
+
+export function drawSea(ctx: CanvasRenderingContext2D, projection: ScreenProjection, height: number) {
+  const coastAt = (y: number) => COAST_X_AT_Y0 + COAST_SLOPE * y;
+  const [, yTop] = projection.toData(0, -60);
+  const [, yBottom] = projection.toData(0, height + 60);
+
+  const beach = [
+    projection.toScreen(coastAt(yTop) + BEACH_WIDTH_M, yTop),
+    projection.toScreen(coastAt(yBottom) + BEACH_WIDTH_M, yBottom),
+    projection.toScreen(coastAt(yBottom), yBottom),
+    projection.toScreen(coastAt(yTop), yTop),
+  ];
+  ctx.beginPath();
+  beach.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+  ctx.closePath();
+  ctx.fillStyle = PALETTE.beach;
+  ctx.fill();
+
+  const [wTopX, wTopY] = projection.toScreen(coastAt(yTop), yTop);
+  const [wBotX, wBotY] = projection.toScreen(coastAt(yBottom), yBottom);
+  ctx.beginPath();
+  ctx.moveTo(wTopX, wTopY);
+  ctx.lineTo(wBotX, wBotY);
+  ctx.lineTo(-60, height + 60);
+  ctx.lineTo(-60, -60);
+  ctx.closePath();
+  ctx.fillStyle = PALETTE.water;
+  ctx.fill();
+
+  // two lines of surf just off the shore
+  const s = projection.scale;
+  for (const [offsetM, alpha] of [
+    [10, 0.55],
+    [24, 0.3],
+  ] as const) {
+    ctx.beginPath();
+    const [ax, ay] = projection.toScreen(coastAt(yTop) - offsetM, yTop);
+    const [bx, by] = projection.toScreen(coastAt(yBottom) - offsetM, yBottom);
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(bx, by);
+    ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+    ctx.lineWidth = Math.max(1.2, 3.5 * s);
+    ctx.setLineDash([26 * s, 14 * s]);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+}
+
+// The dune lakes, outlines traced from the satellite view: angular polygons
+// (one Chaikin round keeps the corners crisp like the real shorelines). The
+// eastern pond sits fully inside the loop, clear of the asphalt.
+const LAKES: Point[][] = [
+  [
+    { x: 655, y: 95 },
+    { x: 700, y: 85 },
+    { x: 730, y: 105 },
+    { x: 735, y: 140 },
+    { x: 710, y: 170 },
+    { x: 670, y: 175 },
+    { x: 645, y: 150 },
+    { x: 642, y: 115 },
+  ],
+  [
+    { x: 250, y: 290 },
+    { x: 300, y: 255 },
+    { x: 370, y: 258 },
+    { x: 415, y: 295 },
+    { x: 400, y: 340 },
+    { x: 330, y: 358 },
+    { x: 265, y: 340 },
+  ],
+  [
+    { x: 505, y: 295 },
+    { x: 555, y: 262 },
+    { x: 600, y: 285 },
+    { x: 595, y: 320 },
+    { x: 540, y: 325 },
+  ],
+  [
+    { x: 722, y: -296 },
+    { x: 742, y: -308 },
+    { x: 763, y: -300 },
+    { x: 762, y: -282 },
+    { x: 740, y: -274 },
+    { x: 724, y: -282 },
+  ],
+];
+
+// One round of closed-loop Chaikin corner-cutting: softens the vertices just
+// enough while keeping the angular satellite-like shoreline.
+function chaikinClosed(points: Point[], rounds: number): Point[] {
+  let pts = points;
+  for (let r = 0; r < rounds; r++) {
+    const out: Point[] = [];
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i];
+      const b = pts[(i + 1) % pts.length];
+      out.push({ x: a.x * 0.75 + b.x * 0.25, y: a.y * 0.75 + b.y * 0.25 });
+      out.push({ x: a.x * 0.25 + b.x * 0.75, y: a.y * 0.25 + b.y * 0.75 });
+    }
+    pts = out;
+  }
+  return pts;
+}
+
+export function drawLakes(ctx: CanvasRenderingContext2D, projection: ScreenProjection) {
+  const s = projection.scale;
+  for (const [lakeIndex, lake] of LAKES.entries()) {
+    tracePath(ctx, chaikinClosed(lake, 1), projection, true);
+    ctx.fillStyle = PALETTE.water;
+    ctx.fill();
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = Math.max(1, 2.5 * s);
+    ctx.strokeStyle = PALETTE.waterEdge;
+    ctx.stroke();
+
+    // clusters of bushes hugging the shoreline, like the satellite view
+    const rand = mulberry32(90 + lakeIndex);
+    ctx.fillStyle = PALETTE.bush;
+    for (let i = 0; i < lake.length; i++) {
+      if (rand() < 0.35) continue;
+      const vertex = lake[i];
+      const next = lake[(i + 1) % lake.length];
+      const outX = vertex.x - (next.y - vertex.y) * 0.15;
+      const outY = vertex.y + (next.x - vertex.x) * 0.15;
+      for (let b = 0; b < 3; b++) {
+        const [bx, by] = projection.toScreen(outX + (rand() - 0.5) * 16, outY + (rand() - 0.5) * 16);
+        ctx.beginPath();
+        ctx.arc(bx, by, Math.max(1.2, (4 + rand() * 5) * s), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+}
+
+// Red direction arrow beside start/finish, like the nos.nl circuit visual.
+export function drawDirectionArrow(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  headingDeg: number,
+  projection: ScreenProjection,
+  alpha: number,
+) {
+  if (alpha <= 0.01) return;
+  const [sx, sy] = projection.toScreen(x, y);
+  // sits just off the track, on the left of the driving direction
+  const leftRad = ((headingDeg - 90) * Math.PI) / 180;
+  const offset = 14 * projection.scale + 16;
+  const cx = sx + Math.cos(leftRad) * offset;
+  const cy = sy + Math.sin(leftRad) * offset;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 12, 0, Math.PI * 2);
+  ctx.fillStyle = '#e61f15';
+  ctx.strokeStyle = PALETTE.white;
+  ctx.lineWidth = 2.5;
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.translate(cx, cy);
+  ctx.rotate(((headingDeg + 90) * Math.PI) / 180);
+  ctx.fillStyle = PALETTE.white;
+  ctx.beginPath();
+  ctx.moveTo(0, -6.5);
+  ctx.lineTo(5, -0.5);
+  ctx.lineTo(2, -0.5);
+  ctx.lineTo(2, 6.5);
+  ctx.lineTo(-2, 6.5);
+  ctx.lineTo(-2, -0.5);
+  ctx.lineTo(-5, -0.5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
 }
 
 // The F1 TV-style green surroundings: a wide grass corridor along the track
@@ -454,7 +642,7 @@ export function drawStartFinish(
   const cols = Math.ceil((ROAD_WIDTH_M * s) / cell);
   for (let row = 0; row < 3; row++) {
     for (let col = 0; col < cols; col++) {
-      ctx.fillStyle = (row + col) % 2 === 0 ? '#15181d' : PALETTE.white;
+      ctx.fillStyle = (row + col) % 2 === 0 ? '#1e1e1e' : PALETTE.white;
       ctx.fillRect((col - cols / 2) * cell, (row - 1.5) * cell, cell + 0.5, cell + 0.5);
     }
   }
@@ -499,7 +687,8 @@ export function drawCornerBadge(
   ctx.globalAlpha = minor ? alpha * 0.55 : alpha;
   ctx.beginPath();
   ctx.arc(screenX, screenY, r, 0, Math.PI * 2);
-  ctx.fillStyle = highlight ? '#e61e14' : '#2f6fed';
+  // Black circle, white number, white ring - the NOS WK-stand graphic style.
+  ctx.fillStyle = '#1e1e1e';
   ctx.strokeStyle = PALETTE.white;
   ctx.lineWidth = minor ? 1.5 : 2.5;
   ctx.fill();
