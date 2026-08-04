@@ -244,6 +244,29 @@ future fixture makes the car jitter or spin, it's GPS stalls again — look at
 Marks pair to events strictly by order (press #i answers event #i). If you
 ever allow more presses than events, revisit that pairing.
 
+## Accessibility
+
+The game is fully keyboard-playable: Space advances the flow and presses the
+pedal Max needs next; R/ArrowLeft and G/ArrowRight hit a specific pedal
+(`aria-keyshortcuts` on the buttons); Enter activates the focused primary
+action. Space is preventDefault-ed globally so a focused button never
+double-fires. Three mechanisms keep Tab honest and screen readers in sync:
+
+- **`inert` on every hidden crossfade layer** (the `layer()` helper in
+  App.tsx) - layers stay mounted for the fade animation, so without inert the
+  invisible buttons would remain tabbable and invisible text would be read.
+- **Focus follows the flow**: an effect moves focus to the primary action on
+  each phase change (intro CTA -> start -> next -> share), so Tab/Enter always
+  land somewhere sensible.
+- **The info row is `aria-live="polite"`**, announcing hints and results;
+  overlays are `role="dialog"` + `aria-modal` + `aria-labelledby`.
+
+Buttons share nos.nl-style interactive states (`BTN_*` constants + the
+`.focus-ring` utilities in index.css): 2px solid focus outline with 2px
+offset - NOS red on light surfaces, ink on red CTAs, white on the pedals -
+warm-gray/darker-red hover backgrounds, 150ms transitions, scale press
+feedback. Exhausted pedals get a real `disabled`, not just dimming.
+
 ## Team radio on the score screen
 
 `scripts/fetch-team-radio.mjs` downloads Max's onboard radio clips for the
