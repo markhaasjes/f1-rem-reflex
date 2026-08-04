@@ -70,6 +70,7 @@ const DENSIFY_STEP_M = 2;
 // the in-between is reconstructed along the track outline instead of guessed
 // by the spline.
 const GUIDE_GAP_M = 15;
+const MIN_VERTEX_SPACING_M = 7;
 const LAP_LENGTH_M = 4218;
 
 interface TracePoint extends Point {
@@ -203,14 +204,39 @@ function repairStraightFills(kept: TracePoint[], outline: Point[]): Point[] {
   // splice from the back so earlier spans' indices stay valid
   for (const { start, end } of spans.toReversed()) {
     const sliceEnd = Math.min(end + 1, kept.length);
-    const sparse = collapseCollinearRuns(kept.slice(start - 1, sliceEnd)) as TracePoint[];
-    const bridged: Point[] = [sparse[0]];
+    const collapsed = collapseCollinearRuns(kept.slice(start - 1, sliceEnd)) as TracePoint[];
+    // Thin near-duplicate vertices: real GPS points 2-5m apart carry ~1m of
+    // lateral jitter, which the spline turns into a visible wobble at the
+    // bridge junctions.
+    const sparse: TracePoint[] = [collapsed[0]];
+    for (let i = 1; i < collapsed.length - 1; i++) {
+      const prev = sparse.at(-1)!;
+      if (Math.hypot(collapsed[i].x - prev.x, collapsed[i].y - prev.y) >= MIN_VERTEX_SPACING_M) {
+        sparse.push(collapsed[i]);
+      }
+    }
+    sparse.push(collapsed.at(-1)!);
+
+    let bridged: Point[] = [sparse[0]];
     for (let i = 1; i < sparse.length; i++) {
       const gap = Math.hypot(sparse[i].x - sparse[i - 1].x, sparse[i].y - sparse[i - 1].y);
       if (gap > GUIDE_GAP_M && Number.isFinite(sparse[i - 1].d) && Number.isFinite(sparse[i].d)) {
         bridged.push(...guidePointsBetween(outline, sparse[i - 1], sparse[i]));
       }
       bridged.push(sparse[i]);
+    }
+    // Two rounds of Chaikin corner-cutting soften what jitter remains
+    // (endpoints stay fixed), then the centripetal spline evens the spacing.
+    for (let round = 0; round < 2; round++) {
+      const smoothed: Point[] = [bridged[0]];
+      for (let i = 0; i < bridged.length - 1; i++) {
+        const a = bridged[i];
+        const b = bridged[i + 1];
+        smoothed.push({ x: a.x * 0.75 + b.x * 0.25, y: a.y * 0.75 + b.y * 0.25 });
+        smoothed.push({ x: a.x * 0.25 + b.x * 0.75, y: a.y * 0.25 + b.y * 0.75 });
+      }
+      smoothed.push(bridged.at(-1)!);
+      bridged = smoothed;
     }
     const curved = densifyCentripetal(bridged, DENSIFY_STEP_M);
     result.splice(start - 1, sliceEnd - (start - 1), ...curved);
