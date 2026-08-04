@@ -74,6 +74,125 @@ function eventChipText(er: EventResult): string {
   });
 }
 
+// A sim-racing style pedal (carbon face plate, metal pivot, spring on the
+// throttle), modeled on real F1 pedal sets. Pressing tilts the pedal like the
+// real thing; the pedal Max needs next gets a white ring.
+function Pedal({
+  variant,
+  onPress,
+  disabled,
+  highlight,
+}: {
+  variant: 'brake' | 'gas';
+  onPress: () => void;
+  disabled: boolean;
+  highlight: boolean;
+}) {
+  const isBrake = variant === 'brake';
+  const accent = isBrake ? '#e61e14' : '#10b981';
+  const face = isBrake ? { x: 10, y: 26, w: 100, h: 72 } : { x: 24, y: 10, w: 72, h: 92 };
+  const gripYs = isBrake ? [48, 62, 76] : [36, 52, 68, 84];
+  const id = `pedal-${variant}`;
+
+  return (
+    <button
+      type="button"
+      onClick={onPress}
+      disabled={disabled}
+      aria-keyshortcuts={isBrake ? 'r arrowleft' : 'g arrowright'}
+      aria-label={isBrake ? 'Rempedaal (toets R)' : 'Gaspedaal (toets G)'}
+      className={`group flex-1 select-none touch-manipulation rounded-2xl pb-1 pt-2 transition-all duration-150 focus-ring focus-ring-white ${
+        disabled ? 'opacity-35' : 'hover:-translate-y-0.5'
+      } ${highlight ? 'ring-4 ring-white/80' : ''}`}
+    >
+      <svg
+        viewBox="0 0 120 200"
+        aria-hidden="true"
+        className={`mx-auto h-24 w-auto drop-shadow-[0_6px_10px_rgba(6,12,60,0.5)] transition-transform duration-100 sm:h-28 wide:h-[clamp(6rem,30vh,10rem)] ${
+          disabled ? '' : 'group-active:[transform:perspective(360px)_rotateX(22deg)] group-active:origin-bottom'
+        }`}
+      >
+        <defs>
+          <pattern id={`${id}-carbon`} width="6" height="6" patternUnits="userSpaceOnUse">
+            <rect width="6" height="6" fill="#1e1f24" />
+            <rect width="3" height="3" fill="#2a2b31" />
+            <rect x="3" y="3" width="3" height="3" fill="#2a2b31" />
+          </pattern>
+          <linearGradient id={`${id}-metal`} x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor="#b9bcc4" />
+            <stop offset="0.5" stopColor="#eef0f4" />
+            <stop offset="1" stopColor="#8f939c" />
+          </linearGradient>
+        </defs>
+
+        {/* base bracket */}
+        <rect x="26" y="178" width="68" height="16" rx="4" fill="#26272c" />
+        <rect x="26" y="178" width="68" height="4" rx="2" fill="#3a3b42" />
+        <circle cx="37" cy="186" r="2.6" fill={`url(#${id}-metal)`} />
+        <circle cx="83" cy="186" r="2.6" fill={`url(#${id}-metal)`} />
+
+        {/* throttle spring + linkage, like the real assembly */}
+        {!isBrake && (
+          <g>
+            <rect x="99" y="112" width="5" height="54" rx="2.5" fill={`url(#${id}-metal)`} />
+            <path
+              d="M 96 118 h 11 M 95 126 h 13 M 94 134 h 15 M 95 142 h 13 M 96 150 h 11 M 97 158 h 9"
+              stroke="#6b6e77"
+              strokeWidth="3"
+              strokeLinecap="round"
+              fill="none"
+            />
+          </g>
+        )}
+
+        {/* arm */}
+        <path
+          d={isBrake ? 'M 46 92 L 74 92 L 80 180 L 40 180 Z' : 'M 49 98 L 71 98 L 77 180 L 43 180 Z'}
+          fill={`url(#${id}-carbon)`}
+          stroke="#111216"
+          strokeWidth="2"
+        />
+        {/* pivot */}
+        <circle cx="60" cy={isBrake ? 132 : 136} r="8" fill={`url(#${id}-metal)`} stroke="#43454c" strokeWidth="1.5" />
+        <circle cx="60" cy={isBrake ? 132 : 136} r="3" fill="#565962" />
+
+        {/* face plate */}
+        <rect
+          x={face.x}
+          y={face.y}
+          width={face.w}
+          height={face.h}
+          rx="10"
+          fill={`url(#${id}-carbon)`}
+          stroke="#0d0e12"
+          strokeWidth="2.5"
+        />
+        {/* accent strip along the top edge */}
+        <rect x={face.x + 7} y={face.y + 6} width={face.w - 14} height="5" rx="2.5" fill={accent} />
+        {/* grip bars */}
+        {gripYs.map((y) => (
+          <rect key={y} x={face.x + 12} y={y} width={face.w - 24} height="6" rx="3" fill="#3b3d45" />
+        ))}
+        {/* corner bolts */}
+        {[
+          [face.x + 9, face.y + 9],
+          [face.x + face.w - 9, face.y + 9],
+          [face.x + 9, face.y + face.h - 9],
+          [face.x + face.w - 9, face.y + face.h - 9],
+        ].map(([cx, cy]) => (
+          <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="3" fill={`url(#${id}-metal)`} stroke="#43454c" />
+        ))}
+      </svg>
+      <span
+        className="mt-1 block text-center text-sm font-extrabold tracking-widest wide:text-base"
+        style={{ color: accent }}
+      >
+        {isBrake ? 'REM!' : 'GAS!'}
+      </span>
+    </button>
+  );
+}
+
 // Visual keycap for the keyboard explainer in the intro modal.
 function Key({ children }: { children: React.ReactNode }) {
   return (
@@ -247,10 +366,6 @@ function App() {
   // Max does this round.
   const pedalLeft = (type: 'brake' | 'gas') =>
     round.events.filter((e) => e.type === type).length - marks.filter((m) => m.type === type).length;
-  const pedalClass = (type: 'brake' | 'gas', color: string) =>
-    `flex-1 select-none touch-manipulation rounded-full px-4 py-5 text-2xl font-extrabold tracking-wide shadow-lg transition-all duration-150 hover:brightness-110 active:scale-95 focus-ring focus-ring-white sm:text-3xl ${color} ${
-      phase === 'running' && pedalLeft(type) === 0 ? 'opacity-30' : ''
-    } ${phase === 'running' && nextEvent?.type === type ? 'ring-4 ring-white/80' : ''}`;
 
   // Crossfading layers stay mounted for the animation, so hidden ones must be
   // `inert`: otherwise invisible buttons stay in the Tab order and invisible
@@ -262,12 +377,12 @@ function App() {
 
   return (
     <>
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 z-10 w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-3 sm:px-6">
+      <div className="absolute top-0 left-4 z-10 sm:left-8 wide:left-10">
         <div className="bg-white px-[18px] pt-[12px] pb-[15px] rounded-b-[10px] shadow-[0_6px_24px_rgba(6,12,60,0.45)] inline-block">
           <NOSLogo className="w-12 h-auto text-white fill-current" />
         </div>
       </div>
-      <div className="flex min-h-svh flex-col items-center justify-center gap-4 bg-track-blue px-3 py-5 text-white sm:gap-6 sm:px-6">
+      <div className="flex h-svh flex-col items-center gap-3 overflow-hidden bg-track-blue px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-white sm:gap-4 sm:px-8 sm:pt-5 wide:px-10">
         <Pill className="gap-3 text-sm sm:text-base">{fixture.meta.circuit}</Pill>
 
         <div
@@ -276,9 +391,9 @@ function App() {
           {roundLabel || '·'}
         </div>
 
-        <main className="flex w-full max-w-md flex-col gap-3 sm:max-w-2xl lg:max-w-4xl">
+        <main className="flex min-h-0 w-full max-w-md flex-1 flex-col gap-3 sm:max-w-2xl lg:max-w-4xl wide:grid wide:w-full wide:max-w-none wide:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)] wide:items-stretch wide:gap-6">
           {/* Stage */}
-          <div className="relative h-[24rem] w-full overflow-hidden rounded-3xl sm:h-[30rem] lg:h-[36rem]">
+          <div className="relative min-h-[13rem] w-full flex-1 overflow-hidden rounded-3xl wide:h-full wide:min-h-[22rem]">
             <CircuitScene
               fixture={fixture}
               camBox={camera.box}
@@ -312,216 +427,208 @@ function App() {
                 </p>
               )}
             </div>
-
-            {/* intro modal */}
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="intro-title"
-              inert={!(phase === 'intro' && !hideIntroChrome) || undefined}
-              className={`absolute inset-0 grid place-items-center bg-ink/70 p-4 backdrop-blur-[3px] transition-all duration-500 ${phase === 'intro' && !hideIntroChrome ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
-            >
-              <div className="w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:p-7">
-                <HeroCar className="mx-auto h-9 w-auto sm:h-11" />
-                <h1 id="intro-title" className="mt-4 text-xl font-extrabold leading-tight sm:text-2xl">
-                  Rem jij net zo laat als <span className="text-[#e61e14]">Max Verstappen</span>?
-                </h1>
-                <p className="mt-2 text-sm font-bold leading-snug text-ink/70 sm:text-base">
-                  Rijd zijn echte poleronde over Zandvoort. Eerst oefenen in de Tarzanbocht, daarna drie bochten voor de
-                  punten: rem en geef weer gas op precies het juiste moment.
-                </p>
-                {/* keyboard explainer: desktop only - most players are on touch */}
-                <div className="mt-4 hidden rounded-2xl bg-[#f3f3f0] p-3.5 text-left sm:block">
-                  <p className="text-xs font-extrabold uppercase tracking-wide text-ink/50">Speel met je toetsenbord</p>
-                  <dl className="mt-2 flex flex-col gap-1.5 text-sm font-bold text-ink/80">
-                    <div className="flex items-center justify-between">
-                      <dt className="flex items-center gap-2">
-                        <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-[#e61e14]" />
-                        Remmen
-                      </dt>
-                      <dd className="flex gap-1">
-                        <Key>R</Key>
-                        <Key>&larr;</Key>
-                      </dd>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <dt className="flex items-center gap-2">
-                        <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                        Gas geven
-                      </dt>
-                      <dd className="flex gap-1">
-                        <Key>G</Key>
-                        <Key>&rarr;</Key>
-                      </dd>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <dt className="flex items-center gap-2">
-                        <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-badge-blue" />
-                        Verder / actie
-                      </dt>
-                      <dd>
-                        <Key>spatie</Key>
-                      </dd>
-                    </div>
-                  </dl>
-                </div>
-                <button
-                  ref={introBtnRef}
-                  type="button"
-                  onClick={startGame}
-                  className={`${BTN_RED} mt-5 w-full px-6 py-4 text-lg`}
-                >
-                  Naar de Tarzanbocht
-                </button>
-              </div>
-            </div>
-
-            {/* final score card */}
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="final-title"
-              inert={!(phase === 'finished' && !showShared) || undefined}
-              className={`absolute inset-0 grid place-items-center bg-ink/60 backdrop-blur-[2px] transition-all duration-700 ${phase === 'finished' && !showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
-            >
-              <div className="mx-4 w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl">
-                <h2 id="final-title" className="text-sm font-extrabold uppercase tracking-wide text-[#e61e14]">
-                  Jouw eindscore
-                </h2>
-                <p className="text-6xl font-extrabold tabular-nums">{total}</p>
-                <p className="mb-3 text-sm font-bold text-ink/60">van de 100 punten</p>
-                <p className="mb-4 text-sm font-bold">{scoreSentence(total)}</p>
-                <ul className="mb-5 space-y-1 text-left text-sm font-bold">
-                  {results.map((r) => (
-                    <li key={r.round.id} className="flex justify-between gap-3">
-                      <span className={r.round.practice ? 'text-ink/50' : ''}>
-                        {r.round.practice ? `${r.round.label} (oefening, telt niet mee)` : r.round.label}
-                      </span>
-                      <span className="tabular-nums">{r.score}/100</span>
-                    </li>
-                  ))}
-                </ul>
-                <div className="flex flex-col gap-2">
-                  <button ref={shareBtnRef} type="button" onClick={share} className={`${BTN_RED} w-full px-6 py-3`}>
-                    {copied ? 'Link gekopieerd!' : 'Deel je score'}
-                  </button>
-                  <button type="button" onClick={restart} className={`${BTN_DARK} w-full px-6 py-3`}>
-                    Nog een keer
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* shared-score landing (opened via a share link) */}
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="shared-title"
-              inert={!showShared || undefined}
-              className={`absolute inset-0 grid place-items-center bg-ink/60 backdrop-blur-[2px] transition-all duration-500 ${showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
-            >
-              <div className="mx-4 w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl">
-                <h2 id="shared-title" className="text-sm font-extrabold uppercase tracking-wide text-[#e61e14]">
-                  Gedeelde score
-                </h2>
-                <p className="text-6xl font-extrabold tabular-nums">{shared?.total}</p>
-                <p className="mb-3 text-sm font-bold text-ink/60">van de 100 punten</p>
-                <p className="mb-5 text-sm font-bold">
-                  Iemand daagt je uit: rem jij net zo laat als Max Verstappen op Zandvoort?
-                </p>
-                <button ref={sharedBtnRef} type="button" onClick={restart} className={`${BTN_RED} w-full px-6 py-3`}>
-                  Speel zelf
-                </button>
-              </div>
-            </div>
           </div>
 
           {/* info row */}
-          <div aria-live="polite" className="grid min-h-14 place-items-center py-1 text-center sm:min-h-16">
-            <p {...layer(phase === 'flying', 'text-sm font-extrabold text-white/85 sm:text-lg')}>
-              Onderweg naar de {round.label}...
-            </p>
-            <div {...layer(phase === 'ready', 'flex flex-col items-center gap-1.5')}>
-              <div className="flex items-center gap-2 rounded-full bg-white px-4 py-1.5 shadow-lg">
-                <span className="rounded-full bg-[#e61e14] px-3 py-0.5 text-sm font-extrabold text-white sm:text-base">
-                  {round.events.length / 2}&times; REM
-                </span>
-                <span className="font-extrabold text-ink/40">&middot;</span>
-                <span className="rounded-full bg-emerald-500 px-3 py-0.5 text-sm font-extrabold text-white sm:text-base">
-                  {round.events.length / 2}&times; GAS
-                </span>
-              </div>
-              <p className="text-sm font-bold text-white/85 sm:text-base">
-                {round.events.length / 2 === 1
-                  ? 'Let op de bocht en druk op het juiste moment!'
-                  : 'Een dubbele: let goed op waar Max remt en weer gas geeft!'}
+          {/* control panel: below the stage in portrait, right column on wide */}
+          <div className="contents wide:flex wide:min-h-0 wide:flex-col wide:justify-center wide:gap-8">
+            <div aria-live="polite" className="grid min-h-14 place-items-center py-1 text-center sm:min-h-16">
+              <p {...layer(phase === 'flying', 'text-sm font-extrabold text-white/85 sm:text-lg')}>
+                Onderweg naar de {round.label}...
               </p>
+              <div {...layer(phase === 'ready', 'flex flex-col items-center gap-1.5')}>
+                <div className="flex items-center gap-2 rounded-full bg-white px-4 py-1.5 shadow-lg">
+                  <span className="rounded-full bg-[#e61e14] px-3 py-0.5 text-sm font-extrabold text-white sm:text-base">
+                    {round.events.length / 2}&times; REM
+                  </span>
+                  <span className="font-extrabold text-ink/40">&middot;</span>
+                  <span className="rounded-full bg-emerald-500 px-3 py-0.5 text-sm font-extrabold text-white sm:text-base">
+                    {round.events.length / 2}&times; GAS
+                  </span>
+                </div>
+                <p className="text-sm font-bold text-white/85 sm:text-base">
+                  {round.events.length / 2 === 1
+                    ? 'Let op de bocht en druk op het juiste moment!'
+                    : 'Een dubbele: let goed op waar Max remt en weer gas geeft!'}
+                </p>
+              </div>
+              <p {...layer(phase === 'running', 'text-base font-extrabold sm:text-xl')}>{runningHint}</p>
+              <div {...layer(showRoundResult, 'flex flex-wrap items-center justify-center gap-2 sm:gap-3')}>
+                {lastResult?.eventResults.map((er) => (
+                  <span
+                    key={er.event.t}
+                    className="rounded-full bg-badge-blue px-3 py-1.5 text-xs font-extrabold text-white sm:px-4 sm:text-sm"
+                  >
+                    {eventChipText(er)}
+                  </span>
+                ))}
+              </div>
             </div>
-            <p {...layer(phase === 'running', 'text-base font-extrabold sm:text-xl')}>{runningHint}</p>
-            <div {...layer(showRoundResult, 'flex flex-wrap items-center justify-center gap-2 sm:gap-3')}>
-              {lastResult?.eventResults.map((er) => (
-                <span
-                  key={er.event.t}
-                  className="rounded-full bg-badge-blue px-3 py-1.5 text-xs font-extrabold text-white sm:px-4 sm:text-sm"
-                >
-                  {eventChipText(er)}
-                </span>
-              ))}
-            </div>
-          </div>
 
-          {/* action row */}
-          <div className="grid h-20 place-items-center sm:h-24">
-            <button
-              {...layer(phase === 'ready', `${BTN_LIGHT} w-full max-w-sm px-8 py-4 text-lg sm:text-xl`)}
-              ref={startBtnRef}
-              type="button"
-              onClick={game.startRun}
-            >
-              {round.practice ? 'Start de oefenbocht' : `Start bocht ${scoringRoundNumber}`}
-            </button>
-            <div {...layer(phase === 'running', 'flex w-full max-w-sm gap-3')}>
+            {/* action row */}
+            <div className="grid min-h-20 place-items-center sm:min-h-24 wide:min-h-56">
               <button
+                {...layer(phase === 'ready', `${BTN_LIGHT} w-full max-w-sm px-8 py-4 text-lg sm:text-xl`)}
+                ref={startBtnRef}
                 type="button"
-                onClick={() => game.press('brake')}
-                disabled={phase === 'running' && pedalLeft('brake') === 0}
-                aria-keyshortcuts="r arrowleft"
-                className={pedalClass('brake', 'bg-red-600')}
+                onClick={game.startRun}
               >
-                REM!
+                {round.practice ? 'Start de oefenbocht' : `Start bocht ${scoringRoundNumber}`}
               </button>
+              <div {...layer(phase === 'running', 'flex w-full max-w-sm gap-4 wide:gap-6')}>
+                <Pedal
+                  variant="brake"
+                  onPress={() => game.press('brake')}
+                  disabled={phase === 'running' && pedalLeft('brake') === 0}
+                  highlight={phase === 'running' && nextEvent?.type === 'brake'}
+                />
+                <Pedal
+                  variant="gas"
+                  onPress={() => game.press('gas')}
+                  disabled={phase === 'running' && pedalLeft('gas') === 0}
+                  highlight={phase === 'running' && nextEvent?.type === 'gas'}
+                />
+              </div>
               <button
+                {...layer(showRoundResult, `${BTN_LIGHT} w-full max-w-sm px-8 py-4 text-lg sm:text-xl`)}
+                ref={nextBtnRef}
                 type="button"
-                onClick={() => game.press('gas')}
-                disabled={phase === 'running' && pedalLeft('gas') === 0}
-                aria-keyshortcuts="g arrowright"
-                className={pedalClass('gas', 'bg-emerald-500')}
+                onClick={isLastRound ? showFinal : nextRound}
               >
-                GAS!
+                {isLastRound ? 'Bekijk je eindscore' : 'Naar de volgende bocht'}
               </button>
             </div>
-            <button
-              {...layer(showRoundResult, `${BTN_LIGHT} w-full max-w-sm px-8 py-4 text-lg sm:text-xl`)}
-              ref={nextBtnRef}
-              type="button"
-              onClick={isLastRound ? showFinal : nextRound}
-            >
-              {isLastRound ? 'Bekijk je eindscore' : 'Naar de volgende bocht'}
-            </button>
-          </div>
 
-          {/* keyboard hint (pointer-fine devices only) */}
-          <p className="hidden text-center text-xs font-bold text-white/40 sm:block">
-            Toetsenbord: <kbd className="rounded bg-white/10 px-1.5 py-0.5">spatie</kbd> = actie ·{' '}
-            <kbd className="rounded bg-white/10 px-1.5 py-0.5">R</kbd> = rem ·{' '}
-            <kbd className="rounded bg-white/10 px-1.5 py-0.5">G</kbd> = gas
-          </p>
+            {/* keyboard hint (pointer-fine devices only) */}
+            <p className="hidden text-center text-xs font-bold text-white/40 sm:block">
+              Toetsenbord: <kbd className="rounded bg-white/10 px-1.5 py-0.5">spatie</kbd> = actie ·{' '}
+              <kbd className="rounded bg-white/10 px-1.5 py-0.5">R</kbd> = rem ·{' '}
+              <kbd className="rounded bg-white/10 px-1.5 py-0.5">G</kbd> = gas
+            </p>
+          </div>
         </main>
 
-        <p className="text-center text-xs text-white/50">
-          Echte data via OpenF1: {fixture.meta.sessionName} {fixture.meta.meetingName} {fixture.meta.year}, ronde{' '}
-          {fixture.meta.lapNumber} van {fixture.meta.driverName}
-        </p>
+        {/* intro modal */}
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="intro-title"
+          inert={!(phase === 'intro' && !hideIntroChrome) || undefined}
+          className={`fixed inset-0 z-40 flex overflow-y-auto bg-ink/70 p-4 backdrop-blur-[3px] transition-all duration-500 ${phase === 'intro' && !hideIntroChrome ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+        >
+          <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:p-7">
+            <HeroCar className="mx-auto h-9 w-auto sm:h-11" />
+            <h1 id="intro-title" className="mt-4 text-xl font-extrabold leading-tight sm:text-2xl">
+              Rem jij net zo laat als <span className="text-[#e61e14]">Max Verstappen</span>?
+            </h1>
+            <p className="mt-2 text-sm font-bold leading-snug text-ink/70 sm:text-base">
+              Rijd zijn echte poleronde over Zandvoort. Eerst oefenen in de Tarzanbocht, daarna drie bochten voor de
+              punten: rem en geef weer gas op precies het juiste moment.
+            </p>
+            {/* keyboard explainer: desktop only - most players are on touch */}
+            <div className="mt-4 hidden rounded-2xl bg-[#f3f3f0] p-3.5 text-left sm:block">
+              <p className="text-xs font-extrabold uppercase tracking-wide text-ink/50">Speel met je toetsenbord</p>
+              <dl className="mt-2 flex flex-col gap-1.5 text-sm font-bold text-ink/80">
+                <div className="flex items-center justify-between">
+                  <dt className="flex items-center gap-2">
+                    <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-[#e61e14]" />
+                    Remmen
+                  </dt>
+                  <dd className="flex gap-1">
+                    <Key>R</Key>
+                    <Key>&larr;</Key>
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <dt className="flex items-center gap-2">
+                    <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                    Gas geven
+                  </dt>
+                  <dd className="flex gap-1">
+                    <Key>G</Key>
+                    <Key>&rarr;</Key>
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <dt className="flex items-center gap-2">
+                    <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-badge-blue" />
+                    Verder / actie
+                  </dt>
+                  <dd>
+                    <Key>spatie</Key>
+                  </dd>
+                </div>
+              </dl>
+            </div>
+            <button
+              ref={introBtnRef}
+              type="button"
+              onClick={startGame}
+              className={`${BTN_RED} mt-5 w-full px-6 py-4 text-lg`}
+            >
+              Naar de Tarzanbocht
+            </button>
+          </div>
+        </div>
+
+        {/* final score card */}
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="final-title"
+          inert={!(phase === 'finished' && !showShared) || undefined}
+          className={`fixed inset-0 z-40 flex overflow-y-auto bg-ink/60 p-4 backdrop-blur-[2px] transition-all duration-700 ${phase === 'finished' && !showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+        >
+          <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl">
+            <h2 id="final-title" className="text-sm font-extrabold uppercase tracking-wide text-[#e61e14]">
+              Jouw eindscore
+            </h2>
+            <p className="text-6xl font-extrabold tabular-nums">{total}</p>
+            <p className="mb-3 text-sm font-bold text-ink/60">van de 100 punten</p>
+            <p className="mb-4 text-sm font-bold">{scoreSentence(total)}</p>
+            <ul className="mb-5 space-y-1 text-left text-sm font-bold">
+              {results.map((r) => (
+                <li key={r.round.id} className="flex justify-between gap-3">
+                  <span className={r.round.practice ? 'text-ink/50' : ''}>
+                    {r.round.practice ? `${r.round.label} (oefening, telt niet mee)` : r.round.label}
+                  </span>
+                  <span className="tabular-nums">{r.score}/100</span>
+                </li>
+              ))}
+            </ul>
+            <div className="flex flex-col gap-2">
+              <button ref={shareBtnRef} type="button" onClick={share} className={`${BTN_RED} w-full px-6 py-3`}>
+                {copied ? 'Link gekopieerd!' : 'Deel je score'}
+              </button>
+              <button type="button" onClick={restart} className={`${BTN_DARK} w-full px-6 py-3`}>
+                Nog een keer
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* shared-score landing (opened via a share link) */}
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="shared-title"
+          inert={!showShared || undefined}
+          className={`fixed inset-0 z-40 flex overflow-y-auto bg-ink/60 p-4 backdrop-blur-[2px] transition-all duration-500 ${showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+        >
+          <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl">
+            <h2 id="shared-title" className="text-sm font-extrabold uppercase tracking-wide text-[#e61e14]">
+              Gedeelde score
+            </h2>
+            <p className="text-6xl font-extrabold tabular-nums">{shared?.total}</p>
+            <p className="mb-3 text-sm font-bold text-ink/60">van de 100 punten</p>
+            <p className="mb-5 text-sm font-bold">
+              Iemand daagt je uit: rem jij net zo laat als Max Verstappen op Zandvoort?
+            </p>
+            <button ref={sharedBtnRef} type="button" onClick={restart} className={`${BTN_RED} w-full px-6 py-3`}>
+              Speel zelf
+            </button>
+          </div>
+        </div>
       </div>
     </>
   );
