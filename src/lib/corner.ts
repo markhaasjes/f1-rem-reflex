@@ -65,11 +65,11 @@ const REPAIR_RANGES: { fromM: number; toM: number }[] = [
 ];
 const COLLINEAR_DEV_M = 0.06; // interior points this close to the chord are lerp fill
 const DENSIFY_STEP_M = 2;
-// A gap between real GPS vertices longer than this has genuinely missing
-// shape (through Hugenholtz the feed skips the entire 39m hairpin arc), so
-// the in-between is reconstructed along the track outline instead of guessed
-// by the spline.
-const GUIDE_GAP_M = 15;
+// A gap between real GPS vertices longer than this has missing shape (the
+// feed skips the entire 39m Hugenholtz hairpin arc, and 10-15m chords still
+// render as visible facets in a tight corner), so the in-between is
+// reconstructed along the track outline instead of guessed by the spline.
+const GUIDE_GAP_M = 9;
 const MIN_VERTEX_SPACING_M = 7;
 const LAP_LENGTH_M = 4218;
 
