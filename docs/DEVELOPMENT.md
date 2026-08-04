@@ -181,6 +181,14 @@ sand + dunes (screen space) -> green corridor + striped infield -> paddock
   turns it into meter→pixel mapping per frame. Flights are step queues
   (`fly([{box, ms}, {ms: pause}, {box, ms}])`), giving the
   corner → overview → next corner two-stage move the user sees.
+- **Chase cam on phones**: `follow(getTarget)` eases 7% of the remaining
+  distance toward a moving target per frame. App engages it while `running`
+  on non-`wide` viewports (box ≈ 0.55× the corner box, centered on the car
+  via an `elapsedT` ref) and flies back to the corner box at `roundResult`
+  so the whole driven line is visible. The effect must depend on the hook's
+  **stable callbacks**, not the returned camera object — that object changes
+  identity every animated frame, which would restart the flight per render
+  and it would never land.
 - **The outline is rotated at load** (`rotateOutline`) so index 0 sits at
   start/finish; corner slices for curbs/gravel then never wrap the closed
   loop's array boundary.
@@ -304,6 +312,12 @@ origin; return the endpoint instead.
   and the best run in localStorage (key `nos-rem-reflex:scores`); the intro
   shows the stored bests, the score card compares against them and tips the
   weakest corner of the current run.
+- **Tips**: [tips.ts](../src/lib/tips.ts) turns a round's worst event into a
+  specific Dutch instruction ("je remde 27m te laat - rem iets eerder"; no
+  tip when the worst event scores ≥90). The score card shows the weakest
+  round's tip, and the per-round tips are saved with the run (`SavedRun.
+advice`) so the next play shows "Vorige keer: ..." on that corner's ready
+  screen — the feedback loop that makes replaying feel like practicing.
 - **Verbal (Dutch)**: `describeBrakeAttempt` / `describeGasAttempt` bucket
   the same delta into tones (perfect ≤3m/≤5m, good, okay, bad) for the
   verdict banner; `combineResults` takes the _worst_ tone of a round.
@@ -333,6 +347,21 @@ Buttons share nos.nl-style interactive states (`BTN_*` constants + the
 offset - NOS red on light surfaces, ink on red CTAs, white on the pedals -
 warm-gray/darker-red hover backgrounds, 150ms transitions, scale press
 feedback. Exhausted pedals get a real `disabled`, not just dimming.
+
+## Layout invariants (portrait / landscape)
+
+- **Portrait deck never resizes.** The info row and the action row under the
+  stage have _fixed_ heights per breakpoint (`h-20`/`h-24` etc.), so the
+  canvas doesn't jump when phases swap content (ready chips ↔ running hint ↔
+  result). The round-result cards therefore overlay the **stage** on portrait
+  (`wide:hidden` absolute layer at its bottom edge) instead of living in the
+  deck; the deck copy of the cards is `hidden` + `wide:flex`.
+- **The wide side panel scrolls, never clips.** The panel is a flex column
+  with `wide:overflow-y-auto` and _no_ `justify-center` (centering an
+  overflowing flex container makes both ends unreachable), and the info row
+  keeps `min-height: auto` so it can't shrink below its content — on a
+  landscape phone that shrink is exactly what made the CTA overlap the
+  result cards.
 
 ## Team radio on the score screen
 

@@ -2,6 +2,8 @@ export interface SavedRun {
   total: number;
   /** Per-round scores keyed by round id. */
   rounds: Record<string, number>;
+  /** Per-round improvement advice keyed by round id (see lib/tips.ts). */
+  advice: Record<string, string>;
   date: string;
 }
 

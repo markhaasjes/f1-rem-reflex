@@ -104,5 +104,21 @@ export function useCameraFlight(initial: CamBox) {
     [stop],
   );
 
-  return { box, flying, fly, jumpTo };
+  // Chase-cam: keeps easing toward a moving target (a fixed fraction of the
+  // remaining distance per frame), so the camera trails the car smoothly.
+  // Runs until fly/jumpTo/stopFollow replaces it.
+  const follow = useCallback(
+    (getTarget: () => CamBox) => {
+      stop();
+      setFlying(false);
+      const tick = () => {
+        setBox((prev) => lerpBox(prev, getTarget(), 0.07));
+        rafRef.current = requestAnimationFrame(tick);
+      };
+      rafRef.current = requestAnimationFrame(tick);
+    },
+    [stop],
+  );
+
+  return { box, flying, fly, jumpTo, follow, stopFollow: stop };
 }
