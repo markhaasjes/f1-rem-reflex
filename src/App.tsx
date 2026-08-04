@@ -377,12 +377,12 @@ function App() {
 
   return (
     <>
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 z-10 w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-3 sm:px-6">
+      <div className="absolute top-0 left-4 z-10 sm:left-8 wide:left-10">
         <div className="bg-white px-[18px] pt-[12px] pb-[15px] rounded-b-[10px] shadow-[0_6px_24px_rgba(6,12,60,0.45)] inline-block">
           <NOSLogo className="w-12 h-auto text-white fill-current" />
         </div>
       </div>
-      <div className="flex min-h-svh flex-col items-center justify-center gap-4 bg-track-blue px-3 py-5 text-white sm:gap-6 sm:px-6">
+      <div className="flex h-svh flex-col items-center gap-3 overflow-hidden bg-track-blue px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-white sm:gap-4 sm:px-8 sm:pt-5 wide:px-10">
         <Pill className="gap-3 text-sm sm:text-base">{fixture.meta.circuit}</Pill>
 
         <div
@@ -391,9 +391,9 @@ function App() {
           {roundLabel || '·'}
         </div>
 
-        <main className="flex w-full max-w-md flex-col gap-3 sm:max-w-2xl lg:max-w-4xl wide:grid wide:min-h-0 wide:w-full wide:max-w-none wide:flex-1 wide:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)] wide:items-stretch wide:gap-6">
+        <main className="flex min-h-0 w-full max-w-md flex-1 flex-col gap-3 sm:max-w-2xl lg:max-w-4xl wide:grid wide:w-full wide:max-w-none wide:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)] wide:items-stretch wide:gap-6">
           {/* Stage */}
-          <div className="relative h-[24rem] w-full overflow-hidden rounded-3xl sm:h-[30rem] lg:h-[36rem] wide:h-full wide:min-h-[22rem]">
+          <div className="relative min-h-[13rem] w-full flex-1 overflow-hidden rounded-3xl wide:h-full wide:min-h-[22rem]">
             <CircuitScene
               fixture={fixture}
               camBox={camera.box}
@@ -426,128 +426,6 @@ function App() {
                   /100 punten
                 </p>
               )}
-            </div>
-
-            {/* intro modal */}
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="intro-title"
-              inert={!(phase === 'intro' && !hideIntroChrome) || undefined}
-              className={`absolute inset-0 grid place-items-center bg-ink/70 p-4 backdrop-blur-[3px] transition-all duration-500 ${phase === 'intro' && !hideIntroChrome ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
-            >
-              <div className="w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:p-7">
-                <HeroCar className="mx-auto h-9 w-auto sm:h-11" />
-                <h1 id="intro-title" className="mt-4 text-xl font-extrabold leading-tight sm:text-2xl">
-                  Rem jij net zo laat als <span className="text-[#e61e14]">Max Verstappen</span>?
-                </h1>
-                <p className="mt-2 text-sm font-bold leading-snug text-ink/70 sm:text-base">
-                  Rijd zijn echte poleronde over Zandvoort. Eerst oefenen in de Tarzanbocht, daarna drie bochten voor de
-                  punten: rem en geef weer gas op precies het juiste moment.
-                </p>
-                {/* keyboard explainer: desktop only - most players are on touch */}
-                <div className="mt-4 hidden rounded-2xl bg-[#f3f3f0] p-3.5 text-left sm:block">
-                  <p className="text-xs font-extrabold uppercase tracking-wide text-ink/50">Speel met je toetsenbord</p>
-                  <dl className="mt-2 flex flex-col gap-1.5 text-sm font-bold text-ink/80">
-                    <div className="flex items-center justify-between">
-                      <dt className="flex items-center gap-2">
-                        <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-[#e61e14]" />
-                        Remmen
-                      </dt>
-                      <dd className="flex gap-1">
-                        <Key>R</Key>
-                        <Key>&larr;</Key>
-                      </dd>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <dt className="flex items-center gap-2">
-                        <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                        Gas geven
-                      </dt>
-                      <dd className="flex gap-1">
-                        <Key>G</Key>
-                        <Key>&rarr;</Key>
-                      </dd>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <dt className="flex items-center gap-2">
-                        <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-badge-blue" />
-                        Verder / actie
-                      </dt>
-                      <dd>
-                        <Key>spatie</Key>
-                      </dd>
-                    </div>
-                  </dl>
-                </div>
-                <button
-                  ref={introBtnRef}
-                  type="button"
-                  onClick={startGame}
-                  className={`${BTN_RED} mt-5 w-full px-6 py-4 text-lg`}
-                >
-                  Naar de Tarzanbocht
-                </button>
-              </div>
-            </div>
-
-            {/* final score card */}
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="final-title"
-              inert={!(phase === 'finished' && !showShared) || undefined}
-              className={`absolute inset-0 grid place-items-center bg-ink/60 backdrop-blur-[2px] transition-all duration-700 ${phase === 'finished' && !showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
-            >
-              <div className="mx-4 w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl">
-                <h2 id="final-title" className="text-sm font-extrabold uppercase tracking-wide text-[#e61e14]">
-                  Jouw eindscore
-                </h2>
-                <p className="text-6xl font-extrabold tabular-nums">{total}</p>
-                <p className="mb-3 text-sm font-bold text-ink/60">van de 100 punten</p>
-                <p className="mb-4 text-sm font-bold">{scoreSentence(total)}</p>
-                <ul className="mb-5 space-y-1 text-left text-sm font-bold">
-                  {results.map((r) => (
-                    <li key={r.round.id} className="flex justify-between gap-3">
-                      <span className={r.round.practice ? 'text-ink/50' : ''}>
-                        {r.round.practice ? `${r.round.label} (oefening, telt niet mee)` : r.round.label}
-                      </span>
-                      <span className="tabular-nums">{r.score}/100</span>
-                    </li>
-                  ))}
-                </ul>
-                <div className="flex flex-col gap-2">
-                  <button ref={shareBtnRef} type="button" onClick={share} className={`${BTN_RED} w-full px-6 py-3`}>
-                    {copied ? 'Link gekopieerd!' : 'Deel je score'}
-                  </button>
-                  <button type="button" onClick={restart} className={`${BTN_DARK} w-full px-6 py-3`}>
-                    Nog een keer
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* shared-score landing (opened via a share link) */}
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="shared-title"
-              inert={!showShared || undefined}
-              className={`absolute inset-0 grid place-items-center bg-ink/60 backdrop-blur-[2px] transition-all duration-500 ${showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
-            >
-              <div className="mx-4 w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl">
-                <h2 id="shared-title" className="text-sm font-extrabold uppercase tracking-wide text-[#e61e14]">
-                  Gedeelde score
-                </h2>
-                <p className="text-6xl font-extrabold tabular-nums">{shared?.total}</p>
-                <p className="mb-3 text-sm font-bold text-ink/60">van de 100 punten</p>
-                <p className="mb-5 text-sm font-bold">
-                  Iemand daagt je uit: rem jij net zo laat als Max Verstappen op Zandvoort?
-                </p>
-                <button ref={sharedBtnRef} type="button" onClick={restart} className={`${BTN_RED} w-full px-6 py-3`}>
-                  Speel zelf
-                </button>
-              </div>
             </div>
           </div>
 
@@ -629,6 +507,128 @@ function App() {
             </p>
           </div>
         </main>
+
+        {/* intro modal */}
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="intro-title"
+          inert={!(phase === 'intro' && !hideIntroChrome) || undefined}
+          className={`fixed inset-0 z-40 flex overflow-y-auto bg-ink/70 p-4 backdrop-blur-[3px] transition-all duration-500 ${phase === 'intro' && !hideIntroChrome ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+        >
+          <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:p-7">
+            <HeroCar className="mx-auto h-9 w-auto sm:h-11" />
+            <h1 id="intro-title" className="mt-4 text-xl font-extrabold leading-tight sm:text-2xl">
+              Rem jij net zo laat als <span className="text-[#e61e14]">Max Verstappen</span>?
+            </h1>
+            <p className="mt-2 text-sm font-bold leading-snug text-ink/70 sm:text-base">
+              Rijd zijn echte poleronde over Zandvoort. Eerst oefenen in de Tarzanbocht, daarna drie bochten voor de
+              punten: rem en geef weer gas op precies het juiste moment.
+            </p>
+            {/* keyboard explainer: desktop only - most players are on touch */}
+            <div className="mt-4 hidden rounded-2xl bg-[#f3f3f0] p-3.5 text-left sm:block">
+              <p className="text-xs font-extrabold uppercase tracking-wide text-ink/50">Speel met je toetsenbord</p>
+              <dl className="mt-2 flex flex-col gap-1.5 text-sm font-bold text-ink/80">
+                <div className="flex items-center justify-between">
+                  <dt className="flex items-center gap-2">
+                    <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-[#e61e14]" />
+                    Remmen
+                  </dt>
+                  <dd className="flex gap-1">
+                    <Key>R</Key>
+                    <Key>&larr;</Key>
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <dt className="flex items-center gap-2">
+                    <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                    Gas geven
+                  </dt>
+                  <dd className="flex gap-1">
+                    <Key>G</Key>
+                    <Key>&rarr;</Key>
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <dt className="flex items-center gap-2">
+                    <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-badge-blue" />
+                    Verder / actie
+                  </dt>
+                  <dd>
+                    <Key>spatie</Key>
+                  </dd>
+                </div>
+              </dl>
+            </div>
+            <button
+              ref={introBtnRef}
+              type="button"
+              onClick={startGame}
+              className={`${BTN_RED} mt-5 w-full px-6 py-4 text-lg`}
+            >
+              Naar de Tarzanbocht
+            </button>
+          </div>
+        </div>
+
+        {/* final score card */}
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="final-title"
+          inert={!(phase === 'finished' && !showShared) || undefined}
+          className={`fixed inset-0 z-40 flex overflow-y-auto bg-ink/60 p-4 backdrop-blur-[2px] transition-all duration-700 ${phase === 'finished' && !showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+        >
+          <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl">
+            <h2 id="final-title" className="text-sm font-extrabold uppercase tracking-wide text-[#e61e14]">
+              Jouw eindscore
+            </h2>
+            <p className="text-6xl font-extrabold tabular-nums">{total}</p>
+            <p className="mb-3 text-sm font-bold text-ink/60">van de 100 punten</p>
+            <p className="mb-4 text-sm font-bold">{scoreSentence(total)}</p>
+            <ul className="mb-5 space-y-1 text-left text-sm font-bold">
+              {results.map((r) => (
+                <li key={r.round.id} className="flex justify-between gap-3">
+                  <span className={r.round.practice ? 'text-ink/50' : ''}>
+                    {r.round.practice ? `${r.round.label} (oefening, telt niet mee)` : r.round.label}
+                  </span>
+                  <span className="tabular-nums">{r.score}/100</span>
+                </li>
+              ))}
+            </ul>
+            <div className="flex flex-col gap-2">
+              <button ref={shareBtnRef} type="button" onClick={share} className={`${BTN_RED} w-full px-6 py-3`}>
+                {copied ? 'Link gekopieerd!' : 'Deel je score'}
+              </button>
+              <button type="button" onClick={restart} className={`${BTN_DARK} w-full px-6 py-3`}>
+                Nog een keer
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* shared-score landing (opened via a share link) */}
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="shared-title"
+          inert={!showShared || undefined}
+          className={`fixed inset-0 z-40 flex overflow-y-auto bg-ink/60 p-4 backdrop-blur-[2px] transition-all duration-500 ${showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+        >
+          <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl">
+            <h2 id="shared-title" className="text-sm font-extrabold uppercase tracking-wide text-[#e61e14]">
+              Gedeelde score
+            </h2>
+            <p className="text-6xl font-extrabold tabular-nums">{shared?.total}</p>
+            <p className="mb-3 text-sm font-bold text-ink/60">van de 100 punten</p>
+            <p className="mb-5 text-sm font-bold">
+              Iemand daagt je uit: rem jij net zo laat als Max Verstappen op Zandvoort?
+            </p>
+            <button ref={sharedBtnRef} type="button" onClick={restart} className={`${BTN_RED} w-full px-6 py-3`}>
+              Speel zelf
+            </button>
+          </div>
+        </div>
       </div>
     </>
   );
