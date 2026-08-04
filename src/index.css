@@ -62,6 +62,17 @@ button:disabled {
   );
 }
 
+/* Scrollable but without scrollbar chrome. Used on the wide side panel: it
+   scrolls for real on landscape phones (touch/wheel keep working), but
+   sub-pixel text heights can leave it 1px "scrollable" on desktop, which
+   macOS with always-visible scrollbars renders as a full useless track. */
+.scrollbar-hidden {
+  scrollbar-width: none;
+}
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
+
 /* NOS-style keyboard focus (like nos.nl): 2px solid outline with 2px offset,
    red on light surfaces, overridable per surface via --ring. Only shows for
    keyboard/assistive focus, never on click. */

@@ -601,7 +601,7 @@ function App() {
 
           {/* info row */}
           {/* control panel: below the stage in portrait, right column on wide */}
-          <div className="contents wide:flex wide:min-h-0 wide:flex-col wide:gap-[clamp(0.75rem,3vh,1.75rem)] wide:overflow-y-auto">
+          <div className="scrollbar-hidden contents wide:flex wide:min-h-0 wide:flex-col wide:gap-[clamp(0.75rem,3vh,1.75rem)] wide:overflow-y-auto">
             <EventCard roundLabel={roundLabel} />
             <div
               aria-live="polite"
