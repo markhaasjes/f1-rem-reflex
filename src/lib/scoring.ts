@@ -1,3 +1,5 @@
+import type { GameRound, PlayerMark, TargetEvent } from '../types';
+
 export type ResultTone = 'perfect' | 'good' | 'okay' | 'bad';
 
 export interface ResultDescription {
@@ -13,7 +15,7 @@ export function describeBrakeAttempt(deltaM: number | null): ResultDescription {
   if (deltaM === null) {
     return {
       title: 'Je hebt niet geremd!',
-      detail: 'Zo ga je rechtdoor het grind in bij de Tarzanbocht.',
+      detail: 'Zo ga je rechtdoor het grind in.',
       tone: 'bad',
     };
   }
@@ -85,15 +87,70 @@ export function describeGasAttempt(deltaM: number | null): ResultDescription {
 const TONE_RANK: Record<ResultTone, number> = { perfect: 3, good: 2, okay: 1, bad: 0 };
 
 const OVERALL_TITLE: Record<ResultTone, string> = {
-  perfect: 'Wereldklasse ronde!',
+  perfect: 'Wereldklasse!',
   good: 'Sterke bocht!',
   okay: 'Netjes gedaan.',
   bad: 'Volgende keer beter.',
 };
 
-// Combines the brake and gas verdicts into one headline, taking the weaker of
-// the two so the player sees the honest overall grade.
-export function combineResults(brake: ResultDescription, gas: ResultDescription): { title: string; tone: ResultTone } {
-  const tone = TONE_RANK[brake.tone] <= TONE_RANK[gas.tone] ? brake.tone : gas.tone;
+// Combines several event verdicts into one headline, taking the weakest so
+// the player sees the honest overall grade.
+export function combineResults(descriptions: ResultDescription[]): { title: string; tone: ResultTone } {
+  const tone = descriptions.reduce<ResultTone>(
+    (worst, d) => (TONE_RANK[d.tone] < TONE_RANK[worst] ? d.tone : worst),
+    'perfect',
+  );
   return { title: OVERALL_TITLE[tone], tone };
+}
+
+// --- Numeric scoring across the whole game ---
+
+/** 100 points within 2m of Max, linearly down to 0 at 50m. Missed event = 0. */
+export function scoreEvent(deltaM: number | null): number {
+  if (deltaM === null) return 0;
+  const absDelta = Math.abs(deltaM);
+  if (absDelta <= 2) return 100;
+  return Math.max(0, Math.round(100 - ((absDelta - 2) * 100) / 48));
+}
+
+export interface EventResult {
+  event: TargetEvent;
+  mark: PlayerMark | null;
+  deltaM: number | null;
+  score: number;
+  description: ResultDescription;
+}
+
+export interface RoundResult {
+  round: GameRound;
+  eventResults: EventResult[];
+  score: number;
+}
+
+// Marks pair to Max's events per pedal, in order: the k-th brake press
+// answers Max's k-th brake event, the k-th gas press his k-th gas event.
+// Unanswered events score 0.
+export function scoreRound(round: GameRound, marks: PlayerMark[]): RoundResult {
+  const byType: Record<PlayerMark['type'], PlayerMark[]> = {
+    brake: marks.filter((m) => m.type === 'brake'),
+    gas: marks.filter((m) => m.type === 'gas'),
+  };
+  const used: Record<PlayerMark['type'], number> = { brake: 0, gas: 0 };
+  const eventResults = round.events.map((event) => {
+    const mark = byType[event.type][used[event.type]++] ?? null;
+    const deltaM = mark ? mark.distanceM - event.distanceM : null;
+    const describe = event.type === 'brake' ? describeBrakeAttempt : describeGasAttempt;
+    return { event, mark, deltaM, score: scoreEvent(deltaM), description: describe(deltaM) };
+  });
+  const score = Math.round(eventResults.reduce((sum, r) => sum + r.score, 0) / eventResults.length);
+  return { round, eventResults, score };
+}
+
+/** Overall 0-100 across the scoring rounds only - practice rounds (the
+ * Tarzan warm-up) are shown on the card but do not count. Every event in the
+ * counted rounds weighs equally. */
+export function totalScore(results: RoundResult[]): number {
+  const events = results.filter((r) => !r.round.practice).flatMap((r) => r.eventResults);
+  if (events.length === 0) return 0;
+  return Math.round(events.reduce((sum, r) => sum + r.score, 0) / events.length);
 }

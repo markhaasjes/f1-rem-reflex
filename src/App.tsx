@@ -1,16 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pill } from './components/Brand';
-import { CircuitMiniMap } from './components/CircuitMiniMap';
-import { CornerScene } from './components/CornerScene';
+import { CircuitScene } from './components/CircuitScene';
 import { HeroCar } from './components/HeroCar';
 import { NOSLogo } from './components/NOSLogo';
-import fixtureJson from './data/tarzanbocht.json';
-import { PRACTICE_ROUNDS, useBrakeGame } from './hooks/useBrakeGame';
-import { computeGasPoint, sampleAt } from './lib/corner';
-import { combineResults, describeBrakeAttempt, describeGasAttempt } from './lib/scoring';
-import type { TarzanFixture } from './types';
+import fixtureJson from './data/zandvoort2025.json';
+import { boxFromBounds, useCameraFlight, type CamBox } from './hooks/useCameraFlight';
+import { useCircuitGame } from './hooks/useCircuitGame';
+import { sampleAt } from './lib/corner';
+import { combineResults, totalScore, type EventResult, type RoundResult } from './lib/scoring';
+import type { GamePhase, ZandvoortFixture } from './types';
 
-const fixture = fixtureJson as TarzanFixture;
+const fixture = fixtureJson as unknown as ZandvoortFixture;
 
 const TONE_STYLES = {
   perfect: 'bg-emerald-500',
@@ -19,113 +19,246 @@ const TONE_STYLES = {
   bad: 'bg-red-600',
 } as const;
 
-// Every phase layer stays mounted in the same grid cell and crossfades, so
-// the layout never jumps when the phase changes.
-function stackLayer(visible: boolean, extra = '') {
-  return `col-start-1 row-start-1 transition-all duration-500 ${visible ? 'opacity-100 translate-y-0' : 'pointer-events-none opacity-0 translate-y-1'} ${extra}`;
+const OVERVIEW_PAD_M = 90;
+const ROUND_PAD_M = 55;
+
+// Max's real team radio, played once on the final score screen (fetched by
+// scripts/fetch-team-radio.mjs). The negative clip is optional: until a file
+// exists at that path the weak-score result simply stays silent.
+const RADIO_POSITIVE_SRC = '/audio/radio-positive.mp3';
+const RADIO_NEGATIVE_SRC = '/audio/radio-negative.mp3';
+const RADIO_POSITIVE_THRESHOLD = 60;
+
+// Interactive states in the nos.nl style: warm-gray hover on light buttons,
+// darker NOS red on red CTAs, 150ms ease transitions, scale press feedback,
+// and a 2px offset focus outline (`.focus-ring` in index.css).
+const BTN_BASE =
+  'select-none touch-manipulation rounded-full font-extrabold shadow-lg transition-all duration-150 active:scale-95 focus-ring';
+const BTN_LIGHT = `${BTN_BASE} bg-white text-ink hover:bg-[#f3f3f0] hover:scale-[1.02]`;
+const BTN_RED = `${BTN_BASE} focus-ring-ink bg-[#e61e14] text-white hover:bg-[#ca1a11] hover:scale-[1.02]`;
+const BTN_DARK = `${BTN_BASE} bg-ink text-white hover:bg-track-blue hover:scale-[1.02]`;
+
+// A player mark phrased against Max's matching point. Positive delta = the
+// player was later than Max. Dutch decimal comma.
+function deltaSentence(distDeltaM: number, opts: { verb: string; suffix: string; perfect: string }): string {
+  const meters = Math.round(distDeltaM);
+  if (meters === 0) return opts.perfect;
+  const direction = meters > 0 ? 'laat' : 'vroeg';
+  return `${opts.verb} ${Math.abs(meters)}m te ${direction}${opts.suffix}`;
 }
 
-// A player mark phrased against Max's matching point, in whole metres plus the
-// time gap in seconds - far more meaningful to a viewer than the raw speed.
-// Positive delta = the player was later than Max.
-function deltaSentence(
-  distDeltaM: number,
-  timeDeltaS: number,
-  opts: { verb: string; suffix: string; perfect: string },
-): string {
-  const meters = Math.round(distDeltaM);
-  const seconds = Math.abs(timeDeltaS).toFixed(2).replace('.', ','); // Dutch decimal comma
-  if (meters === 0) return `${opts.perfect} (${seconds}s)`;
-  const direction = meters > 0 ? 'laat' : 'vroeg';
-  return `${opts.verb} ${Math.abs(meters)}m te ${direction}${opts.suffix} (${seconds}s)`;
+function buildShareUrl(total: number, results: RoundResult[]): string {
+  const rounds = results.map((r) => r.score).join('.');
+  return `${location.origin}${location.pathname}?s=${total}&r=${rounds}`;
+}
+
+// A score arriving via a shared link: ?s=<total>&r=<r0.r1.r2.r3>
+function parseSharedScore(): { total: number; rounds: number[] } | null {
+  const params = new URLSearchParams(location.search);
+  const s = Number(params.get('s'));
+  const rounds = (params.get('r') ?? '')
+    .split('.')
+    .map(Number)
+    .filter((n) => Number.isFinite(n));
+  if (!Number.isFinite(s) || rounds.length !== fixture.rounds.length) return null;
+  return { total: Math.round(s), rounds: rounds.map(Math.round) };
+}
+
+function eventChipText(er: EventResult): string {
+  const isBrake = er.event.type === 'brake';
+  if (er.deltaM === null) return isBrake ? 'Niet geremd' : 'Geen gas gegeven';
+  return deltaSentence(er.deltaM, {
+    verb: isBrake ? 'Rem' : 'Gas',
+    suffix: '',
+    perfect: isBrake ? 'Rem: perfect!' : 'Gas: perfect!',
+  });
+}
+
+// Visual keycap for the keyboard explainer in the intro modal.
+function Key({ children }: { children: React.ReactNode }) {
+  return (
+    <kbd className="inline-block min-w-7 rounded-md border border-ink/15 bg-white px-1.5 py-0.5 text-center text-xs font-extrabold text-ink shadow-[0_2px_0_rgba(11,20,64,0.15)]">
+      {children}
+    </kbd>
+  );
+}
+
+function scoreSentence(total: number): string {
+  if (total >= 90) return 'Wereldklasse - jij remt als Max zelf!';
+  if (total >= 70) return 'Sterke ronde, bijna kwalificatie-waardig.';
+  if (total >= 45) return 'Netjes! Maar Max rijdt nog wel even weg.';
+  return 'De grindbak is goed gevuld vandaag.';
 }
 
 function App() {
-  const {
-    phase,
-    attempt,
-    isScoring,
-    awaitingGas,
-    elapsedT,
-    brakeAttempt,
-    gasAttempt,
-    crashed,
-    start,
-    press,
-    nextAttempt,
-    reset,
-  } = useBrakeGame(fixture);
+  const game = useCircuitGame(fixture);
+  const { phase, round, roundIndex, elapsedT, marks, results, nextEvent } = game;
 
-  const gasPoint = useMemo(() => computeGasPoint(fixture.samples, fixture.apexPoint.t), []);
+  const overviewBox = useMemo<CamBox>(() => {
+    const xs = fixture.trackOutline.map((p) => p.x);
+    const ys = fixture.trackOutline.map((p) => p.y);
+    return boxFromBounds(
+      { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) },
+      OVERVIEW_PAD_M,
+    );
+  }, []);
+  const roundBoxes = useMemo<CamBox[]>(() => fixture.rounds.map((r) => boxFromBounds(r.bounds, ROUND_PAD_M)), []);
 
-  // The intro (circuit map + hero) is its own step: the player first goes "to
-  // the track", then presses Start to actually launch the lap - so the car
-  // never takes off the instant they leave the intro.
-  const [introDismissed, setIntroDismissed] = useState(false);
-  const showIntro = phase === 'ready' && attempt === 1 && !introDismissed;
+  // Visual-QA hook: ?corner=N starts the camera zoomed on corner N with the
+  // intro chrome hidden, so Playwright can snapshot every corner in isolation.
+  const debugCornerBox = useMemo<CamBox | null>(() => {
+    const n = Number(new URLSearchParams(location.search).get('corner'));
+    const corner = fixture.corners.find((c) => c.number === n);
+    if (!corner) return null;
+    return boxFromBounds({ minX: corner.x - 130, minY: corner.y - 130, maxX: corner.x + 130, maxY: corner.y + 130 }, 0);
+  }, []);
 
-  const backToStart = () => {
-    setIntroDismissed(false);
-    reset();
-  };
+  const camera = useCameraFlight(debugCornerBox ?? overviewBox);
+  const [shared] = useState(parseSharedScore);
+  const [showShared, setShowShared] = useState(shared !== null);
+  const [copied, setCopied] = useState(false);
+  const hideIntroChrome = showShared || debugCornerBox !== null;
 
-  const roundLabel = isScoring ? 'Scoreronde · dit telt' : 'Oefenronde';
-  const showVerdict = phase === 'result' && isScoring;
+  const isLastRound = roundIndex === fixture.rounds.length - 1;
+  const scoringRoundNumber = fixture.rounds.filter((r, i) => i <= roundIndex && !r.practice).length;
 
-  let resultButtonLabel = 'Volgende oefenronde';
-  if (isScoring) resultButtonLabel = 'Nog een keer';
-  else if (attempt >= PRACTICE_ROUNDS) resultButtonLabel = 'Naar de scoreronde';
+  // --- flow handlers: game state + camera flight stay in lockstep ---
+  const startGame = useCallback(() => {
+    game.flyToRound(0);
+    camera.fly([{ box: roundBoxes[0], ms: 1700 }], game.arm);
+  }, [game, camera, roundBoxes]);
 
-  let readyButtonLabel = 'Start de oefenronde';
-  if (showIntro) readyButtonLabel = 'Naar de baan';
-  else if (isScoring) readyButtonLabel = 'Start de scoreronde';
+  const nextRound = useCallback(() => {
+    const next = roundIndex + 1;
+    game.flyToRound(next);
+    camera.fly([{ box: overviewBox, ms: 1200 }, { ms: 300 }, { box: roundBoxes[next], ms: 1500 }], game.arm);
+  }, [game, camera, roundIndex, overviewBox, roundBoxes]);
 
+  // Max's real radio on the score reveal. Launched from the same click that
+  // finishes the game, so autoplay policies treat it as user-initiated; a
+  // missing file (negative clip pending) or blocked playback just stays quiet.
+  const radioRef = useRef<HTMLAudioElement | null>(null);
+  const stopRadio = useCallback(() => {
+    radioRef.current?.pause();
+    radioRef.current = null;
+  }, []);
+
+  const showFinal = useCallback(() => {
+    game.finish();
+    camera.fly([{ box: overviewBox, ms: 1400 }]);
+    const score = totalScore(game.results);
+    const audio = new Audio(score >= RADIO_POSITIVE_THRESHOLD ? RADIO_POSITIVE_SRC : RADIO_NEGATIVE_SRC);
+    radioRef.current = audio;
+    audio.play().catch(() => {});
+  }, [game, camera, overviewBox]);
+
+  const restart = useCallback(() => {
+    stopRadio();
+    setShowShared(false);
+    history.replaceState(null, '', location.pathname);
+    game.restart();
+    camera.fly([{ box: overviewBox, ms: 900 }]);
+  }, [game, camera, overviewBox, stopRadio]);
+
+  // Space advances the flow; while running it presses the pedal Max needs
+  // next. R/ArrowLeft and G/ArrowRight hit a specific pedal (like the
+  // on-screen buttons). Space is preventDefault-ed, so a focused button never
+  // double-fires; Enter activates the focused button natively.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (showShared) return;
+      if (phase === 'running' && (event.code === 'KeyR' || event.code === 'ArrowLeft')) {
+        event.preventDefault();
+        game.press('brake');
+        return;
+      }
+      if (phase === 'running' && (event.code === 'KeyG' || event.code === 'ArrowRight')) {
+        event.preventDefault();
+        game.press('gas');
+        return;
+      }
       if (event.code !== 'Space') return;
       event.preventDefault();
-      if (phase === 'ready') {
-        if (showIntro) setIntroDismissed(true);
-        else start();
-      } else if (phase === 'running') press();
+      if (phase === 'intro') startGame();
+      else if (phase === 'ready') game.startRun();
+      else if (phase === 'running' && nextEvent) game.press(nextEvent.type);
+      else if (phase === 'roundResult') (isLastRound ? showFinal : nextRound)();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [phase, showIntro, start, press]);
+  }, [phase, showShared, game, nextEvent, startGame, nextRound, showFinal, isLastRound]);
 
-  const liveSpeed = phase === 'running' ? Math.round(sampleAt(fixture.samples, elapsedT).speedKph) : null;
+  // Move keyboard focus along with the flow, so Tab/Enter always lands on the
+  // primary action and screen-reader users follow the game without hunting.
+  const introBtnRef = useRef<HTMLButtonElement>(null);
+  const startBtnRef = useRef<HTMLButtonElement>(null);
+  const nextBtnRef = useRef<HTMLButtonElement>(null);
+  const shareBtnRef = useRef<HTMLButtonElement>(null);
+  const sharedBtnRef = useRef<HTMLButtonElement>(null);
 
-  // Result chips: metres + seconds from Max's point on the scoring lap (a real
-  // yardstick), the player's own speed on the blind practice laps.
-  let brakeMark = '';
-  if (brakeAttempt) {
-    brakeMark = isScoring
-      ? deltaSentence(brakeAttempt.distanceM - fixture.brakePoint.distanceM, brakeAttempt.t - fixture.brakePoint.t, {
-          verb: 'Jij remde',
-          suffix: '',
-          perfect: 'Jij remde precies op het rempunt',
-        })
-      : `Jij rem: ${Math.round(brakeAttempt.speedKph)} km/u`;
+  useEffect(() => {
+    const byPhase: Partial<Record<GamePhase, React.RefObject<HTMLButtonElement | null>>> = {
+      intro: introBtnRef,
+      ready: startBtnRef,
+      roundResult: nextBtnRef,
+      finished: shareBtnRef,
+    };
+    const target = showShared ? sharedBtnRef : byPhase[phase];
+    if (!target) return;
+    // wait for the crossfade layer to become non-inert before focusing
+    const id = setTimeout(() => target.current?.focus({ preventScroll: true }), 120);
+    return () => clearTimeout(id);
+  }, [phase, showShared]);
+
+  const total = totalScore(results);
+
+  const share = useCallback(async () => {
+    const url = buildShareUrl(total, results);
+    const text = `Ik scoorde ${total}/100 in NOS Rem Reflex - rem jij net zo laat als Max Verstappen op Zandvoort?`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'NOS Rem Reflex', text, url });
+        return;
+      }
+    } catch {
+      /* fall through to clipboard */
+    }
+    await navigator.clipboard.writeText(`${text} ${url}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  }, [total, results]);
+
+  // --- derived display state ---
+  const liveSpeed = phase === 'running' ? Math.round(sampleAt(fixture.lap.samples, elapsedT).speedKph) : null;
+  const lastResult = results.at(-1) ?? null;
+  const showRoundResult = phase === 'roundResult' && lastResult !== null;
+  const verdict = showRoundResult ? combineResults(lastResult.eventResults.map((r) => r.description)) : null;
+
+  let roundLabel = '';
+  if (phase !== 'intro' && phase !== 'finished') {
+    roundLabel = round.practice ? `Oefenbocht · ${round.label}` : `Bocht ${scoringRoundNumber} van 3 · ${round.label}`;
   }
-  let gasMark = isScoring ? 'Jij ging niet op het gas' : 'Jij gas: geen gas';
-  if (gasAttempt) {
-    gasMark = isScoring
-      ? deltaSentence(gasAttempt.distanceM - gasPoint.distanceM, gasAttempt.t - gasPoint.t, {
-          verb: 'Jij ging',
-          suffix: ' op het gas',
-          perfect: 'Jij ging precies op het gas',
-        })
-      : `Jij gas: ${Math.round(gasAttempt.speedKph)} km/u`;
-  }
 
-  const verdict = useMemo(() => {
-    if (phase !== 'result') return null;
-    const brakeDelta = brakeAttempt ? brakeAttempt.distanceM - fixture.brakePoint.distanceM : null;
-    const gasDelta = gasAttempt ? gasAttempt.distanceM - gasPoint.distanceM : null;
-    const brakeDesc = describeBrakeAttempt(brakeDelta);
-    const gasDesc = describeGasAttempt(gasDelta);
-    return { brakeDesc, gasDesc, overall: combineResults(brakeDesc, gasDesc) };
-  }, [phase, brakeAttempt, gasAttempt, gasPoint]);
+  let runningHint = 'Uitrijden...';
+  if (nextEvent?.type === 'brake') runningHint = 'Wachten... rem op het juiste moment';
+  else if (nextEvent?.type === 'gas') runningHint = 'Nu weer op het gas!';
+
+  // A pedal dims (and truly disables) once the player has used it as often as
+  // Max does this round.
+  const pedalLeft = (type: 'brake' | 'gas') =>
+    round.events.filter((e) => e.type === type).length - marks.filter((m) => m.type === type).length;
+  const pedalClass = (type: 'brake' | 'gas', color: string) =>
+    `flex-1 select-none touch-manipulation rounded-full px-4 py-5 text-2xl font-extrabold tracking-wide shadow-lg transition-all duration-150 hover:brightness-110 active:scale-95 focus-ring focus-ring-white sm:text-3xl ${color} ${
+      phase === 'running' && pedalLeft(type) === 0 ? 'opacity-30' : ''
+    } ${phase === 'running' && nextEvent?.type === type ? 'ring-4 ring-white/80' : ''}`;
+
+  // Crossfading layers stay mounted for the animation, so hidden ones must be
+  // `inert`: otherwise invisible buttons stay in the Tab order and invisible
+  // text keeps getting read by screen readers.
+  const layer = (visible: boolean, extra = '') => ({
+    className: `col-start-1 row-start-1 transition-all duration-500 ${visible ? 'opacity-100 translate-y-0' : 'pointer-events-none opacity-0 translate-y-1'} ${extra}`,
+    inert: !visible || undefined,
+  });
 
   return (
     <>
@@ -138,133 +271,251 @@ function App() {
         <Pill className="gap-3 text-sm sm:text-base">{fixture.meta.circuit}</Pill>
 
         <div
-          className={`rounded-full px-4 py-1 text-xs font-extrabold tracking-wide sm:text-sm ${isScoring ? 'bg-red-600 text-white' : 'bg-white/15 text-white/90'}`}
+          className={`rounded-full px-4 py-1 text-xs font-extrabold tracking-wide transition-opacity sm:text-sm ${roundLabel ? 'opacity-100' : 'opacity-0'} ${round?.practice ? 'bg-white/15 text-white/90' : 'bg-red-600 text-white'}`}
         >
-          {roundLabel}
+          {roundLabel || '·'}
         </div>
 
         <main className="flex w-full max-w-md flex-col gap-3 sm:max-w-2xl lg:max-w-4xl">
-          {/* Stage: fixed height, scene always mounted underneath, intro layer on top */}
+          {/* Stage */}
           <div className="relative h-[24rem] w-full overflow-hidden rounded-3xl sm:h-[30rem] lg:h-[36rem]">
-            <CornerScene
+            <CircuitScene
               fixture={fixture}
-              phase={phase === 'ready' ? 'idle' : phase}
+              camBox={camera.box}
+              phase={phase}
+              round={round}
+              roundIndex={roundIndex}
               elapsedT={elapsedT}
-              gasPoint={gasPoint}
-              brakeAttempt={brakeAttempt}
-              gasAttempt={gasAttempt}
-              showReference={isScoring}
+              marks={marks}
+              showReference={phase === 'roundResult' || phase === 'finished'}
             />
 
             {/* live speed */}
             <div
+              aria-hidden={liveSpeed === null}
               className={`absolute left-3 top-3 rounded-full bg-white/95 px-4 py-1.5 font-extrabold tabular-nums text-ink shadow transition-opacity duration-300 sm:text-lg ${liveSpeed === null ? 'opacity-0' : 'opacity-100'}`}
             >
               {liveSpeed ?? 0} km/u
             </div>
 
-            {/* verdict banner */}
+            {/* verdict banner (round result) */}
             <div
-              className={`absolute inset-x-3 top-3 mx-auto max-w-md rounded-2xl px-5 py-3 text-center shadow-lg transition-all duration-500 ${showVerdict ? 'opacity-100 translate-y-0' : 'pointer-events-none opacity-0 -translate-y-2'} ${TONE_STYLES[verdict?.overall.tone ?? 'okay']}`}
+              inert={!verdict || undefined}
+              className={`absolute inset-x-3 top-3 mx-auto max-w-md rounded-2xl px-5 py-3 text-center shadow-lg transition-all duration-500 ${verdict ? 'opacity-100 translate-y-0' : 'pointer-events-none opacity-0 -translate-y-2'} ${TONE_STYLES[verdict?.tone ?? 'okay']}`}
             >
-              <h2 className="text-lg font-extrabold sm:text-xl">{verdict?.overall.title}</h2>
-              <p className="text-sm text-white/90">
-                <span className="font-extrabold">Rem:</span> {verdict?.brakeDesc.title}
-              </p>
-              <p className="text-sm text-white/90">
-                <span className="font-extrabold">Gas:</span> {verdict?.gasDesc.title}
-              </p>
-            </div>
-
-            {/* intro layer: circuit map + hero car */}
-            <div
-              className={`absolute -inset-px flex flex-col bg-track-blue transition-all duration-700 ease-in-out ${showIntro ? 'opacity-100 scale-100' : 'pointer-events-none opacity-0 scale-150'}`}
-            >
-              <div className="relative min-h-0 flex-1 p-2">
-                <CircuitMiniMap fixture={fixture} />
-              </div>
-              <div className="mx-3 mb-3 flex items-center gap-6 rounded-2xl bg-[#dbe7fb] p-3 sm:mx-6 sm:mb-5 sm:gap-10 sm:p-4">
-                <HeroCar className="h-5 w-auto shrink-0 sm:h-10" />
-                <p className="text-sm font-bold leading-snug text-ink sm:text-lg">
-                  Rem jij net zo laat als <span className="text-[#E10600]">Max Verstappen</span>? Dit is zijn echte
-                  poleronde door de Tarzanbocht.
+              <h2 className="text-lg font-extrabold sm:text-xl">{verdict?.title}</h2>
+              {lastResult && (
+                <p className="text-sm text-white/90">
+                  {round.practice ? 'Oefenbocht' : round.label}:{' '}
+                  <span className="font-extrabold">{lastResult.score}</span>
+                  /100 punten
                 </p>
-              </div>
-            </div>
-          </div>
-
-          {/* info row: min-height so the result sentences can wrap without the
-              layout jumping between phases */}
-          <div className="grid min-h-14 place-items-center py-1 text-center sm:min-h-16">
-            <p className={stackLayer(phase === 'ready', 'text-sm text-white/85 sm:text-lg')}>
-              Vind het rempunt én het gaspunt. Rem, en geef daarna weer gas op het juiste moment.
-            </p>
-            <p className={stackLayer(phase === 'running', 'text-base font-extrabold sm:text-xl')}>
-              {awaitingGas ? 'Nu weer op het gas!' : 'Remmen... wachten...'}
-            </p>
-            <div
-              className={stackLayer(phase === 'result', 'flex flex-wrap items-center justify-center gap-2 sm:gap-3')}
-            >
-              {crashed || !brakeAttempt ? (
-                <span className="rounded-full bg-badge-blue px-3 py-1.5 text-xs font-extrabold text-white sm:px-4 sm:text-base">
-                  Jij: niet geremd
-                </span>
-              ) : (
-                <>
-                  <span className="rounded-full bg-badge-blue px-3 py-1.5 text-xs font-extrabold text-white sm:px-4 sm:text-base">
-                    {brakeMark}
-                  </span>
-                  <span className="rounded-full bg-badge-blue px-3 py-1.5 text-xs font-extrabold text-white sm:px-4 sm:text-base">
-                    {gasMark}
-                  </span>
-                </>
               )}
             </div>
+
+            {/* intro modal */}
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="intro-title"
+              inert={!(phase === 'intro' && !hideIntroChrome) || undefined}
+              className={`absolute inset-0 grid place-items-center bg-ink/70 p-4 backdrop-blur-[3px] transition-all duration-500 ${phase === 'intro' && !hideIntroChrome ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+            >
+              <div className="w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:p-7">
+                <HeroCar className="mx-auto h-9 w-auto sm:h-11" />
+                <h1 id="intro-title" className="mt-4 text-xl font-extrabold leading-tight sm:text-2xl">
+                  Rem jij net zo laat als <span className="text-[#e61e14]">Max Verstappen</span>?
+                </h1>
+                <p className="mt-2 text-sm font-bold leading-snug text-ink/70 sm:text-base">
+                  Rijd zijn echte poleronde over Zandvoort. Eerst oefenen in de Tarzanbocht, daarna drie bochten voor de
+                  punten: rem en geef weer gas op precies het juiste moment.
+                </p>
+                {/* keyboard explainer: desktop only - most players are on touch */}
+                <div className="mt-4 hidden rounded-2xl bg-[#f3f3f0] p-3.5 text-left sm:block">
+                  <p className="text-xs font-extrabold uppercase tracking-wide text-ink/50">Speel met je toetsenbord</p>
+                  <dl className="mt-2 flex flex-col gap-1.5 text-sm font-bold text-ink/80">
+                    <div className="flex items-center justify-between">
+                      <dt className="flex items-center gap-2">
+                        <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-[#e61e14]" />
+                        Remmen
+                      </dt>
+                      <dd className="flex gap-1">
+                        <Key>R</Key>
+                        <Key>&larr;</Key>
+                      </dd>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <dt className="flex items-center gap-2">
+                        <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                        Gas geven
+                      </dt>
+                      <dd className="flex gap-1">
+                        <Key>G</Key>
+                        <Key>&rarr;</Key>
+                      </dd>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <dt className="flex items-center gap-2">
+                        <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-badge-blue" />
+                        Verder / actie
+                      </dt>
+                      <dd>
+                        <Key>spatie</Key>
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+                <button
+                  ref={introBtnRef}
+                  type="button"
+                  onClick={startGame}
+                  className={`${BTN_RED} mt-5 w-full px-6 py-4 text-lg`}
+                >
+                  Naar de Tarzanbocht
+                </button>
+              </div>
+            </div>
+
+            {/* final score card */}
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="final-title"
+              inert={!(phase === 'finished' && !showShared) || undefined}
+              className={`absolute inset-0 grid place-items-center bg-ink/60 backdrop-blur-[2px] transition-all duration-700 ${phase === 'finished' && !showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+            >
+              <div className="mx-4 w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl">
+                <h2 id="final-title" className="text-sm font-extrabold uppercase tracking-wide text-[#e61e14]">
+                  Jouw eindscore
+                </h2>
+                <p className="text-6xl font-extrabold tabular-nums">{total}</p>
+                <p className="mb-3 text-sm font-bold text-ink/60">van de 100 punten</p>
+                <p className="mb-4 text-sm font-bold">{scoreSentence(total)}</p>
+                <ul className="mb-5 space-y-1 text-left text-sm font-bold">
+                  {results.map((r) => (
+                    <li key={r.round.id} className="flex justify-between gap-3">
+                      <span className={r.round.practice ? 'text-ink/50' : ''}>
+                        {r.round.practice ? `${r.round.label} (oefening, telt niet mee)` : r.round.label}
+                      </span>
+                      <span className="tabular-nums">{r.score}/100</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex flex-col gap-2">
+                  <button ref={shareBtnRef} type="button" onClick={share} className={`${BTN_RED} w-full px-6 py-3`}>
+                    {copied ? 'Link gekopieerd!' : 'Deel je score'}
+                  </button>
+                  <button type="button" onClick={restart} className={`${BTN_DARK} w-full px-6 py-3`}>
+                    Nog een keer
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* shared-score landing (opened via a share link) */}
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="shared-title"
+              inert={!showShared || undefined}
+              className={`absolute inset-0 grid place-items-center bg-ink/60 backdrop-blur-[2px] transition-all duration-500 ${showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+            >
+              <div className="mx-4 w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl">
+                <h2 id="shared-title" className="text-sm font-extrabold uppercase tracking-wide text-[#e61e14]">
+                  Gedeelde score
+                </h2>
+                <p className="text-6xl font-extrabold tabular-nums">{shared?.total}</p>
+                <p className="mb-3 text-sm font-bold text-ink/60">van de 100 punten</p>
+                <p className="mb-5 text-sm font-bold">
+                  Iemand daagt je uit: rem jij net zo laat als Max Verstappen op Zandvoort?
+                </p>
+                <button ref={sharedBtnRef} type="button" onClick={restart} className={`${BTN_RED} w-full px-6 py-3`}>
+                  Speel zelf
+                </button>
+              </div>
+            </div>
           </div>
 
-          {/* action row: fixed height, layers crossfade */}
+          {/* info row */}
+          <div aria-live="polite" className="grid min-h-14 place-items-center py-1 text-center sm:min-h-16">
+            <p {...layer(phase === 'flying', 'text-sm font-extrabold text-white/85 sm:text-lg')}>
+              Onderweg naar de {round.label}...
+            </p>
+            <div {...layer(phase === 'ready', 'flex flex-col items-center gap-1.5')}>
+              <div className="flex items-center gap-2 rounded-full bg-white px-4 py-1.5 shadow-lg">
+                <span className="rounded-full bg-[#e61e14] px-3 py-0.5 text-sm font-extrabold text-white sm:text-base">
+                  {round.events.length / 2}&times; REM
+                </span>
+                <span className="font-extrabold text-ink/40">&middot;</span>
+                <span className="rounded-full bg-emerald-500 px-3 py-0.5 text-sm font-extrabold text-white sm:text-base">
+                  {round.events.length / 2}&times; GAS
+                </span>
+              </div>
+              <p className="text-sm font-bold text-white/85 sm:text-base">
+                {round.events.length / 2 === 1
+                  ? 'Let op de bocht en druk op het juiste moment!'
+                  : 'Een dubbele: let goed op waar Max remt en weer gas geeft!'}
+              </p>
+            </div>
+            <p {...layer(phase === 'running', 'text-base font-extrabold sm:text-xl')}>{runningHint}</p>
+            <div {...layer(showRoundResult, 'flex flex-wrap items-center justify-center gap-2 sm:gap-3')}>
+              {lastResult?.eventResults.map((er) => (
+                <span
+                  key={er.event.t}
+                  className="rounded-full bg-badge-blue px-3 py-1.5 text-xs font-extrabold text-white sm:px-4 sm:text-sm"
+                >
+                  {eventChipText(er)}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* action row */}
           <div className="grid h-20 place-items-center sm:h-24">
             <button
+              {...layer(phase === 'ready', `${BTN_LIGHT} w-full max-w-sm px-8 py-4 text-lg sm:text-xl`)}
+              ref={startBtnRef}
               type="button"
-              onClick={showIntro ? () => setIntroDismissed(true) : start}
-              className={stackLayer(
-                phase === 'ready',
-                'w-full max-w-sm select-none touch-manipulation rounded-full bg-white px-8 py-4 text-lg font-extrabold text-ink shadow-lg transition hover:scale-[1.02] active:scale-95 sm:text-xl',
-              )}
+              onClick={game.startRun}
             >
-              {readyButtonLabel}
+              {round.practice ? 'Start de oefenbocht' : `Start bocht ${scoringRoundNumber}`}
             </button>
-            <button
-              type="button"
-              onClick={press}
-              className={stackLayer(
-                phase === 'running',
-                `w-full max-w-sm select-none touch-manipulation rounded-full px-8 py-5 text-2xl font-extrabold tracking-wide shadow-lg active:scale-95 sm:text-3xl ${awaitingGas ? 'bg-emerald-500' : 'bg-red-600'}`,
-              )}
-            >
-              {awaitingGas ? 'VOL GAS!' : 'REM!'}
-            </button>
-            <div className={stackLayer(phase === 'result', 'flex w-full max-w-sm flex-col items-center gap-1.5')}>
+            <div {...layer(phase === 'running', 'flex w-full max-w-sm gap-3')}>
               <button
                 type="button"
-                onClick={isScoring ? backToStart : nextAttempt}
-                className="w-full select-none touch-manipulation rounded-full bg-white px-8 py-4 text-lg font-extrabold text-ink shadow-lg transition hover:scale-[1.02] active:scale-95 sm:text-xl"
+                onClick={() => game.press('brake')}
+                disabled={phase === 'running' && pedalLeft('brake') === 0}
+                aria-keyshortcuts="r arrowleft"
+                className={pedalClass('brake', 'bg-red-600')}
               >
-                {resultButtonLabel}
+                REM!
               </button>
-              {/* Always rendered (invisible on the scoring lap) so the primary
-                  button keeps the same position across every result screen. */}
               <button
                 type="button"
-                onClick={backToStart}
-                aria-hidden={isScoring}
-                tabIndex={isScoring ? -1 : undefined}
-                className={`text-sm font-semibold text-white/70 underline underline-offset-4 ${isScoring ? 'invisible' : ''}`}
+                onClick={() => game.press('gas')}
+                disabled={phase === 'running' && pedalLeft('gas') === 0}
+                aria-keyshortcuts="g arrowright"
+                className={pedalClass('gas', 'bg-emerald-500')}
               >
-                Terug naar start
+                GAS!
               </button>
             </div>
+            <button
+              {...layer(showRoundResult, `${BTN_LIGHT} w-full max-w-sm px-8 py-4 text-lg sm:text-xl`)}
+              ref={nextBtnRef}
+              type="button"
+              onClick={isLastRound ? showFinal : nextRound}
+            >
+              {isLastRound ? 'Bekijk je eindscore' : 'Naar de volgende bocht'}
+            </button>
           </div>
+
+          {/* keyboard hint (pointer-fine devices only) */}
+          <p className="hidden text-center text-xs font-bold text-white/40 sm:block">
+            Toetsenbord: <kbd className="rounded bg-white/10 px-1.5 py-0.5">spatie</kbd> = actie ·{' '}
+            <kbd className="rounded bg-white/10 px-1.5 py-0.5">R</kbd> = rem ·{' '}
+            <kbd className="rounded bg-white/10 px-1.5 py-0.5">G</kbd> = gas
+          </p>
         </main>
 
         <p className="text-center text-xs text-white/50">
