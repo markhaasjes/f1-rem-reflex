@@ -361,7 +361,9 @@ feedback. Exhausted pedals get a real `disabled`, not just dimming.
   overflowing flex container makes both ends unreachable), and the info row
   keeps `min-height: auto` so it can't shrink below its content — on a
   landscape phone that shrink is exactly what made the CTA overlap the
-  result cards.
+  result cards. The panel also carries `.scrollbar-hidden` (index.css):
+  sub-pixel text heights leave it 1px "scrollable" on desktop, which macOS
+  with always-visible scrollbars renders as a full useless track.
 
 ## Team radio on the score screen
 
@@ -431,6 +433,24 @@ the screenshots. Two traps: layered UI keeps hidden buttons in the DOM
 passes early — gate on _clickability_, not visibility; and a Space press
 after a round ends advances the flow, so mistimed presses silently skip
 phases.
+
+Hard-won additions to that pattern:
+
+- **Drive the flow by state, not by sleeps.** Blind `waitForTimeout` +
+  `Enter` chains desync after a few rounds (one missed press shifts every
+  later one). Wait for the phase's button to leave its `inert` layer
+  (`!btn.closest('[inert]')`), then click it.
+- **Test mobile at three viewports**: 390×844 (portrait), 844×390
+  (landscape phone), and a desktop size. For the no-jump guarantee, compare
+  `getBoundingClientRect()` of the stage and the pedal deck across
+  ready/running/result — they must be pixel-identical.
+- **Screenshots race the 500ms layer crossfade**: a probe that fires the
+  moment a phase flips captures mid-fade frames; settle ~800ms before
+  screenshotting.
+- **Seed localStorage to test persistence UI** (`nos-rem-reflex:scores`
+  with a `SavedRun`) instead of playing a full prior game — but get the
+  round ids from the fixture (`tarzan`, `hugenholtz`, `bocht9-10`,
+  `hansernst`), don't guess them.
 
 ## Deployment (Vercel)
 
