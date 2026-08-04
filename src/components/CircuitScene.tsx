@@ -14,6 +14,7 @@ import {
   drawPaddock,
   drawPin,
   drawRibbon,
+  drawDirectionArrow,
   drawSandBackground,
   drawSea,
   drawLakes,
@@ -86,7 +87,7 @@ const LABEL_OFFSETS: Record<string, { dx: number; dy: number }> = {
 const PHASE_COLOR: Record<DrivingPhase, string> = {
   flat: '#12a37f',
   coast: '#f2a11c',
-  brake: '#e10600',
+  brake: '#e61f15',
 };
 
 // The scene renders on its own requestAnimationFrame loop, reading the
@@ -167,7 +168,7 @@ export function CircuitScene(props: CircuitSceneProps) {
           const s = sampleAt(samples, event.t);
           const [x, y] = projection.toScreen(s.x, s.y);
           const isBrake = event.type === 'brake';
-          const color = isBrake ? '#e61e14' : '#0b7a43';
+          const color = isBrake ? '#e61f15' : '#0b7a43';
           const pulse = (now % 1400) / 1400;
           ctx.save();
           ctx.globalAlpha = 1 - pulse;
@@ -183,7 +184,7 @@ export function CircuitScene(props: CircuitSceneProps) {
 
       // --- run/result overlays ---
       if (phase === 'running' && elapsedT > round.tStart) {
-        drawRibbon(ctx, smoothPathPoints(samples, round.tStart, elapsedT), 'rgba(225, 6, 0, 0.85)', projection);
+        drawRibbon(ctx, smoothPathPoints(samples, round.tStart, elapsedT), 'rgba(230, 31, 21, 0.85)', projection);
       }
 
       if (showReference) {
@@ -252,7 +253,7 @@ export function CircuitScene(props: CircuitSceneProps) {
             ctx.globalAlpha = badgeAlpha * (1 - pulse);
             ctx.beginPath();
             ctx.arc(x, y, 13 + pulse * 22, 0, Math.PI * 2);
-            ctx.strokeStyle = '#e61e14';
+            ctx.strokeStyle = '#e61f15';
             ctx.lineWidth = 3;
             ctx.stroke();
             ctx.restore();
@@ -267,6 +268,15 @@ export function CircuitScene(props: CircuitSceneProps) {
           drawMapLabel(ctx, x + offset.dx, y + offset.dy, r.label, badgeAlpha, compact ? 11 : 13);
         });
       }
+
+      drawDirectionArrow(
+        ctx,
+        fixture.startFinish.x,
+        fixture.startFinish.y,
+        fixture.startFinish.headingDeg,
+        projection,
+        badgeAlpha,
+      );
 
       drawScaleBar(ctx, projection, h);
     };

@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" fill="#0A1230" />
+  <rect width="32" height="32" fill="#294CBD" />
 
   <!-- NOS logo, directly on the blue background -->
   <g transform="translate(2 7.01) scale(0.2435)">
@@ -18,18 +18,18 @@
     <path
       clip-rule="evenodd"
       d="M59.128 29.9117C53.6847 29.9117 49.2724 25.5032 49.2724 20.0681C49.2724 14.6314 53.6847 10.2229 59.128 10.2229C64.5713 10.2229 68.9852 14.6314 68.9852 20.0681C68.9852 25.5032 64.5713 29.9117 59.128 29.9117ZM59.128 0C48.0328 0 39.037 8.98323 39.037 20.0681C39.037 31.1498 48.0328 40.1346 59.128 40.1346C70.2248 40.1346 79.2206 31.1498 79.2206 20.0681C79.2206 8.98323 70.2248 0 59.128 0Z"
-      fill="#E61E14"
+      fill="#E61F15"
       fill-rule="evenodd"
     />
   </g>
 
   <!-- starting grid stripe -->
   <rect x="0" y="24" width="8" height="4" fill="#F5F5F5" />
-  <rect x="8" y="24" width="8" height="4" fill="#E10600" />
+  <rect x="8" y="24" width="8" height="4" fill="#E61F15" />
   <rect x="16" y="24" width="8" height="4" fill="#F5F5F5" />
-  <rect x="24" y="24" width="8" height="4" fill="#E10600" />
-  <rect x="0" y="28" width="8" height="4" fill="#E10600" />
+  <rect x="24" y="24" width="8" height="4" fill="#E61F15" />
+  <rect x="0" y="28" width="8" height="4" fill="#E61F15" />
   <rect x="8" y="28" width="8" height="4" fill="#F5F5F5" />
-  <rect x="16" y="28" width="8" height="4" fill="#E10600" />
+  <rect x="16" y="28" width="8" height="4" fill="#E61F15" />
   <rect x="24" y="28" width="8" height="4" fill="#F5F5F5" />
 </svg>

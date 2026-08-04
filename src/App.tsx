@@ -16,7 +16,7 @@ const TONE_STYLES = {
   perfect: 'bg-emerald-500',
   good: 'bg-emerald-600',
   okay: 'bg-amber-500',
-  bad: 'bg-red-600',
+  bad: 'bg-[#e61f15]',
 } as const;
 
 const OVERVIEW_PAD_M = 90;
@@ -36,7 +36,7 @@ const RADIO_POSITIVE_THRESHOLD = 60;
 const BTN_BASE =
   'select-none touch-manipulation rounded-full font-extrabold shadow-lg transition-all duration-150 active:scale-95 focus-ring';
 const BTN_LIGHT = `${BTN_BASE} bg-white text-ink hover:bg-[#f3f3f0] hover:scale-[1.02]`;
-const BTN_RED = `${BTN_BASE} focus-ring-ink bg-[#e61e14] text-white hover:bg-[#ca1a11] hover:scale-[1.02]`;
+const BTN_RED = `${BTN_BASE} focus-ring-ink bg-[#e61f15] text-white hover:bg-[#ca1a11] hover:scale-[1.02]`;
 const BTN_DARK = `${BTN_BASE} bg-ink text-white hover:bg-track-blue hover:scale-[1.02]`;
 
 // A player mark phrased against Max's matching point. Positive delta = the
@@ -90,7 +90,7 @@ function Pedal({
   highlight: boolean;
 }) {
   const isBrake = variant === 'brake';
-  const accent = isBrake ? '#e61e14' : '#10b981';
+  const accent = isBrake ? '#e61f15' : '#10b981';
   const face = isBrake ? { x: 10, y: 26, w: 100, h: 72 } : { x: 24, y: 10, w: 72, h: 92 };
   const gripYs = isBrake ? [48, 62, 76] : [36, 52, 68, 84];
   const id = `pedal-${variant}`;
@@ -195,6 +195,41 @@ function Pedal({
         <Key>{isBrake ? '\u2190' : '\u2192'}</Key>
       </span>
     </button>
+  );
+}
+
+// Circular Dutch flag, like the country flags in the NOS GP graphics.
+function DutchFlag({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 60 60" aria-hidden="true" className={className}>
+      <circle cx="30" cy="30" r="30" fill="#ffffff" />
+      <clipPath id="flag-clip">
+        <circle cx="30" cy="30" r="26" />
+      </clipPath>
+      <g clipPath="url(#flag-clip)">
+        <rect x="4" y="4" width="52" height="17.4" fill="#ae1c28" />
+        <rect x="4" y="21.4" width="52" height="17.4" fill="#ffffff" />
+        <rect x="4" y="38.8" width="52" height="17.4" fill="#21468b" />
+      </g>
+    </svg>
+  );
+}
+
+// Event header in the NOS GP-graphic style (flag, white title pill, dark
+// sub-pill). Lives in the control panel on wide screens.
+function EventCard({ roundLabel }: { roundLabel: string }) {
+  return (
+    <div className="hidden flex-col items-center gap-3 wide:flex">
+      <DutchFlag className="h-14 w-14 drop-shadow-[0_4px_10px_rgba(0,0,0,0.35)]" />
+      <div className="rounded-full bg-white px-7 py-2 text-xl font-extrabold text-[#1e1e1e] shadow-lg xl:text-2xl">
+        Circuit Zandvoort
+      </div>
+      <div
+        className={`rounded-full bg-[#1e1e1e] px-5 py-1.5 text-sm font-extrabold text-white shadow transition-opacity ${roundLabel ? 'opacity-100' : 'opacity-0'}`}
+      >
+        {roundLabel || '\u00b7'}
+      </div>
+    </div>
   );
 }
 
@@ -390,10 +425,10 @@ function App() {
         </div>
       </div>
       <div className="bg-carbon flex h-svh flex-col items-center gap-3 overflow-hidden px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-white sm:gap-4 sm:px-8 sm:pt-5 wide:px-10">
-        <Pill className="gap-3 text-sm sm:text-base">{fixture.meta.circuit}</Pill>
+        <Pill className="gap-3 text-sm wide:hidden sm:text-base">{fixture.meta.circuit}</Pill>
 
         <div
-          className={`rounded-full px-4 py-1 text-xs font-extrabold tracking-wide transition-opacity sm:text-sm ${roundLabel ? 'opacity-100' : 'opacity-0'} ${round?.practice ? 'bg-white/15 text-white/90' : 'bg-red-600 text-white'}`}
+          className={`rounded-full px-4 py-1 text-xs font-extrabold tracking-wide transition-opacity wide:hidden sm:text-sm ${roundLabel ? 'opacity-100' : 'opacity-0'} ${round?.practice ? 'bg-white/15 text-white/90' : 'bg-[#e61f15] text-white'}`}
         >
           {roundLabel || '·'}
         </div>
@@ -438,14 +473,15 @@ function App() {
 
           {/* info row */}
           {/* control panel: below the stage in portrait, right column on wide */}
-          <div className="contents wide:flex wide:min-h-0 wide:flex-col wide:justify-center wide:gap-8">
+          <div className="contents wide:flex wide:min-h-0 wide:flex-col wide:justify-center wide:gap-7">
+            <EventCard roundLabel={roundLabel} />
             <div aria-live="polite" className="grid min-h-14 place-items-center py-1 text-center sm:min-h-16">
               <p {...layer(phase === 'flying', 'text-sm font-extrabold text-white/85 sm:text-lg')}>
                 Onderweg naar de {round.label}...
               </p>
               <div {...layer(phase === 'ready', 'flex flex-col items-center gap-1.5')}>
                 <div className="flex items-center gap-2 rounded-full bg-white px-4 py-1.5 shadow-lg">
-                  <span className="rounded-full bg-[#e61e14] px-3 py-0.5 text-sm font-extrabold text-white sm:text-base">
+                  <span className="rounded-full bg-[#e61f15] px-3 py-0.5 text-sm font-extrabold text-white sm:text-base">
                     {round.events.length / 2}&times; REM
                   </span>
                   <span className="font-extrabold text-ink/40">&middot;</span>
@@ -527,8 +563,8 @@ function App() {
         >
           <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:p-7">
             <HeroCar className="mx-auto h-9 w-auto sm:h-11" />
-            <h1 id="intro-title" className="mt-4 text-xl font-extrabold leading-tight sm:text-2xl">
-              Rem jij net zo laat als <span className="text-[#e61e14]">Max Verstappen</span>?
+            <h1 id="intro-title" className="mt-4 text-xl font-normal leading-tight text-[#1e1e1e] sm:text-2xl">
+              Rem jij net zo laat als <span className="font-extrabold">Max Verstappen</span>?
             </h1>
             <p className="mt-2 text-sm font-bold leading-snug text-ink/70 sm:text-base">
               Rijd zijn echte poleronde over Zandvoort. Eerst oefenen in de Tarzanbocht, daarna drie bochten voor de
@@ -540,7 +576,7 @@ function App() {
               <dl className="mt-2 flex flex-col gap-1.5 text-sm font-bold text-ink/80">
                 <div className="flex items-center justify-between">
                   <dt className="flex items-center gap-2">
-                    <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-[#e61e14]" />
+                    <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-[#e61f15]" />
                     Remmen
                   </dt>
                   <dd className="flex gap-1">
@@ -589,7 +625,7 @@ function App() {
           className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-ink/60 p-4 backdrop-blur-[2px] transition-all duration-700 ${phase === 'finished' && !showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
           <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl">
-            <h2 id="final-title" className="text-sm font-extrabold uppercase tracking-wide text-[#e61e14]">
+            <h2 id="final-title" className="text-sm font-extrabold uppercase tracking-wide text-[#e61f15]">
               Jouw eindscore
             </h2>
             <p className="text-6xl font-extrabold tabular-nums">{total}</p>
@@ -625,7 +661,7 @@ function App() {
           className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-ink/60 p-4 backdrop-blur-[2px] transition-all duration-500 ${showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
           <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl">
-            <h2 id="shared-title" className="text-sm font-extrabold uppercase tracking-wide text-[#e61e14]">
+            <h2 id="shared-title" className="text-sm font-extrabold uppercase tracking-wide text-[#e61f15]">
               Gedeelde score
             </h2>
             <p className="text-6xl font-extrabold tabular-nums">{shared?.total}</p>

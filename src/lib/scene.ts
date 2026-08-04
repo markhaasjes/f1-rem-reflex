@@ -27,7 +27,7 @@ export const PALETTE = {
   asphaltLight: '#5f6268',
   paddock: '#aaa8a4',
   white: '#ffffff',
-  curbRed: '#e61e14', // redNosRood
+  curbRed: '#e61f15', // redNosRood
   water: '#8fb8d4',
   waterEdge: '#7aa6c4',
   beach: '#efe4c3',
@@ -279,27 +279,129 @@ export function drawSea(ctx: CanvasRenderingContext2D, projection: ScreenProject
   ctx.setLineDash([]);
 }
 
-// The dune lakes, placed against the satellite view: one enclosed by the
-// eastern loop, the bigger ones in the south, a small one in the NE dunes.
-const LAKES = [
-  { x: 775, y: 70, rx: 48, ry: 36, rot: 0.45 },
-  { x: 330, y: 300, rx: 80, ry: 50, rot: -0.2 },
-  { x: 560, y: 295, rx: 55, ry: 40, rot: 0.3 },
-  { x: 745, y: -285, rx: 30, ry: 20, rot: 0.15 },
+// The dune lakes, with outlines traced from the satellite view: the curved
+// pond enclosed by the eastern loop, the big kidney-shaped one and its
+// neighbor in the south, and a small one in the NE dunes.
+const LAKES: Point[][] = [
+  [
+    { x: 715, y: 105 },
+    { x: 738, y: 72 },
+    { x: 768, y: 54 },
+    { x: 800, y: 58 },
+    { x: 818, y: 78 },
+    { x: 812, y: 102 },
+    { x: 786, y: 118 },
+    { x: 750, y: 122 },
+    { x: 726, y: 118 },
+  ],
+  [
+    { x: 245, y: 295 },
+    { x: 262, y: 268 },
+    { x: 295, y: 252 },
+    { x: 340, y: 250 },
+    { x: 362, y: 262 },
+    { x: 355, y: 275 },
+    { x: 378, y: 268 },
+    { x: 408, y: 282 },
+    { x: 418, y: 305 },
+    { x: 405, y: 330 },
+    { x: 372, y: 342 },
+    { x: 345, y: 352 },
+    { x: 305, y: 352 },
+    { x: 268, y: 338 },
+    { x: 250, y: 318 },
+  ],
+  [
+    { x: 505, y: 300 },
+    { x: 528, y: 278 },
+    { x: 560, y: 268 },
+    { x: 592, y: 276 },
+    { x: 606, y: 294 },
+    { x: 596, y: 314 },
+    { x: 566, y: 323 },
+    { x: 530, y: 318 },
+  ],
+  [
+    { x: 722, y: -296 },
+    { x: 742, y: -308 },
+    { x: 763, y: -300 },
+    { x: 762, y: -282 },
+    { x: 740, y: -274 },
+    { x: 724, y: -282 },
+  ],
 ];
+
+// Two rounds of closed-loop Chaikin corner-cutting turn the traced polygon
+// into a natural-looking shoreline.
+function chaikinClosed(points: Point[], rounds: number): Point[] {
+  let pts = points;
+  for (let r = 0; r < rounds; r++) {
+    const out: Point[] = [];
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i];
+      const b = pts[(i + 1) % pts.length];
+      out.push({ x: a.x * 0.75 + b.x * 0.25, y: a.y * 0.75 + b.y * 0.25 });
+      out.push({ x: a.x * 0.25 + b.x * 0.75, y: a.y * 0.25 + b.y * 0.75 });
+    }
+    pts = out;
+  }
+  return pts;
+}
 
 export function drawLakes(ctx: CanvasRenderingContext2D, projection: ScreenProjection) {
   const s = projection.scale;
   for (const lake of LAKES) {
-    const [cx, cy] = projection.toScreen(lake.x, lake.y);
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, lake.rx * s, lake.ry * s, lake.rot, 0, Math.PI * 2);
+    tracePath(ctx, chaikinClosed(lake, 2), projection, true);
     ctx.fillStyle = PALETTE.water;
     ctx.fill();
+    ctx.lineJoin = 'round';
     ctx.lineWidth = Math.max(1, 2.5 * s);
     ctx.strokeStyle = PALETTE.waterEdge;
     ctx.stroke();
   }
+}
+
+// Red direction arrow beside start/finish, like the nos.nl circuit visual.
+export function drawDirectionArrow(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  headingDeg: number,
+  projection: ScreenProjection,
+  alpha: number,
+) {
+  if (alpha <= 0.01) return;
+  const [sx, sy] = projection.toScreen(x, y);
+  // sits just off the track, on the left of the driving direction
+  const leftRad = ((headingDeg - 90) * Math.PI) / 180;
+  const offset = 14 * projection.scale + 16;
+  const cx = sx + Math.cos(leftRad) * offset;
+  const cy = sy + Math.sin(leftRad) * offset;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 12, 0, Math.PI * 2);
+  ctx.fillStyle = '#e61f15';
+  ctx.strokeStyle = PALETTE.white;
+  ctx.lineWidth = 2.5;
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.translate(cx, cy);
+  ctx.rotate(((headingDeg + 90) * Math.PI) / 180);
+  ctx.fillStyle = PALETTE.white;
+  ctx.beginPath();
+  ctx.moveTo(0, -6.5);
+  ctx.lineTo(5, -0.5);
+  ctx.lineTo(2, -0.5);
+  ctx.lineTo(2, 6.5);
+  ctx.lineTo(-2, 6.5);
+  ctx.lineTo(-2, -0.5);
+  ctx.lineTo(-5, -0.5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
 }
 
 // The F1 TV-style green surroundings: a wide grass corridor along the track
@@ -534,7 +636,7 @@ export function drawStartFinish(
   const cols = Math.ceil((ROAD_WIDTH_M * s) / cell);
   for (let row = 0; row < 3; row++) {
     for (let col = 0; col < cols; col++) {
-      ctx.fillStyle = (row + col) % 2 === 0 ? '#15181d' : PALETTE.white;
+      ctx.fillStyle = (row + col) % 2 === 0 ? '#1e1e1e' : PALETTE.white;
       ctx.fillRect((col - cols / 2) * cell, (row - 1.5) * cell, cell + 0.5, cell + 0.5);
     }
   }
@@ -580,7 +682,7 @@ export function drawCornerBadge(
   ctx.beginPath();
   ctx.arc(screenX, screenY, r, 0, Math.PI * 2);
   // Black circle, white number, white ring - the NOS WK-stand graphic style.
-  ctx.fillStyle = '#1f1f1f';
+  ctx.fillStyle = '#1e1e1e';
   ctx.strokeStyle = PALETTE.white;
   ctx.lineWidth = minor ? 1.5 : 2.5;
   ctx.fill();
