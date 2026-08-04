@@ -6,8 +6,10 @@ import { NOSLogo } from './components/NOSLogo';
 import fixtureJson from './data/zandvoort2025.json';
 import { boxFromBounds, useCameraFlight, type CamBox } from './hooks/useCameraFlight';
 import { useCircuitGame } from './hooks/useCircuitGame';
-import { sampleAt } from './lib/corner';
+import { positionAt, sampleAt } from './lib/corner';
 import { combineResults, totalScore, type EventResult, type RoundResult } from './lib/scoring';
+import { loadScores, saveRun, type SavedRun, type SavedScores } from './lib/storage';
+import { adviceForRound, adviceForRun } from './lib/tips';
 import type { GamePhase, ZandvoortFixture } from './types';
 
 const fixture = fixtureJson as unknown as ZandvoortFixture;
@@ -18,6 +20,21 @@ const TONE_STYLES = {
   okay: 'bg-amber-500',
   bad: 'bg-[#e61f15]',
 } as const;
+
+// Mirrors the `wide` Tailwind variant (landscape + >=48rem) for JS-side
+// decisions like the mobile chase camera.
+const WIDE_MEDIA_QUERY = '(orientation: landscape) and (min-width: 48rem)';
+
+function useWideViewport(): boolean {
+  const [isWide, setIsWide] = useState(() => matchMedia(WIDE_MEDIA_QUERY).matches);
+  useEffect(() => {
+    const mq = matchMedia(WIDE_MEDIA_QUERY);
+    const onChange = () => setIsWide(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return isWide;
+}
 
 const OVERVIEW_PAD_M = 90;
 const OVERVIEW_SEA_PAD_M = 190;
@@ -76,7 +93,7 @@ function EventResultCard({ er }: { er: EventResult }) {
 
   if (er.deltaM === null || er.mark === null) {
     return (
-      <div className="w-44 rounded-2xl bg-white px-3 py-2 text-left shadow-lg">
+      <div className="w-40 rounded-2xl bg-white px-3 py-2 text-left shadow-lg sm:w-44">
         <span className="text-xs font-extrabold" style={{ color: accent }}>
           {label}
         </span>
@@ -93,7 +110,7 @@ function EventResultCard({ er }: { er: EventResult }) {
   const dotPercent = 50 + (Math.max(-GAUGE_RANGE_M, Math.min(GAUGE_RANGE_M, er.deltaM)) / GAUGE_RANGE_M) * 50;
 
   return (
-    <div className="w-44 rounded-2xl bg-white px-3 pb-2 pt-1.5 shadow-lg">
+    <div className="w-40 rounded-2xl bg-white px-3 pb-2 pt-1.5 shadow-lg sm:w-44">
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-xs font-extrabold" style={{ color: accent }}>
           {label}
@@ -152,7 +169,7 @@ function Pedal({
       <svg
         viewBox="0 0 120 200"
         aria-hidden="true"
-        className={`mx-auto h-24 w-auto drop-shadow-[0_6px_10px_rgba(6,12,60,0.5)] transition-transform duration-100 sm:h-28 wide:h-[clamp(6rem,30vh,10rem)] ${
+        className={`mx-auto h-16 w-auto drop-shadow-[0_6px_10px_rgba(6,12,60,0.5)] transition-transform duration-100 sm:h-28 wide:h-[clamp(6rem,30vh,10rem)] ${
           disabled ? '' : 'group-active:[transform:perspective(360px)_rotateX(22deg)] group-active:origin-bottom'
         }`}
       >
@@ -228,7 +245,7 @@ function Pedal({
         ))}
       </svg>
       <span
-        className="mt-1 block text-center text-sm font-extrabold tracking-widest wide:text-base"
+        className="mt-1 block text-center text-xs font-extrabold tracking-widest sm:text-sm wide:text-base"
         style={{ color: accent }}
       >
         {isBrake ? 'REM!' : 'GAS!'}
@@ -324,6 +341,11 @@ function App() {
 
   const camera = useCameraFlight(debugCornerBox ?? overviewBox);
   const [shared] = useState(parseSharedScore);
+  // The player's history, persisted in localStorage (this game's "cookie"):
+  // the last attempt and the best run. runContext freezes what the history
+  // looked like BEFORE this run was saved, for the score-card comparison.
+  const [savedScores, setSavedScores] = useState<SavedScores>(loadScores);
+  const [runContext, setRunContext] = useState<{ previousLast: SavedRun | null; isNewBest: boolean } | null>(null);
   const [showShared, setShowShared] = useState(shared !== null);
   const [copied, setCopied] = useState(false);
   const hideIntroChrome = showShared || debugCornerBox !== null;
@@ -359,15 +381,56 @@ function App() {
     const audio = new Audio(score >= RADIO_POSITIVE_THRESHOLD ? RADIO_POSITIVE_SRC : RADIO_NEGATIVE_SRC);
     radioRef.current = audio;
     audio.play().catch(() => {});
+
+    const previous = loadScores();
+    const run: SavedRun = {
+      total: score,
+      rounds: Object.fromEntries(game.results.map((r) => [r.round.id, r.score])),
+      advice: adviceForRun(game.results),
+      date: new Date().toISOString(),
+    };
+    setSavedScores(saveRun(run));
+    setRunContext({
+      previousLast: previous.last,
+      isNewBest: !previous.best || score > previous.best.total,
+    });
   }, [game, camera, overviewBox]);
 
   const restart = useCallback(() => {
     stopRadio();
     setShowShared(false);
+    setRunContext(null);
     history.replaceState(null, '', location.pathname);
     game.restart();
     camera.fly([{ box: overviewBox, ms: 900 }]);
   }, [game, camera, overviewBox, stopRadio]);
+
+  // On phones the corner overview leaves the circuit small, so while running
+  // the camera rides with the car at a tighter zoom; once the round is scored
+  // it flies back out so the whole driven line is visible again. Wide layouts
+  // keep the static corner framing.
+  const isWide = useWideViewport();
+  const elapsedTRef = useRef(elapsedT);
+  elapsedTRef.current = elapsedT;
+  // Depends on the hook's stable callbacks, NOT the camera object: that object
+  // is rebuilt every frame while the camera moves, which would restart the
+  // zoom-out flight on every render and it would never land.
+  const { follow: cameraFollow, fly: cameraFly, jumpTo: cameraJumpTo } = camera;
+  useEffect(() => {
+    if (phase === 'running' && !isWide) {
+      const base = roundBoxes[roundIndex];
+      const size = { w: Math.max(base.w * 0.55, 230), h: Math.max(base.h * 0.55, 230) };
+      cameraFollow(() => {
+        const p = positionAt(fixture.lap.samples, elapsedTRef.current);
+        return { cx: p.x, cy: p.y, ...size };
+      });
+    } else if (phase === 'running' && isWide) {
+      // rotated to landscape mid-run: drop the chase cam
+      cameraJumpTo(roundBoxes[roundIndex]);
+    } else if (phase === 'roundResult' && !isWide) {
+      cameraFly([{ box: roundBoxes[roundIndex], ms: 900 }]);
+    }
+  }, [phase, isWide, cameraFollow, cameraFly, cameraJumpTo, roundBoxes, roundIndex]);
 
   // Space advances the flow; while running it presses the pedal Max needs
   // next. R/ArrowLeft and G/ArrowRight hit a specific pedal (like the
@@ -420,6 +483,18 @@ function App() {
   }, [phase, showShared]);
 
   const total = totalScore(results);
+  // What went wrong at this corner last time, shown while the round is armed.
+  const lastRoundAdvice = savedScores.last?.advice?.[round.id] ?? null;
+  // The corner with the most points left on the table this run.
+  const improvementTip =
+    phase === 'finished'
+      ? results
+          .filter((r) => !r.round.practice)
+          .reduce<RoundResult | null>((weakest, r) => {
+            if (!weakest || r.score < weakest.score) return r;
+            return weakest;
+          }, null)
+      : null;
 
   const share = useCallback(async () => {
     const url = buildShareUrl(total, results);
@@ -493,7 +568,7 @@ function App() {
             {/* live speed */}
             <div
               aria-hidden={liveSpeed === null}
-              className={`absolute left-3 top-3 rounded-full bg-white/95 px-4 py-1.5 font-extrabold tabular-nums text-ink shadow transition-opacity duration-300 sm:text-lg ${liveSpeed === null ? 'opacity-0' : 'opacity-100'}`}
+              className={`absolute bottom-3 right-3 rounded-full bg-white/95 px-4 py-1.5 font-extrabold tabular-nums text-ink shadow transition-opacity duration-300 sm:text-lg ${liveSpeed === null ? 'opacity-0' : 'opacity-100'}`}
             >
               {liveSpeed ?? 0} km/u
             </div>
@@ -512,15 +587,25 @@ function App() {
                 </p>
               )}
             </div>
+
+            {/* round result: on portrait the cards overlay the stage, so the deck below never changes height */}
+            <div
+              inert={!showRoundResult || undefined}
+              className={`absolute inset-x-2 bottom-2 flex flex-wrap items-center justify-center gap-2 transition-all duration-500 wide:hidden ${showRoundResult ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-1 opacity-0'}`}
+            >
+              {lastResult?.eventResults.map((er) => (
+                <EventResultCard key={er.event.t} er={er} />
+              ))}
+            </div>
           </div>
 
           {/* info row */}
           {/* control panel: below the stage in portrait, right column on wide */}
-          <div className="contents wide:flex wide:min-h-0 wide:flex-col wide:justify-center wide:gap-7">
+          <div className="scrollbar-hidden contents wide:flex wide:min-h-0 wide:flex-col wide:gap-[clamp(0.75rem,3vh,1.75rem)] wide:overflow-y-auto">
             <EventCard roundLabel={roundLabel} />
             <div
               aria-live="polite"
-              className="grid min-h-14 place-items-center py-1 text-center wide:min-h-0 wide:flex-1 sm:min-h-16"
+              className="grid h-20 place-items-center py-1 text-center sm:h-24 wide:h-auto wide:flex-1"
             >
               <p {...layer(phase === 'flying', 'text-sm font-extrabold text-white/85 sm:text-lg')}>
                 Onderweg naar de {round.label}...
@@ -535,16 +620,25 @@ function App() {
                     {round.events.length / 2}&times; GAS
                   </span>
                 </div>
-                <p className="text-sm font-bold text-white/85 sm:text-base">
-                  {round.practice && 'Rem bij het rode punt en geef weer gas bij het groene punt!'}
-                  {!round.practice &&
-                    (round.events.length / 2 === 1
-                      ? 'Let op de bocht en druk op het juiste moment!'
-                      : 'Een dubbele: let goed op waar Max remt en weer gas geeft!')}
-                </p>
+                {lastRoundAdvice ? (
+                  <p className="text-xs font-bold text-white sm:text-base">
+                    <span className="mr-1.5 rounded-full bg-[#ffc828] px-2 py-0.5 text-[10px] font-extrabold text-[#1e1e1e]">
+                      TIP
+                    </span>
+                    Vorige keer: {lastRoundAdvice}
+                  </p>
+                ) : (
+                  <p className="text-xs font-bold text-white/85 sm:text-base">
+                    {round.practice && 'Rem bij het rode punt en geef weer gas bij het groene punt!'}
+                    {!round.practice &&
+                      (round.events.length / 2 === 1
+                        ? 'Let op de bocht en druk op het juiste moment!'
+                        : 'Een dubbele: let goed op waar Max remt en weer gas geeft!')}
+                  </p>
+                )}
               </div>
               <p {...layer(phase === 'running', 'text-base font-extrabold sm:text-xl')}>{runningHint}</p>
-              <div {...layer(showRoundResult, 'flex flex-wrap items-center justify-center gap-2 sm:gap-3')}>
+              <div {...layer(showRoundResult, 'hidden flex-wrap items-center justify-center gap-2 wide:flex sm:gap-3')}>
                 {lastResult?.eventResults.map((er) => (
                   <EventResultCard key={er.event.t} er={er} />
                 ))}
@@ -552,7 +646,7 @@ function App() {
             </div>
 
             {/* action row */}
-            <div className="grid min-h-20 place-items-center sm:min-h-24 wide:min-h-56">
+            <div className="grid h-24 place-items-center sm:h-44 wide:h-auto wide:min-h-[clamp(6rem,34vh,14rem)]">
               <button
                 {...layer(phase === 'ready', `${BTN_LIGHT} w-full max-w-sm px-8 py-4 text-lg sm:text-xl`)}
                 ref={startBtnRef}
@@ -611,6 +705,17 @@ function App() {
               Rijd zijn echte poleronde over Zandvoort. Eerst oefenen in de Tarzanbocht, daarna drie bochten voor de
               punten: rem en geef weer gas op precies het juiste moment.
             </p>
+            {savedScores.best && (
+              <p className="mt-3 text-sm font-extrabold text-[#1e1e1e]">
+                Jouw beste score: <span className="tabular-nums text-[#e61f15]">{savedScores.best.total}</span>
+                {savedScores.last && savedScores.last.total !== savedScores.best.total && (
+                  <span className="text-[#1e1e1e]/60">
+                    {' '}
+                    &middot; vorige poging: <span className="tabular-nums">{savedScores.last.total}</span>
+                  </span>
+                )}
+              </p>
+            )}
             {/* keyboard explainer: desktop only - most players are on touch */}
             <div className="mt-4 hidden rounded-2xl bg-[#f3f3f0] p-3.5 text-left sm:block">
               <p className="text-xs font-extrabold uppercase tracking-wide text-ink/50">Speel met je toetsenbord</p>
@@ -678,10 +783,39 @@ function App() {
                   <span className={r.round.practice ? 'text-ink/50' : ''}>
                     {r.round.practice ? `${r.round.label} (oefening, telt niet mee)` : r.round.label}
                   </span>
-                  <span className="tabular-nums">{r.score}/100</span>
+                  <span className={`tabular-nums ${r.round.practice ? 'text-ink/50' : ''}`}>{r.score}/100</span>
                 </li>
               ))}
             </ul>
+            {runContext && savedScores.best && (
+              <div className="mb-3 grid grid-cols-2 gap-2 text-left">
+                <div className="rounded-2xl bg-[#f3f3f0] px-3 py-2">
+                  <p className="text-[10px] font-extrabold uppercase tracking-wide text-[#1e1e1e]/50">Beste score</p>
+                  <p className="text-xl font-extrabold tabular-nums text-[#1e1e1e]">
+                    {savedScores.best.total}
+                    {runContext.isNewBest && (
+                      <span className="ml-2 rounded-full bg-emerald-500 px-2 py-0.5 align-middle text-[10px] font-extrabold text-white">
+                        nieuw record!
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-[#f3f3f0] px-3 py-2">
+                  <p className="text-[10px] font-extrabold uppercase tracking-wide text-[#1e1e1e]/50">Vorige poging</p>
+                  <p className="text-xl font-extrabold tabular-nums text-[#1e1e1e]">
+                    {runContext.previousLast ? runContext.previousLast.total : '\u2014'}
+                  </p>
+                </div>
+              </div>
+            )}
+            {improvementTip && (
+              <p className="mb-4 text-xs font-bold text-[#1e1e1e]/70">
+                Tip: in de <span className="font-extrabold">{improvementTip.round.label}</span>
+                {adviceForRound(improvementTip)
+                  ? `: ${adviceForRound(improvementTip)} (${improvementTip.score}/100).`
+                  : ` valt de meeste winst te halen (${improvementTip.score}/100).`}
+              </p>
+            )}
             <div className="flex flex-col gap-2">
               <button ref={shareBtnRef} type="button" onClick={share} className={`${BTN_RED} w-full px-6 py-3`}>
                 {copied ? 'Link gekopieerd!' : 'Deel je score'}
