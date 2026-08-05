@@ -96,16 +96,6 @@ export function resampleByArcLength(points, n) {
   return { points: result, totalLength: total };
 }
 
-export function shoelaceArea(points) {
-  let sum = 0;
-  for (let i = 0; i < points.length; i++) {
-    const a = points[i];
-    const b = points[(i + 1) % points.length];
-    sum += a.x * b.y - b.x * a.y;
-  }
-  return sum;
-}
-
 // Finds the best 2D similarity transform (rotation + uniform scale +
 // translation, no reflection) mapping `source` onto `target`, both closed
 // loops of N evenly-arc-length-spaced points around the same physical track.

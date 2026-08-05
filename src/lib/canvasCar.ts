@@ -23,7 +23,7 @@ function roundRect(
   }
 }
 
-export interface CarDynamics {
+interface CarDynamics {
   /** Current speed in km/h - drives the length/opacity of the motion streaks. */
   speedKph: number;
 }

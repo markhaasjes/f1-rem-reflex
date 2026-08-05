@@ -104,6 +104,10 @@ function EventResultCard({ er }: { er: EventResult }) {
 
   const late = er.deltaM > 0;
   const meters = Math.abs(Math.round(er.deltaM));
+  let deltaLabel = 'perfect!';
+  if (meters > 0) {
+    deltaLabel = `${meters}m ${late ? 'te laat' : 'te vroeg'}`;
+  }
   const seconds = Math.abs(er.mark.t - er.event.t)
     .toFixed(2)
     .replace('.', ',');
@@ -115,9 +119,7 @@ function EventResultCard({ er }: { er: EventResult }) {
         <span className="text-xs font-extrabold" style={{ color: accent }}>
           {label}
         </span>
-        <span className="text-xs font-extrabold text-[#1e1e1e]">
-          {meters === 0 ? 'perfect!' : `${meters}m ${late ? 'te laat' : 'te vroeg'}`}
-        </span>
+        <span className="text-xs font-extrabold text-[#1e1e1e]">{deltaLabel}</span>
       </div>
       <div className="relative mt-1.5 h-2 rounded-full bg-[#ececec]">
         <span className="absolute left-1/2 top-1/2 h-3.5 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded bg-[#1e1e1e]/50" />

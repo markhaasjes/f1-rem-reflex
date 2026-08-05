@@ -2,7 +2,7 @@ import type { Point } from '../types';
 import type { ScreenProjection } from './canvas';
 
 // All widths in real meters; multiply by projection.scale when drawing.
-export const ROAD_WIDTH_M = 13;
+const ROAD_WIDTH_M = 13;
 const EDGE_LINE_M = 1.6; // white edge line sticking out past the asphalt
 const CURB_WIDTH_M = 2.8;
 const CURB_EDGE_OFFSET_M = ROAD_WIDTH_M / 2 + 1.2;
@@ -14,7 +14,7 @@ const GREEN_BAND_M = 110; // grass corridor around the track, F1 TV map style
 // asphalt with a lighter worn line, paved beige-gray run-offs, khaki dune
 // sand with olive scrub, muted grass banks. Curbs are white + NOS red
 // (docs/colors.ts redNosRood) per design.
-export const PALETTE = {
+const PALETTE = {
   sand: '#d8cdb2',
   sandLight: '#e4dbc6',
   sandSpeckle: '#b8ab8d',
@@ -56,7 +56,7 @@ function unitNormalAt(points: Point[], index: number): Point {
 
 // Which side of the path is the outside of the corner at `index`:
 // +1/-1 multiplier for the unit normal, from the local curvature sign.
-export function outsideSignAt(points: Point[], index: number): number {
+function outsideSignAt(points: Point[], index: number): number {
   const i = Math.max(2, Math.min(points.length - 3, index));
   const before = points[i - 2];
   const at = points[i];
@@ -165,7 +165,7 @@ function pointInPolygon(polygon: Point[], p: Point): boolean {
 }
 
 /** +1/-1 normal multiplier that points into the interior of the closed outline. */
-export function interiorSign(outline: Point[], index: number): number {
+function interiorSign(outline: Point[], index: number): number {
   const n = unitNormalAt(outline, index);
   const probe = { x: outline[index].x + n.x * 25, y: outline[index].y + n.y * 25 };
   return pointInPolygon(outline, probe) ? 1 : -1;
@@ -577,7 +577,7 @@ function chaikinSlice(points: Point[], from: number, to: number): Point[] {
   return pts;
 }
 
-export function drawCurb(
+function drawCurb(
   ctx: CanvasRenderingContext2D,
   roadPath: Point[],
   from: number,

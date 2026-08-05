@@ -245,13 +245,19 @@ function detectEvents(samples, fromM, toM, gasSustainSamples = GAS_SUSTAIN_SAMPL
   return events;
 }
 
+function throttleState(sample) {
+  if (sample.brakeActive) return 'BRAKE';
+  if (sample.throttle >= 95) return 'FLAT';
+  return `thr ${sample.throttle}`;
+}
+
 // Debug view of a telemetry stretch so round windows can be sanity-checked.
 function printTimeline(samples, fromM, toM, label) {
   console.log(`\n--- ${label} (${fromM}-${toM}m) ---`);
   let prevState = '';
   for (const s of samples) {
     if (s.distanceM < fromM || s.distanceM > toM) continue;
-    const state = s.brakeActive ? 'BRAKE' : s.throttle >= 95 ? 'FLAT' : `thr ${s.throttle}`;
+    const state = throttleState(s);
     if (state !== prevState) {
       console.log(
         `  ${s.distanceM.toFixed(0).padStart(5)}m t=${s.t.toFixed(2).padStart(6)} ${s.speedKph} km/u ${state}`,
@@ -327,9 +333,8 @@ async function main() {
       distanceM: round2(e.distanceM - lap.lapStartDistanceM),
       speedKph: e.speedKph,
     }));
-    console.log(
-      `  events: ${events.map((e) => `${e.type}@${e.distanceM.toFixed(0)}m`).join(', ') || 'NONE - window needs tuning'}`,
-    );
+    const eventsSummary = events.map((e) => `${e.type}@${e.distanceM.toFixed(0)}m`).join(', ');
+    console.log(`  events: ${eventsSummary || 'NONE - window needs tuning'}`);
 
     const windowSamples = lap.samples.filter((s) => s.distanceM >= fromM && s.distanceM <= toM);
     const xs = windowSamples.map((s) => s.x);

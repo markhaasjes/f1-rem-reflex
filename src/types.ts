@@ -3,7 +3,7 @@ export interface Point {
   y: number;
 }
 
-export interface OrientedPoint extends Point {
+interface OrientedPoint extends Point {
   headingDeg: number;
 }
 
@@ -16,7 +16,7 @@ export interface LapSample extends Point {
   gear: number;
 }
 
-export interface CornerMarker extends Point {
+interface CornerMarker extends Point {
   number: number;
   name: string;
   distanceM: number;

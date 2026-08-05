@@ -32,7 +32,7 @@ corner — one continuous map, no separate per-corner artwork.
 - One Canvas 2D scene for every zoom level (devicePixelRatio capped at 2),
   inline SVG for the hero car
 - No backend and no runtime network calls: one baked fixture
-  (`src/data/zandvoort2025.json`, ~216 KB raw) carries the circuit geometry,
+  (`src/data/zandvoort2025.json`, ~385 KB raw) carries the circuit geometry,
   the full pole lap at 20 Hz and the four rounds.
 
 ## Run it
@@ -64,19 +64,25 @@ updating the `DRIVER` lap reference in the script and re-running it.
 scripts/build-game-fixture.mjs   data pipeline: OpenF1 + official geometry -> the fixture
 scripts/fetch-team-radio.mjs     downloads Max's team-radio mp3s for the score screen
 scripts/analyze-race-line.mjs    diagnoses straight/faceted race-line corners (GPS data gaps)
+scripts/lib/geojson.mjs          shared geometry helpers (fitting, resampling, smoothing)
 src/data/zandvoort2025.json      the one fixture: circuit, full lap, rounds + target events
+src/types.ts                     the fixture/game shape shared by every module
 src/lib/canvas.ts                projection math + devicePixelRatio-aware canvas setup
+src/lib/geometry.ts              the ViewBox type shared by canvas.ts and the camera
 src/lib/scene.ts                 illustrated scene: sand, green corridor, paddock, track, curbs, gravel, badges
 src/lib/canvasCar.ts             top-down car sprite, in team-evocative colors
 src/lib/corner.ts                sampling/interpolation + GPS-stall-proof car motion
 src/lib/phases.ts                flat/coast/brake segmentation of the driven line
 src/lib/scoring.ts               per-event scores (0-100) + Dutch verdicts
+src/lib/storage.ts               localStorage persistence for the last run + best run
+src/lib/tips.ts                  turns a round's worst event into a Dutch coaching tip
 src/lib/teamLivery.ts            hand-picked livery palette (no official marks)
 src/hooks/useCircuitGame.ts      game state machine (intro/flying/ready/running/result/finished)
 src/hooks/useCameraFlight.ts     animated camera box (log-space zoom, step queues)
 src/hooks/useElementSize.ts      ResizeObserver hook
 src/components/CircuitScene.tsx  the one canvas scene, own rAF loop, every zoom level
 src/components/HeroCar.tsx       flat side-view car illustration for the intro
+src/components/NOSLogo.tsx       NOS wordmark used in the app chrome
 src/components/Brand.tsx         shared pill/badge chrome
 src/App.tsx                      layout shell, flow wiring, share flow, copy
 ```
@@ -148,7 +154,10 @@ for how the pieces fit together; the rules below are about how to change them.
 - Formatting and basic correctness are enforced by Prettier
   (single quotes, trailing commas, 120-column width — see
   [.prettierrc](.prettierrc)) and oxlint ([.oxlintrc.json](.oxlintrc.json));
-  run `npm run lint` before committing.
+  run `npm run lint` before committing. `npm run knip` ([knip.json](knip.json))
+  catches dead files, unused exports and unused dependencies — the CLI
+  scripts in `scripts/` are configured as entry points since nothing in
+  `src/` imports them.
 
 ## Known limitations (POC scope)
 

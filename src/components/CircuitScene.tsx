@@ -39,6 +39,13 @@ interface CircuitSceneProps {
   showReference: boolean;
 }
 
+// The corner a round's name label anchors to: for combined rounds (e.g.
+// Gerlach & Hugenholtz) that's the corner the round is named after, its last.
+function lastRoundCorner(fixture: ZandvoortFixture, round: GameRound) {
+  const lastCornerNumber = round.cornerNumbers.at(-1);
+  return fixture.corners.find((c) => c.number === lastCornerNumber);
+}
+
 const CAR_SCALE = 13 / 22;
 const CAR_MIN_LENGTH_PX = 15; // keep the car spottable at overview zoom
 const CAR_ART_LENGTH_UNITS = 37;
@@ -261,7 +268,7 @@ export function CircuitScene(props: CircuitSceneProps) {
         });
         // name labels for the four game corners
         fixture.rounds.forEach((r) => {
-          const corner = fixture.corners.find((c) => c.number === r.cornerNumbers.at(-1));
+          const corner = lastRoundCorner(fixture, r);
           if (!corner) return;
           const [x, y] = projection.toScreen(corner.x, corner.y);
           const offset = LABEL_OFFSETS[r.id] ?? { dx: 0, dy: 28 };

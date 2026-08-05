@@ -1,4 +1,6 @@
-const NOSLogo = (props: any) => (
+import type { SVGProps } from 'react';
+
+const NOSLogo = (props: SVGProps<SVGSVGElement>) => (
   <svg {...props} fill="none" viewBox="0 0 115 41" xmlns="http://www.w3.org/2000/svg">
     <path
       clipRule="evenodd"

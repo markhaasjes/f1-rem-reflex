@@ -11,7 +11,7 @@ export interface ResultDescription {
 // deltaM: player's brake distance minus Verstappen's. Positive = player
 // braked later (deeper into the corner), negative = earlier. null = the
 // player never braked at all.
-export function describeBrakeAttempt(deltaM: number | null): ResultDescription {
+function describeBrakeAttempt(deltaM: number | null): ResultDescription {
   if (deltaM === null) {
     return {
       title: 'Je hebt niet geremd!',
@@ -52,7 +52,7 @@ export function describeBrakeAttempt(deltaM: number | null): ResultDescription {
 // deltaM: player's throttle-on distance minus Verstappen's. Positive = player
 // got back on the gas later (further round the corner), negative = earlier.
 // null = the player never got on the gas.
-export function describeGasAttempt(deltaM: number | null): ResultDescription {
+function describeGasAttempt(deltaM: number | null): ResultDescription {
   if (deltaM === null) {
     return { title: 'Geen gas gegeven!', detail: 'Je bleef te lang van het gas af.', tone: 'bad' };
   }
@@ -106,7 +106,7 @@ export function combineResults(descriptions: ResultDescription[]): { title: stri
 // --- Numeric scoring across the whole game ---
 
 /** 100 points within 2m of Max, linearly down to 0 at 50m. Missed event = 0. */
-export function scoreEvent(deltaM: number | null): number {
+function scoreEvent(deltaM: number | null): number {
   if (deltaM === null) return 0;
   const absDelta = Math.abs(deltaM);
   if (absDelta <= 2) return 100;
