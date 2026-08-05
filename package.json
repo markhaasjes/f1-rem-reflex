@@ -4,7 +4,6 @@
   "version": "0.0.0",
   "type": "module",
   "engines": {
-    "node": ">=24.17.0",
     "npm": ">=11.10.0"
   },
   "scripts": {
