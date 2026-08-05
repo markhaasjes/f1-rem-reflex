@@ -35,28 +35,23 @@ button:disabled {
 }
 
 /* NOS F1 graphics carbon: a fine diagonal hatch over the brand blue, same as
-   the broadcast/WK-stand visuals. */
+   the broadcast/WK-stand visuals. Hatch lines in the darker brand blue
+   (#001189) per design. */
 .bg-carbon {
   background-color: var(--color-track-blue);
   /* the solid rounded curve rising from the bottom paints over the hatch,
      exactly like the NOS F1 broadcast graphics */
   background-image:
     radial-gradient(95% 58% at 50% 124%, var(--color-track-blue) 0 99.6%, transparent 100%),
-    repeating-linear-gradient(
-      115deg,
-      rgba(255, 255, 255, 0.055) 0px,
-      rgba(255, 255, 255, 0.055) 2px,
-      transparent 2px,
-      transparent 8px
-    );
+    repeating-linear-gradient(115deg, #001189 0px, #001189 2px, transparent 2px, transparent 8px);
 }
 
 /* The same hatch woven into modal backdrops, on top of the dark blur. */
 .backdrop-carbon {
   background-image: repeating-linear-gradient(
     115deg,
-    rgba(255, 255, 255, 0.045) 0px,
-    rgba(255, 255, 255, 0.045) 2px,
+    rgba(0, 17, 137, 0.45) 0px,
+    rgba(0, 17, 137, 0.45) 2px,
     transparent 2px,
     transparent 8px
   );

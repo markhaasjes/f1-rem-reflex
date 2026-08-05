@@ -70,18 +70,17 @@ src/types.ts                     the fixture/game shape shared by every module
 src/lib/canvas.ts                projection math + devicePixelRatio-aware canvas setup
 src/lib/geometry.ts              the ViewBox type shared by canvas.ts and the camera
 src/lib/scene.ts                 illustrated scene: sand, green corridor, paddock, track, curbs, gravel, badges
-src/lib/canvasCar.ts             top-down car sprite, in team-evocative colors
+src/lib/canvasCar.ts             draws the top-down car SVG (public/images/auto-boven.svg) on the canvas
 src/lib/corner.ts                sampling/interpolation + GPS-stall-proof car motion
 src/lib/phases.ts                flat/coast/brake segmentation of the driven line
 src/lib/scoring.ts               per-event scores (0-100) + Dutch verdicts
 src/lib/storage.ts               localStorage persistence for the last run + best run
 src/lib/tips.ts                  turns a round's worst event into a Dutch coaching tip
-src/lib/teamLivery.ts            hand-picked livery palette (no official marks)
 src/hooks/useCircuitGame.ts      game state machine (intro/flying/ready/running/result/finished)
 src/hooks/useCameraFlight.ts     animated camera box (log-space zoom, step queues)
 src/hooks/useElementSize.ts      ResizeObserver hook
 src/components/CircuitScene.tsx  the one canvas scene, own rAF loop, every zoom level
-src/components/HeroCar.tsx       flat side-view car illustration for the intro
+src/components/HeroCar.tsx       side-view car for the intro (public/images/auto-zij.svg)
 src/components/NOSLogo.tsx       NOS wordmark used in the app chrome
 src/components/Brand.tsx         shared pill/badge chrome
 src/App.tsx                      layout shell, flow wiring, share flow, copy
@@ -116,7 +115,8 @@ for how the pieces fit together; the rules below are about how to change them.
   [Hugenholtz playbook](docs/DEVELOPMENT.md#repairing-a-race-line-with-gps-data-gaps-the-hugenholtz-playbook).
 - **User-facing copy is Dutch; code, comments, docs and commit messages are
   English.** Keep new UI strings consistent with the existing verdict/copy
-  tone in [scoring.ts](src/lib/scoring.ts) and [App.tsx](src/App.tsx).
+  tone in [scoring.ts](src/lib/scoring.ts) and [App.tsx](src/App.tsx). Never
+  use a dash (`-`) as a pause in Dutch copy; use a comma instead.
 - **Commit messages explain why, not just what.** Follow the existing
   `type: short summary` subject style (`feat`, `fix`, `polish`, `docs`,
   `chore`, `revert`) with a body that gives the reasoning and, where it

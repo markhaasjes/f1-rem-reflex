@@ -163,12 +163,19 @@ the loop reads the latest props from a ref and React stays out of the hot
 path. Draw order, back to front:
 
 ```
-sand + dunes (screen space) -> green corridor + striped infield -> paddock
+sand + dunes (world space) -> green corridor + striped infield -> paddock
   -> gravel traps (GRAVEL_CORNERS) -> track ribbon (white edge, dark asphalt,
   center sheen) -> red/white curbs at all 14 corners -> start/finish checker
   -> [running] driven line so far -> [result] phase ribbons + pins
   -> car -> corner badges + labels (fade out as you zoom in) -> scale bar
 ```
+
+The sand decoration (dune patches, scrub, grass speckles) is a fixed field in
+world meters (`SAND_FIELD`/`SAND_DECOR` in scene.ts), precomputed once and
+projected per frame — an earlier screen-space version left the background
+standing still while the camera moved, which broke the map illusion on the
+phone chase cam and during zoom flights. Only the flat base sand color fills
+in screen space, covering any zoom-out past the decorated field.
 
 - **One scene, every zoom.** There are no separate overview/corner
   renderings: everything physical is specified in meters and multiplied by
@@ -199,7 +206,10 @@ sand + dunes (screen space) -> green corridor + striped infield -> paddock
   product) puts gravel outside and curbs on the right sides for either
   corner direction; `interiorSign` (point-in-polygon probe) finds the
   infield for the paddock. No per-corner flip flags.
-- **Car sizing**: the sprite is deliberately oversized (~22m) for
+- **The car is an SVG image**: `drawF1Car` draws
+  `public/images/auto-boven.svg` (nose toward +x, livery colors baked into
+  the file) via `drawImage`, normalized to the same 37-unit footprint the old
+  path-drawn sprite used. It is deliberately oversized (~22m) for
   readability; at overview zoom a minimum pixel length kicks in
   (`CAR_MIN_LENGTH_PX`), so it stays spottable when parked on the grid.
 - **Ribbons are drawn from the smoothed car path**, never from raw samples:
@@ -396,8 +406,9 @@ build trust on it.
   adapts to any number of rounds and any (alternating) event count; only the
   "Bocht N van 3" copy in App.tsx assumes three scoring rounds.
 - **New driver**: add a `DRIVER` entry (lap start timestamp + duration from
-  OpenF1's `laps` endpoint), emit a second fixture, add a picker. Liveries
-  live in [teamLivery.ts](../src/lib/teamLivery.ts).
+  OpenF1's `laps` endpoint), emit a second fixture, add a picker. The livery
+  colors are baked into the car SVGs (`public/images/auto-zij.svg` and
+  `auto-boven.svg`), so a second driver needs recolored copies of those.
 - **Different circuit**: the pipeline generalizes (another f1-circuits
   GeoJSON + session key + corner anchors), but `CORNER_DEFINITIONS`
   meters-into-lap anchors are hand-tuned per circuit — budget time with the
@@ -411,12 +422,15 @@ build trust on it.
 
 ## Working with the hero/share art
 
-- [HeroCar.tsx](../src/components/HeroCar.tsx) is a recolored Noun Project
-  icon. When swapping the source SVG: measure the real bbox in a headless
-  browser (`getBBox()` — Noun Project viewBoxes lie), mirror via a single
-  `<g transform>` if it faces right (game convention is nose-left), recolor
-  by fill only, and verify by screenshotting the rendered app, not the raw
-  file.
+- Both car illustrations live in `public/images` with the livery colors baked
+  into the files: `auto-zij.svg` (side view, faces right in the file;
+  [HeroCar.tsx](../src/components/HeroCar.tsx) mirrors it with a CSS
+  transform because the game convention is nose-left) and `auto-boven.svg`
+  (top-down, nose toward +x, drawn onto the canvas by `drawF1Car`). When
+  swapping or recoloring either: keep explicit `width`/`height` attributes on
+  the root `<svg>` (canvas `drawImage` of an SVG without them is unreliable
+  across browsers), recolor by fill only, and verify by screenshotting the
+  rendered app, not the raw file.
 - `public/images/share.png` is flat art: `magick -strip -colors 64 PNG8:`
   gives ~80% size reduction with no visible loss; compare candidates before
   going lower (32 colors banded on the car shading).
