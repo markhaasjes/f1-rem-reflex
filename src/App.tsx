@@ -7,7 +7,14 @@ import fixtureJson from './data/zandvoort2025.json';
 import { boxFromBounds, useCameraFlight, type CamBox } from './hooks/useCameraFlight';
 import { useCircuitGame } from './hooks/useCircuitGame';
 import { positionAt, sampleAt } from './lib/corner';
-import { combineResults, totalScore, type EventResult, type RoundResult } from './lib/scoring';
+import {
+  combineResults,
+  totalScore,
+  totalScoreFromRoundScores,
+  type EventResult,
+  type RoundResult,
+} from './lib/scoring';
+import { decodeShareToken, encodeShareToken } from './lib/shareToken';
 import { loadScores, saveRun, type SavedRun, type SavedScores } from './lib/storage';
 import { adviceForRound, adviceForRun } from './lib/tips';
 import type { GamePhase, ZandvoortFixture } from './types';
@@ -56,21 +63,24 @@ const BTN_LIGHT = `${BTN_BASE} focus-ring-dark bg-white text-ink hover:bg-[#f3f3
 const BTN_RED = `${BTN_BASE} focus-ring-ink bg-[#e61f15] text-white hover:bg-[#ca1a11] hover:scale-[1.02]`;
 const BTN_DARK = `${BTN_BASE} bg-ink text-white hover:bg-track-blue hover:scale-[1.02]`;
 
-function buildShareUrl(total: number, results: RoundResult[]): string {
-  const rounds = results.map((r) => r.score).join('.');
-  return `${location.origin}${location.pathname}?s=${total}&r=${rounds}`;
+// The total isn't carried in the URL at all, and the per-round scores are
+// packed into one opaque token rather than sitting in the URL as plain,
+// readable numbers - see lib/shareToken.ts.
+function buildShareUrl(results: RoundResult[]): string {
+  const token = encodeShareToken(results.map((r) => r.score));
+  return `${location.origin}${location.pathname}?d=${token}`;
 }
 
-// A score arriving via a shared link: ?s=<total>&r=<r0.r1.r2.r3>
+// A score arriving via a shared link: ?d=<encodeShareToken output>. The
+// token's tamper check must match, so hand-editing it (or forging one
+// without reading lib/shareToken.ts) invalidates the link - it's then
+// treated the same as no shared score.
 function parseSharedScore(): { total: number; rounds: number[] } | null {
-  const params = new URLSearchParams(location.search);
-  const s = Number(params.get('s'));
-  const rounds = (params.get('r') ?? '')
-    .split('.')
-    .map(Number)
-    .filter((n) => Number.isFinite(n));
-  if (!Number.isFinite(s) || rounds.length !== fixture.rounds.length) return null;
-  return { total: Math.round(s), rounds: rounds.map(Math.round) };
+  const token = new URLSearchParams(location.search).get('d');
+  if (!token) return null;
+  const roundScores = decodeShareToken(token);
+  if (!roundScores || roundScores.length !== fixture.rounds.length) return null;
+  return { total: totalScoreFromRoundScores(fixture.rounds, roundScores), rounds: roundScores };
 }
 
 // How far the gauge scale reaches on either side of Max's point.
@@ -499,7 +509,7 @@ function App() {
       : null;
 
   const share = useCallback(async () => {
-    const url = buildShareUrl(total, results);
+    const url = buildShareUrl(results);
     const text = `Ik scoorde ${total}/100 in NOS Rem Reflex - rem jij net zo laat als Max Verstappen op Zandvoort?`;
     try {
       if (navigator.share) {
