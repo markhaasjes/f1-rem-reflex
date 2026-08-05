@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useElementSize } from '../hooks/useElementSize';
 import { viewBoxFromCam, type CamBox } from '../hooks/useCameraFlight';
 import { fitProjection, prepareCanvas } from '../lib/canvas';
-import { drawF1Car } from '../lib/canvasCar';
+import { CAR_ART_LENGTH_UNITS, drawF1Car } from '../lib/canvasCar';
 import { headingAt, positionAt, primePathModel, sampleAt, smoothPathPoints } from '../lib/corner';
 import { buildPhaseSegments, type DrivingPhase } from '../lib/phases';
 import {
@@ -24,7 +24,6 @@ import {
   nearestIndex,
   rotateOutline,
 } from '../lib/scene';
-import { VERSTAPPEN_LIVERY } from '../lib/teamLivery';
 import type { GamePhase, GameRound, PlayerMark, ZandvoortFixture } from '../types';
 
 interface CircuitSceneProps {
@@ -48,7 +47,6 @@ function lastRoundCorner(fixture: ZandvoortFixture, round: GameRound) {
 
 const CAR_SCALE = 13 / 22;
 const CAR_MIN_LENGTH_PX = 15; // keep the car spottable at overview zoom
-const CAR_ART_LENGTH_UNITS = 37;
 
 // Gravel traps per corner number, sized to match the real run-off areas as
 // drawn on the official F1 TV circuit map (backM/fwdM = meters of trap
@@ -152,7 +150,7 @@ export function CircuitScene(props: CircuitSceneProps) {
       const samples = fixture.lap.samples;
 
       // --- environment ---
-      drawSandBackground(ctx, w, h);
+      drawSandBackground(ctx, projection, w, h);
       drawSea(ctx, projection, h);
       drawGreenSurroundings(ctx, outline, projection);
       drawPaddock(ctx, outline, 0, projection);
@@ -227,7 +225,6 @@ export function CircuitScene(props: CircuitSceneProps) {
         x: carPos.x,
         y: carPos.y,
         headingDeg: headingAt(samples, carT),
-        livery: VERSTAPPEN_LIVERY,
         sizeScale: Math.max(CAR_SCALE, minScale),
         projection,
         dynamics: phase === 'running' ? { speedKph: carState.speedKph } : undefined,
@@ -241,13 +238,13 @@ export function CircuitScene(props: CircuitSceneProps) {
       // big screens. Fully visible at the ~1200m overview, gone below ~700m.
       const badgeAlpha = Math.max(0, Math.min(1, (camBox.w - 700) / 300));
       if (badgeAlpha > 0) {
-        // Anchor on the last corner number: for combined rounds that is the
-        // corner the round is named after (Hugenholtz for 2+3, etc.).
+        // Every corner of the upcoming round pulses, so a double (Gerlach &
+        // Hugenholtz, Bocht 9 & 10) announces both its corners at once.
         const nextRound = fixture.rounds[roundIndex];
-        const pulseCornerNumber = phase === 'intro' || phase === 'flying' ? nextRound.cornerNumbers.at(-1) : null;
+        const pulseCornerNumbers = new Set(phase === 'intro' || phase === 'flying' ? nextRound.cornerNumbers : []);
         fixture.corners.forEach((corner) => {
           const [x, y] = projection.toScreen(corner.x, corner.y);
-          const isPulse = corner.number === pulseCornerNumber;
+          const isPulse = pulseCornerNumbers.has(corner.number);
           drawCornerBadge(ctx, x, y, String(corner.number), {
             highlight: isPulse,
             minor: !roundCornerNumbers.has(corner.number),

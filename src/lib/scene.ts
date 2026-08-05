@@ -171,56 +171,99 @@ function interiorSign(outline: Point[], index: number): number {
   return pointInPolygon(outline, probe) ? 1 : -1;
 }
 
-export function drawSandBackground(ctx: CanvasRenderingContext2D, width: number, height: number) {
+// The dune decoration lives in world space (meters), so the sand moves and
+// zooms with the track. The earlier screen-space version left the background
+// standing still while the camera flew or followed the car, which broke the
+// "one continuous map" illusion, worst on the phone chase cam. One fixed
+// field of patches covers the map plus a wide margin; the plain sand fill
+// covers anything beyond it.
+const SAND_FIELD = { minX: -800, minY: -1100, maxX: 1700, maxY: 1100 };
+
+interface SandEllipse {
+  x: number;
+  y: number;
+  rxM: number;
+  ryM: number;
+  rotation: number;
+  alpha: number;
+}
+
+interface SandSpeckle {
+  x: number;
+  y: number;
+  lengthM: number;
+  rotation: number;
+}
+
+const SAND_DECOR = (() => {
   const rand = mulberry32(7);
+  const spanX = SAND_FIELD.maxX - SAND_FIELD.minX;
+  const spanY = SAND_FIELD.maxY - SAND_FIELD.minY;
+  const randomPoint = () => ({ x: SAND_FIELD.minX + rand() * spanX, y: SAND_FIELD.minY + rand() * spanY });
+  const patches: SandEllipse[] = Array.from({ length: 30 }, () => ({
+    ...randomPoint(),
+    rxM: 90 + rand() * 140,
+    ryM: 60 + rand() * 90,
+    rotation: rand() * Math.PI,
+    alpha: 1,
+  }));
+  const scrub: SandEllipse[] = Array.from({ length: 30 }, () => ({
+    ...randomPoint(),
+    rxM: 40 + rand() * 70,
+    ryM: 30 + rand() * 45,
+    rotation: rand() * Math.PI,
+    alpha: 0.35 + rand() * 0.2,
+  }));
+  const speckles: SandSpeckle[] = Array.from({ length: 300 }, () => ({
+    ...randomPoint(),
+    lengthM: 10 + rand() * 14,
+    rotation: rand() * Math.PI,
+  }));
+  return { patches, scrub, speckles };
+})();
+
+export function drawSandBackground(
+  ctx: CanvasRenderingContext2D,
+  projection: ScreenProjection,
+  width: number,
+  height: number,
+) {
   ctx.fillStyle = PALETTE.sand;
   ctx.fillRect(0, 0, width, height);
 
-  // lighter dune patches
-  for (let i = 0; i < 8; i++) {
-    ctx.beginPath();
-    ctx.ellipse(
-      rand() * width,
-      rand() * height,
-      (0.12 + rand() * 0.16) * width,
-      (0.08 + rand() * 0.1) * height,
-      rand() * Math.PI,
-      0,
-      Math.PI * 2,
-    );
-    ctx.fillStyle = PALETTE.sandLight;
-    ctx.fill();
+  const s = projection.scale;
+  const offscreen = (x: number, y: number, marginPx: number) =>
+    x < -marginPx || x > width + marginPx || y < -marginPx || y > height + marginPx;
+
+  // lighter dune patches, then olive scrub on top
+  for (const [layer, fill] of [
+    [SAND_DECOR.patches, PALETTE.sandLight],
+    [SAND_DECOR.scrub, PALETTE.scrub],
+  ] as const) {
+    ctx.fillStyle = fill;
+    for (const patch of layer) {
+      const [x, y] = projection.toScreen(patch.x, patch.y);
+      if (offscreen(x, y, patch.rxM * s)) continue;
+      ctx.beginPath();
+      ctx.ellipse(x, y, patch.rxM * s, patch.ryM * s, patch.rotation, 0, Math.PI * 2);
+      ctx.globalAlpha = patch.alpha;
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
   }
 
-  // olive dune scrub
-  for (let i = 0; i < 8; i++) {
-    ctx.beginPath();
-    ctx.ellipse(
-      rand() * width,
-      rand() * height,
-      (0.05 + rand() * 0.09) * width,
-      (0.04 + rand() * 0.06) * height,
-      rand() * Math.PI,
-      0,
-      Math.PI * 2,
-    );
-    ctx.fillStyle = PALETTE.scrub;
-    ctx.globalAlpha = 0.35 + rand() * 0.2;
-    ctx.fill();
-  }
-  ctx.globalAlpha = 1;
-
-  // speckle dashes
+  // speckle dashes (dune grass)
   ctx.fillStyle = PALETTE.sandSpeckle;
-  for (let i = 0; i < 70; i++) {
-    const x = rand() * width;
-    const y = rand() * height;
-    const w = 5 + rand() * 9;
+  for (const speckle of SAND_DECOR.speckles) {
+    const [x, y] = projection.toScreen(speckle.x, speckle.y);
+    if (offscreen(x, y, 30 * s)) continue;
+    const w = speckle.lengthM * s;
+    const h = 3 * s;
     ctx.save();
     ctx.translate(x, y);
-    ctx.rotate(rand() * Math.PI);
+    ctx.rotate(speckle.rotation);
     ctx.beginPath();
-    ctx.roundRect(-w / 2, -1.5, w, 3, 1.5);
+    ctx.roundRect(-w / 2, -h / 2, w, h, h / 2);
     ctx.fill();
     ctx.restore();
   }
@@ -649,12 +692,14 @@ export function drawStartFinish(
   ctx.restore();
 }
 
+// Width sized against the SVG car art: the earlier 4.6m ribbon dwarfed the
+// (narrower) car sprite and read as a colored road half.
 export function drawRibbon(
   ctx: CanvasRenderingContext2D,
   points: Point[],
   color: string,
   projection: ScreenProjection,
-  widthM = 4.6,
+  widthM = 3.2,
 ) {
   if (points.length < 2) return;
   tracePath(ctx, points, projection);
@@ -687,12 +732,9 @@ export function drawCornerBadge(
   ctx.globalAlpha = minor ? alpha * 0.55 : alpha;
   ctx.beginPath();
   ctx.arc(screenX, screenY, r, 0, Math.PI * 2);
-  // Black circle, white number, white ring - the NOS WK-stand graphic style.
+  // Solid black circle with a white number, no ring - per design.
   ctx.fillStyle = '#1e1e1e';
-  ctx.strokeStyle = PALETTE.white;
-  ctx.lineWidth = minor ? 1.5 : 2.5;
   ctx.fill();
-  ctx.stroke();
   let fontPx = 12;
   if (highlight) fontPx = 15;
   else if (minor) fontPx = 9;

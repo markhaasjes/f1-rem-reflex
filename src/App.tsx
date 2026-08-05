@@ -95,15 +95,17 @@ const TONE_DOT: Record<EventResult['description']['tone'], string> = {
 
 // One brake/gas moment, visualized: a gauge with Max's point as the center
 // tick and the player's press as a colored dot early (left) or late (right)
-// of it, with the distance and time gaps spelled out.
-function EventResultCard({ er }: { er: EventResult }) {
+// of it, with the distance and time gaps spelled out. Card chrome lives on
+// the per-corner group (RoundResultCards); `compact` is the phone variant.
+function EventResultGauge({ er, compact = false }: { er: EventResult; compact?: boolean }) {
   const isBrake = er.event.type === 'brake';
   const label = isBrake ? 'REM' : 'GAS';
   const accent = isBrake ? '#e61f15' : '#10b981';
+  const width = compact ? 'w-28' : 'w-32 sm:w-36';
 
   if (er.deltaM === null || er.mark === null) {
     return (
-      <div className="w-40 rounded-2xl bg-white px-3 py-2 text-left shadow-lg sm:w-44">
+      <div className={`${width} text-left`}>
         <span className="text-xs font-extrabold" style={{ color: accent }}>
           {label}
         </span>
@@ -124,32 +126,162 @@ function EventResultCard({ er }: { er: EventResult }) {
   const dotPercent = 50 + (Math.max(-GAUGE_RANGE_M, Math.min(GAUGE_RANGE_M, er.deltaM)) / GAUGE_RANGE_M) * 50;
 
   return (
-    <div className="w-40 rounded-2xl bg-white px-3 pb-2 pt-1.5 shadow-lg sm:w-44">
+    <div className={width}>
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-xs font-extrabold" style={{ color: accent }}>
+        <span className={`font-extrabold ${compact ? 'text-[10px]' : 'text-xs'}`} style={{ color: accent }}>
           {label}
         </span>
-        <span className="text-xs font-extrabold text-[#1e1e1e]">{deltaLabel}</span>
+        <span className={`font-extrabold text-[#1e1e1e] ${compact ? 'text-[10px]' : 'text-xs'}`}>{deltaLabel}</span>
       </div>
-      <div className="relative mt-1.5 h-2 rounded-full bg-[#ececec]">
+      <div className={`relative mt-1.5 rounded-full bg-[#ececec] ${compact ? 'h-1.5' : 'h-2'}`}>
         <span className="absolute left-1/2 top-1/2 h-3.5 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded bg-[#1e1e1e]/50" />
         <span
-          className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow"
+          className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow ${compact ? 'h-3 w-3' : 'h-3.5 w-3.5'}`}
           style={{ left: `${dotPercent}%`, backgroundColor: TONE_DOT[er.description.tone] }}
         />
       </div>
-      <div className="mt-1 flex items-center justify-between text-[10px] font-bold text-[#1e1e1e]/45">
-        <span>te vroeg</span>
-        <span className="text-[11px] font-extrabold tabular-nums text-[#1e1e1e]/75">{seconds}s</span>
-        <span>te laat</span>
-      </div>
+      {compact ? (
+        <p className="mt-0.5 text-center text-[10px] font-extrabold tabular-nums text-[#1e1e1e]/75">{seconds}s</p>
+      ) : (
+        <div className="mt-1 flex items-center justify-between text-[10px] font-bold text-[#1e1e1e]/45">
+          <span>te vroeg</span>
+          <span className="text-[11px] font-extrabold tabular-nums text-[#1e1e1e]/75">{seconds}s</span>
+          <span>te laat</span>
+        </div>
+      )}
     </div>
   );
 }
 
-// A sim-racing style pedal (carbon face plate, metal pivot, spring on the
-// throttle), modeled on real F1 pedal sets. Pressing tilts the pedal like the
-// real thing; the pedal Max needs next gets a white ring.
+// A round's result cards, one white card per braking zone (brake + gas pair),
+// so on a double corner it's clear which REM belongs to which GAS. When the
+// round covers as many corners as zones, each card is titled with its corner.
+function RoundResultCards({ result, compact = false }: { result: RoundResult; compact?: boolean }) {
+  const pairs: EventResult[][] = [];
+  for (const er of result.eventResults) {
+    const currentPair = pairs.at(-1);
+    if (!currentPair || currentPair.length === 2) pairs.push([er]);
+    else currentPair.push(er);
+  }
+  const zoneNames =
+    pairs.length > 1 && result.round.cornerNumbers.length === pairs.length
+      ? result.round.cornerNumbers.map((n) => fixture.corners.find((c) => c.number === n)?.name ?? `Bocht ${n}`)
+      : null;
+
+  return (
+    <>
+      {pairs.map((pair, i) => (
+        <div
+          key={pair[0].event.t}
+          className={`rounded-2xl bg-white shadow-lg ${compact ? 'px-2.5 py-1.5' : 'px-3 py-2'}`}
+        >
+          {zoneNames && (
+            <p
+              className={`text-left font-extrabold uppercase tracking-wide text-[#1e1e1e]/50 ${compact ? 'text-[9px]' : 'text-[10px]'}`}
+            >
+              {zoneNames[i]}
+            </p>
+          )}
+          <div className={`flex ${compact ? 'gap-2.5' : 'gap-3'}`}>
+            {pair.map((er) => (
+              <EventResultGauge key={er.event.t} er={er} compact={compact} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
+// The sim-racing pedal artwork (carbon face plate, metal pivot, spring on the
+// throttle), modeled on real F1 pedal sets. Shared by the in-game pedal
+// buttons and the intro explainer; `idPrefix` keeps the pattern/gradient defs
+// unique per rendered instance.
+function PedalArt({ variant, idPrefix, className }: { variant: 'brake' | 'gas'; idPrefix: string; className: string }) {
+  const isBrake = variant === 'brake';
+  const accent = isBrake ? '#e61f15' : '#10b981';
+  const face = isBrake ? { x: 10, y: 26, w: 100, h: 72 } : { x: 24, y: 10, w: 72, h: 92 };
+  const gripYs = isBrake ? [48, 62, 76] : [36, 52, 68, 84];
+  const id = `${idPrefix}-${variant}`;
+
+  return (
+    <svg viewBox="0 0 120 200" aria-hidden="true" className={className}>
+      <defs>
+        <pattern id={`${id}-carbon`} width="6" height="6" patternUnits="userSpaceOnUse">
+          <rect width="6" height="6" fill="#1e1f24" />
+          <rect width="3" height="3" fill="#2a2b31" />
+          <rect x="3" y="3" width="3" height="3" fill="#2a2b31" />
+        </pattern>
+        <linearGradient id={`${id}-metal`} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#b9bcc4" />
+          <stop offset="0.5" stopColor="#eef0f4" />
+          <stop offset="1" stopColor="#8f939c" />
+        </linearGradient>
+      </defs>
+
+      {/* base bracket */}
+      <rect x="26" y="178" width="68" height="16" rx="4" fill="#26272c" />
+      <rect x="26" y="178" width="68" height="4" rx="2" fill="#3a3b42" />
+      <circle cx="37" cy="186" r="2.6" fill={`url(#${id}-metal)`} />
+      <circle cx="83" cy="186" r="2.6" fill={`url(#${id}-metal)`} />
+
+      {/* throttle spring + linkage, like the real assembly */}
+      {!isBrake && (
+        <g>
+          <rect x="99" y="112" width="5" height="54" rx="2.5" fill={`url(#${id}-metal)`} />
+          <path
+            d="M 96 118 h 11 M 95 126 h 13 M 94 134 h 15 M 95 142 h 13 M 96 150 h 11 M 97 158 h 9"
+            stroke="#6b6e77"
+            strokeWidth="3"
+            strokeLinecap="round"
+            fill="none"
+          />
+        </g>
+      )}
+
+      {/* arm */}
+      <path
+        d={isBrake ? 'M 46 92 L 74 92 L 80 180 L 40 180 Z' : 'M 49 98 L 71 98 L 77 180 L 43 180 Z'}
+        fill={`url(#${id}-carbon)`}
+        stroke="#111216"
+        strokeWidth="2"
+      />
+      {/* pivot */}
+      <circle cx="60" cy={isBrake ? 132 : 136} r="8" fill={`url(#${id}-metal)`} stroke="#43454c" strokeWidth="1.5" />
+      <circle cx="60" cy={isBrake ? 132 : 136} r="3" fill="#565962" />
+
+      {/* face plate */}
+      <rect
+        x={face.x}
+        y={face.y}
+        width={face.w}
+        height={face.h}
+        rx="10"
+        fill={`url(#${id}-carbon)`}
+        stroke="#0d0e12"
+        strokeWidth="2.5"
+      />
+      {/* accent strip along the top edge */}
+      <rect x={face.x + 7} y={face.y + 6} width={face.w - 14} height="5" rx="2.5" fill={accent} />
+      {/* grip bars */}
+      {gripYs.map((y) => (
+        <rect key={y} x={face.x + 12} y={y} width={face.w - 24} height="6" rx="3" fill="#3b3d45" />
+      ))}
+      {/* corner bolts */}
+      {[
+        [face.x + 9, face.y + 9],
+        [face.x + face.w - 9, face.y + 9],
+        [face.x + 9, face.y + face.h - 9],
+        [face.x + face.w - 9, face.y + face.h - 9],
+      ].map(([cx, cy]) => (
+        <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="3" fill={`url(#${id}-metal)`} stroke="#43454c" />
+      ))}
+    </svg>
+  );
+}
+
+// An in-game pedal button. Pressing tilts the pedal like the real thing; the
+// pedal Max needs next gets a white ring.
 function Pedal({
   variant,
   onPress,
@@ -163,9 +295,6 @@ function Pedal({
 }) {
   const isBrake = variant === 'brake';
   const accent = isBrake ? '#e61f15' : '#10b981';
-  const face = isBrake ? { x: 10, y: 26, w: 100, h: 72 } : { x: 24, y: 10, w: 72, h: 92 };
-  const gripYs = isBrake ? [48, 62, 76] : [36, 52, 68, 84];
-  const id = `pedal-${variant}`;
 
   return (
     <button
@@ -178,84 +307,13 @@ function Pedal({
         disabled ? 'opacity-50 saturate-50' : 'hover:-translate-y-0.5'
       } ${highlight ? 'ring-4 ring-white/80' : ''}`}
     >
-      <svg
-        viewBox="0 0 120 200"
-        aria-hidden="true"
+      <PedalArt
+        variant={variant}
+        idPrefix="pedal"
         className={`mx-auto h-16 w-auto drop-shadow-[0_6px_10px_rgba(6,12,60,0.5)] transition-transform duration-100 sm:h-28 wide:h-[clamp(6rem,30vh,10rem)] ${
           disabled ? '' : 'group-active:[transform:perspective(360px)_rotateX(22deg)] group-active:origin-bottom'
         }`}
-      >
-        <defs>
-          <pattern id={`${id}-carbon`} width="6" height="6" patternUnits="userSpaceOnUse">
-            <rect width="6" height="6" fill="#1e1f24" />
-            <rect width="3" height="3" fill="#2a2b31" />
-            <rect x="3" y="3" width="3" height="3" fill="#2a2b31" />
-          </pattern>
-          <linearGradient id={`${id}-metal`} x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0" stopColor="#b9bcc4" />
-            <stop offset="0.5" stopColor="#eef0f4" />
-            <stop offset="1" stopColor="#8f939c" />
-          </linearGradient>
-        </defs>
-
-        {/* base bracket */}
-        <rect x="26" y="178" width="68" height="16" rx="4" fill="#26272c" />
-        <rect x="26" y="178" width="68" height="4" rx="2" fill="#3a3b42" />
-        <circle cx="37" cy="186" r="2.6" fill={`url(#${id}-metal)`} />
-        <circle cx="83" cy="186" r="2.6" fill={`url(#${id}-metal)`} />
-
-        {/* throttle spring + linkage, like the real assembly */}
-        {!isBrake && (
-          <g>
-            <rect x="99" y="112" width="5" height="54" rx="2.5" fill={`url(#${id}-metal)`} />
-            <path
-              d="M 96 118 h 11 M 95 126 h 13 M 94 134 h 15 M 95 142 h 13 M 96 150 h 11 M 97 158 h 9"
-              stroke="#6b6e77"
-              strokeWidth="3"
-              strokeLinecap="round"
-              fill="none"
-            />
-          </g>
-        )}
-
-        {/* arm */}
-        <path
-          d={isBrake ? 'M 46 92 L 74 92 L 80 180 L 40 180 Z' : 'M 49 98 L 71 98 L 77 180 L 43 180 Z'}
-          fill={`url(#${id}-carbon)`}
-          stroke="#111216"
-          strokeWidth="2"
-        />
-        {/* pivot */}
-        <circle cx="60" cy={isBrake ? 132 : 136} r="8" fill={`url(#${id}-metal)`} stroke="#43454c" strokeWidth="1.5" />
-        <circle cx="60" cy={isBrake ? 132 : 136} r="3" fill="#565962" />
-
-        {/* face plate */}
-        <rect
-          x={face.x}
-          y={face.y}
-          width={face.w}
-          height={face.h}
-          rx="10"
-          fill={`url(#${id}-carbon)`}
-          stroke="#0d0e12"
-          strokeWidth="2.5"
-        />
-        {/* accent strip along the top edge */}
-        <rect x={face.x + 7} y={face.y + 6} width={face.w - 14} height="5" rx="2.5" fill={accent} />
-        {/* grip bars */}
-        {gripYs.map((y) => (
-          <rect key={y} x={face.x + 12} y={y} width={face.w - 24} height="6" rx="3" fill="#3b3d45" />
-        ))}
-        {/* corner bolts */}
-        {[
-          [face.x + 9, face.y + 9],
-          [face.x + face.w - 9, face.y + 9],
-          [face.x + 9, face.y + face.h - 9],
-          [face.x + face.w - 9, face.y + face.h - 9],
-        ].map(([cx, cy]) => (
-          <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="3" fill={`url(#${id}-metal)`} stroke="#43454c" />
-        ))}
-      </svg>
+      />
       <span
         className="mt-1 block text-center text-xs font-extrabold tracking-widest sm:text-sm wide:text-base"
         style={{ color: accent }}
@@ -314,9 +372,18 @@ function Key({ children }: { children: React.ReactNode }) {
   );
 }
 
+// The yellow TIP marker, shared by the ready-screen advice and the score card.
+function TipBadge() {
+  return (
+    <span className="mr-1.5 rounded-full bg-[#ffc828] px-2 py-0.5 align-middle text-[10px] font-extrabold text-[#1e1e1e]">
+      TIP
+    </span>
+  );
+}
+
 function scoreSentence(total: number): string {
-  if (total >= 90) return 'Wereldklasse - jij remt als Max zelf!';
-  if (total >= 70) return 'Sterke ronde, bijna kwalificatie-waardig.';
+  if (total >= 90) return 'Wereldklasse, jij remt als Max zelf!';
+  if (total >= 70) return 'Sterke ronde, bijna kwalificatiewaardig.';
   if (total >= 45) return 'Netjes! Maar Max rijdt nog wel even weg.';
   return 'De grindbak is goed gevuld vandaag.';
 }
@@ -510,7 +577,7 @@ function App() {
 
   const share = useCallback(async () => {
     const url = buildShareUrl(results);
-    const text = `Ik scoorde ${total}/100 in NOS Rem Reflex - rem jij net zo laat als Max Verstappen op Zandvoort?`;
+    const text = `Ik scoorde ${total}/100 in NOS Rem Reflex, rem jij net zo laat als Max Verstappen op Zandvoort?`;
     try {
       if (navigator.share) {
         await navigator.share({ title: 'NOS Rem Reflex', text, url });
@@ -600,14 +667,14 @@ function App() {
               )}
             </div>
 
-            {/* round result: on portrait the cards overlay the stage, so the deck below never changes height */}
+            {/* round result: on portrait the cards overlay the stage, hugging its
+                bottom edge so they stay clear of the brake/gas pins on the map,
+                and the deck below never changes height */}
             <div
               inert={!showRoundResult || undefined}
-              className={`absolute inset-x-2 bottom-2 flex flex-wrap items-center justify-center gap-2 transition-all duration-500 wide:hidden ${showRoundResult ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-1 opacity-0'}`}
+              className={`absolute inset-x-2 bottom-1.5 flex flex-col items-center gap-1.5 transition-all duration-500 wide:hidden ${showRoundResult ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-1 opacity-0'}`}
             >
-              {lastResult?.eventResults.map((er) => (
-                <EventResultCard key={er.event.t} er={er} />
-              ))}
+              {lastResult && <RoundResultCards result={lastResult} compact />}
             </div>
           </div>
 
@@ -634,9 +701,7 @@ function App() {
                 </div>
                 {lastRoundAdvice ? (
                   <p className="text-xs font-bold text-white sm:text-base">
-                    <span className="mr-1.5 rounded-full bg-[#ffc828] px-2 py-0.5 align-middle text-[10px] font-extrabold text-[#1e1e1e]">
-                      TIP
-                    </span>
+                    <TipBadge />
                     Vorige keer: {lastRoundAdvice}
                   </p>
                 ) : (
@@ -651,9 +716,7 @@ function App() {
               </div>
               <p {...layer(phase === 'running', 'text-base font-extrabold sm:text-xl')}>{runningHint}</p>
               <div {...layer(showRoundResult, 'hidden flex-wrap items-center justify-center gap-2 wide:flex sm:gap-3')}>
-                {lastResult?.eventResults.map((er) => (
-                  <EventResultCard key={er.event.t} er={er} />
-                ))}
+                {lastResult && <RoundResultCards result={lastResult} />}
               </div>
             </div>
 
@@ -708,12 +771,12 @@ function App() {
           inert={!(phase === 'intro' && !hideIntroChrome) || undefined}
           className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-ink/70 p-4 backdrop-blur-[3px] transition-all duration-500 ${phase === 'intro' && !hideIntroChrome ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
-          <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:p-7">
-            <HeroCar className="mx-auto h-9 w-auto sm:h-11" />
-            <h1 id="intro-title" className="mt-4 text-xl font-normal leading-tight text-[#1e1e1e] sm:text-2xl">
+          <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:max-w-md sm:p-10">
+            <HeroCar className="mx-auto h-9 w-auto sm:h-12" />
+            <h1 id="intro-title" className="mt-4 text-xl font-normal leading-tight text-[#1e1e1e] sm:mt-5 sm:text-2xl">
               Rem jij net zo laat als <span className="font-extrabold">Max Verstappen</span>?
             </h1>
-            <p className="mt-2 text-sm font-bold leading-snug text-ink/70 sm:text-base">
+            <p className="mt-2 text-sm font-bold leading-snug text-ink/70 sm:mt-3 sm:text-base">
               Rijd zijn echte poleronde over Zandvoort. Eerst oefenen in de Tarzanbocht, daarna drie bochten voor de
               punten: rem en geef weer gas op precies het juiste moment.
             </p>
@@ -728,46 +791,37 @@ function App() {
                 )}
               </p>
             )}
-            {/* keyboard explainer: desktop only - most players are on touch */}
-            <div className="mt-4 hidden rounded-2xl bg-[#f3f3f0] p-3.5 text-left sm:block">
-              <p className="text-xs font-extrabold uppercase tracking-wide text-ink/50">Speel met je toetsenbord</p>
-              <dl className="mt-2 flex flex-col gap-1.5 text-sm font-bold text-ink/80">
-                <div className="flex items-center justify-between">
-                  <dt className="flex items-center gap-2">
-                    <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-[#e61f15]" />
-                    Remmen
-                  </dt>
-                  <dd className="flex gap-1">
+            {/* the two pedals the game is played with; keyboard hints join in
+                on larger screens, touch players just see what to expect */}
+            <div className="mt-4 rounded-2xl bg-[#f3f3f0] p-3.5 sm:mt-5 sm:p-5">
+              <p className="text-left text-xs font-extrabold uppercase tracking-wide text-ink/50">Zo speel je</p>
+              <div className="mt-2 flex items-end justify-center gap-10 sm:mt-3 sm:gap-14">
+                <div className="flex flex-col items-center gap-1">
+                  <PedalArt variant="brake" idPrefix="intro" className="h-14 w-auto sm:h-20" />
+                  <span className="text-xs font-extrabold tracking-widest text-[#e61f15]">REM!</span>
+                  <span aria-hidden="true" className="hidden gap-1 sm:flex">
                     <Key>R</Key>
                     <Key>&larr;</Key>
-                  </dd>
+                  </span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <dt className="flex items-center gap-2">
-                    <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                    Gas geven
-                  </dt>
-                  <dd className="flex gap-1">
+                <div className="flex flex-col items-center gap-1">
+                  <PedalArt variant="gas" idPrefix="intro" className="h-14 w-auto sm:h-20" />
+                  <span className="text-xs font-extrabold tracking-widest text-emerald-600">GAS!</span>
+                  <span aria-hidden="true" className="hidden gap-1 sm:flex">
                     <Key>G</Key>
                     <Key>&rarr;</Key>
-                  </dd>
+                  </span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <dt className="flex items-center gap-2">
-                    <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-badge-blue" />
-                    Verder / actie
-                  </dt>
-                  <dd>
-                    <Key>spatie</Key>
-                  </dd>
-                </div>
-              </dl>
+              </div>
+              <p className="mt-3 hidden text-center text-xs font-bold text-ink/60 sm:block">
+                <Key>spatie</Key> = verder / actie
+              </p>
             </div>
             <button
               ref={introBtnRef}
               type="button"
               onClick={startGame}
-              className={`${BTN_RED} mt-5 w-full px-6 py-4 text-lg`}
+              className={`${BTN_RED} mt-5 w-full px-6 py-4 text-lg sm:mt-6`}
             >
               Naar de Tarzanbocht
             </button>
@@ -782,14 +836,14 @@ function App() {
           inert={!(phase === 'finished' && !showShared) || undefined}
           className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-ink/60 p-4 backdrop-blur-[2px] transition-all duration-700 ${phase === 'finished' && !showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
-          <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl">
+          <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:max-w-md sm:p-10">
             <h2 id="final-title" className="text-sm font-extrabold uppercase tracking-wide text-[#e61f15]">
               Jouw eindscore
             </h2>
             <p className="text-6xl font-extrabold tabular-nums">{total}</p>
             <p className="mb-3 text-sm font-bold text-ink/60">van de 100 punten</p>
-            <p className="mb-4 text-sm font-bold">{scoreSentence(total)}</p>
-            <ul className="mb-5 space-y-1 text-left text-sm font-bold">
+            <p className="mb-4 text-sm font-bold sm:mb-5">{scoreSentence(total)}</p>
+            <ul className="mb-5 space-y-1 text-left text-sm font-bold sm:mb-6 sm:space-y-1.5">
               {results.map((r) => (
                 <li key={r.round.id} className="flex justify-between gap-3">
                   <span className={r.round.practice ? 'text-ink/50' : ''}>
@@ -800,7 +854,7 @@ function App() {
               ))}
             </ul>
             {runContext && savedScores.best && (
-              <div className="mb-3 grid grid-cols-2 gap-2 text-left">
+              <div className="mb-3 grid grid-cols-2 gap-2 text-left sm:mb-4">
                 <div className="rounded-2xl bg-[#f3f3f0] px-3 py-2">
                   <p className="text-[10px] font-extrabold uppercase tracking-wide text-[#1e1e1e]/50">Beste score</p>
                   <p className="text-xl font-extrabold tabular-nums text-[#1e1e1e]">
@@ -821,8 +875,9 @@ function App() {
               </div>
             )}
             {improvementTip && (
-              <p className="mb-4 text-xs font-bold text-[#1e1e1e]/70">
-                Tip: in de <span className="font-extrabold">{improvementTip.round.label}</span>
+              <p className="mb-4 text-xs font-bold text-[#1e1e1e]/70 sm:mb-5">
+                <TipBadge />
+                In de <span className="font-extrabold">{improvementTip.round.label}</span>
                 {adviceForRound(improvementTip)
                   ? `: ${adviceForRound(improvementTip)} (${improvementTip.score}/100).`
                   : ` valt de meeste winst te halen (${improvementTip.score}/100).`}
@@ -847,13 +902,13 @@ function App() {
           inert={!showShared || undefined}
           className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-ink/60 p-4 backdrop-blur-[2px] transition-all duration-500 ${showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
-          <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl">
+          <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:max-w-md sm:p-10">
             <h2 id="shared-title" className="text-sm font-extrabold uppercase tracking-wide text-[#e61f15]">
               Gedeelde score
             </h2>
             <p className="text-6xl font-extrabold tabular-nums">{shared?.total}</p>
             <p className="mb-3 text-sm font-bold text-ink/60">van de 100 punten</p>
-            <p className="mb-5 text-sm font-bold">
+            <p className="mb-5 text-sm font-bold sm:mb-6">
               Iemand daagt je uit: rem jij net zo laat als Max Verstappen op Zandvoort?
             </p>
             <button ref={sharedBtnRef} type="button" onClick={restart} className={`${BTN_RED} w-full px-6 py-3`}>
