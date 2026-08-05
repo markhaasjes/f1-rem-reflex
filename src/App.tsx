@@ -52,7 +52,7 @@ const RADIO_POSITIVE_THRESHOLD = 60;
 // and a 2px offset focus outline (`.focus-ring` in index.css).
 const BTN_BASE =
   'select-none touch-manipulation rounded-full font-extrabold shadow-lg transition-all duration-150 active:scale-95 focus-ring';
-const BTN_LIGHT = `${BTN_BASE} bg-white text-ink hover:bg-[#f3f3f0] hover:scale-[1.02]`;
+const BTN_LIGHT = `${BTN_BASE} focus-ring-dark bg-white text-ink hover:bg-[#f3f3f0] hover:scale-[1.02]`;
 const BTN_RED = `${BTN_BASE} focus-ring-ink bg-[#e61f15] text-white hover:bg-[#ca1a11] hover:scale-[1.02]`;
 const BTN_DARK = `${BTN_BASE} bg-ink text-white hover:bg-track-blue hover:scale-[1.02]`;
 
@@ -601,7 +601,7 @@ function App() {
 
           {/* info row */}
           {/* control panel: below the stage in portrait, right column on wide */}
-          <div className="scrollbar-hidden contents wide:flex wide:min-h-0 wide:flex-col wide:gap-[clamp(0.75rem,3vh,1.75rem)] wide:overflow-y-auto">
+          <div className="scrollbar-hidden contents wide:flex wide:min-h-0 wide:flex-col wide:gap-[clamp(0.75rem,3vh,1.75rem)] wide:overflow-y-auto wide:px-1.5">
             <EventCard roundLabel={roundLabel} />
             <div
               aria-live="polite"
@@ -610,7 +610,7 @@ function App() {
               <p {...layer(phase === 'flying', 'text-sm font-extrabold text-white/85 sm:text-lg')}>
                 Onderweg naar de {round.label}...
               </p>
-              <div {...layer(phase === 'ready', 'flex flex-col items-center gap-1.5')}>
+              <div {...layer(phase === 'ready', 'flex flex-col items-center gap-3')}>
                 <div className="flex items-center gap-2 rounded-full bg-white px-4 py-1.5 shadow-lg">
                   <span className="rounded-full bg-[#e61f15] px-3 py-0.5 text-sm font-extrabold text-white sm:text-base">
                     {round.events.length / 2}&times; REM
@@ -622,7 +622,7 @@ function App() {
                 </div>
                 {lastRoundAdvice ? (
                   <p className="text-xs font-bold text-white sm:text-base">
-                    <span className="mr-1.5 rounded-full bg-[#ffc828] px-2 py-0.5 text-[10px] font-extrabold text-[#1e1e1e]">
+                    <span className="mr-1.5 rounded-full bg-[#ffc828] px-2 py-0.5 align-middle text-[10px] font-extrabold text-[#1e1e1e]">
                       TIP
                     </span>
                     Vorige keer: {lastRoundAdvice}
