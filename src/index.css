@@ -86,3 +86,6 @@ button:disabled {
 .focus-ring-ink {
   --ring: #0b1440;
 }
+.focus-ring-dark {
+  --ring: #1e1e1e;
+}
