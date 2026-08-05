@@ -14,7 +14,7 @@ import {
   type EventResult,
   type RoundResult,
 } from './lib/scoring';
-import { signRoundScores } from './lib/shareSignature';
+import { decodeShareToken, encodeShareToken } from './lib/shareToken';
 import { loadScores, saveRun, type SavedRun, type SavedScores } from './lib/storage';
 import { adviceForRound, adviceForRun } from './lib/tips';
 import type { GamePhase, ZandvoortFixture } from './types';
@@ -63,24 +63,23 @@ const BTN_LIGHT = `${BTN_BASE} focus-ring-dark bg-white text-ink hover:bg-[#f3f3
 const BTN_RED = `${BTN_BASE} focus-ring-ink bg-[#e61f15] text-white hover:bg-[#ca1a11] hover:scale-[1.02]`;
 const BTN_DARK = `${BTN_BASE} bg-ink text-white hover:bg-track-blue hover:scale-[1.02]`;
 
-// The total isn't carried in the URL: it's always derived from the per-round
-// scores below, so there's nothing to gain by editing it directly.
+// The total isn't carried in the URL at all, and the per-round scores are
+// packed into one opaque token rather than sitting in the URL as plain,
+// readable numbers - see lib/shareToken.ts.
 function buildShareUrl(results: RoundResult[]): string {
-  const rounds = results.map((r) => r.score);
-  const sig = signRoundScores(rounds);
-  return `${location.origin}${location.pathname}?r=${rounds.join('.')}&sig=${sig}`;
+  const token = encodeShareToken(results.map((r) => r.score));
+  return `${location.origin}${location.pathname}?d=${token}`;
 }
 
-// A score arriving via a shared link: ?r=<r0.r1.r2.r3>&sig=<signRoundScores>.
-// The signature must match the round scores exactly, so hand-editing any of
-// them (or the total, which isn't in the URL at all) invalidates the link -
-// it's then treated the same as no shared score.
+// A score arriving via a shared link: ?d=<encodeShareToken output>. The
+// token's tamper check must match, so hand-editing it (or forging one
+// without reading lib/shareToken.ts) invalidates the link - it's then
+// treated the same as no shared score.
 function parseSharedScore(): { total: number; rounds: number[] } | null {
-  const params = new URLSearchParams(location.search);
-  const rounds = (params.get('r') ?? '').split('.').map(Number);
-  if (rounds.length !== fixture.rounds.length || rounds.some((n) => !Number.isFinite(n))) return null;
-  const roundScores = rounds.map(Math.round);
-  if (params.get('sig') !== signRoundScores(roundScores)) return null;
+  const token = new URLSearchParams(location.search).get('d');
+  if (!token) return null;
+  const roundScores = decodeShareToken(token);
+  if (!roundScores || roundScores.length !== fixture.rounds.length) return null;
   return { total: totalScoreFromRoundScores(fixture.rounds, roundScores), rounds: roundScores };
 }
 
