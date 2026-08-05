@@ -146,13 +146,30 @@ export function scoreRound(round: GameRound, marks: PlayerMark[]): RoundResult {
   return { round, eventResults, score };
 }
 
+/** Overall 0-100: the average of the scoring rounds' (rounded) scores,
+ * paired up by index with the round metadata that says which ones count.
+ * Split out from `totalScore` so a shared-score link can recompute the same
+ * total from the per-round scores it carries instead of trusting a total the
+ * URL claims. */
+export function totalScoreFromRoundScores(rounds: GameRound[], roundScores: number[]): number {
+  let sum = 0;
+  let count = 0;
+  rounds.forEach((round, i) => {
+    if (round.practice) return;
+    sum += roundScores[i];
+    count += 1;
+  });
+  return count === 0 ? 0 : Math.round(sum / count);
+}
+
 /** Overall 0-100: the average of the scoring rounds' (rounded) scores;
  * practice rounds are shown on the card but do not count. Averaging at the
  * round level keeps the total verifiable from the score card - the earlier
  * event-weighted average (double corners counting twice as heavy) produced
  * totals that looked like calculation mistakes next to the listed rounds. */
 export function totalScore(results: RoundResult[]): number {
-  const scoring = results.filter((r) => !r.round.practice);
-  if (scoring.length === 0) return 0;
-  return Math.round(scoring.reduce((sum, r) => sum + r.score, 0) / scoring.length);
+  return totalScoreFromRoundScores(
+    results.map((r) => r.round),
+    results.map((r) => r.score),
+  );
 }
