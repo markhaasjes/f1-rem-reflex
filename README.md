@@ -28,8 +28,7 @@ production code.
 5. **Hans Ernstbocht** — the chicane, one deep braking zone.
 6. **Eindscore** — 0–100 across the three scoring corners, plus a share link
    that carries your whole run (~80 characters): whoever opens it sees your
-   racelines drawn beside Max's on a mini circuit and your overall
-   REM/LOS/GAS accuracy bars.
+   overall REM/LOS/GAS accuracy bars rebuilt from your actual pedal work.
 
 Each corner starts the moment you first hold the gas pedal on the ready
 screen; while driving, the trail behind the car is colored by your own
@@ -93,8 +92,7 @@ src/lib/tips.ts                  turns a round's worst zone into a Dutch coachin
 src/hooks/useCircuitGame.ts      game state machine (intro/flying/ready/running/result/finished)
 src/hooks/useCameraFlight.ts     animated camera box (log-space zoom, step queues)
 src/hooks/useElementSize.ts      ResizeObserver hook
-src/components/CircuitScene.tsx  the one canvas scene, own rAF loop, every zoom level
-src/components/MiniComparisonMap.tsx  static SVG circuit on the shared-score landing (Max vs sharer)
+src/components/CircuitScene.tsx  the one canvas scene, own rAF loop (lazy repaint), every zoom level
 src/components/HeroCar.tsx       side-view car for the intro (public/images/auto-zij.svg)
 src/components/NOSLogo.tsx       NOS wordmark used in the app chrome
 src/components/Brand.tsx         shared pill/badge chrome

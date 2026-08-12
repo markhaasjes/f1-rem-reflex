@@ -156,6 +156,23 @@ export function CircuitScene(props: CircuitSceneProps) {
     segments: PhaseSegment[];
   } | null>(null);
 
+  // Redraws happen lazily: the rAF loop keeps running (cheap), but the scene
+  // - sand field, corridor, track, curbs, everything - is only rasterized
+  // when something visible changed. Painting unconditionally at 60fps kept
+  // the main thread >50% busy on completely idle screens (intro, ready,
+  // result), which users noticed as a hot browser. The snapshot covers every
+  // input the drawing reads; 'running' and 'flying' are time-animated (the
+  // clock / the badge pulse) and always paint. Fonts load async, so the
+  // loaded-flag is part of the snapshot - otherwise an early static frame
+  // would keep fallback-font labels until the next change.
+  const fontsLoadedRef = useRef(false);
+  useEffect(() => {
+    document.fonts?.ready.then(() => {
+      fontsLoadedRef.current = true;
+    });
+  }, []);
+  const lastSnapshotRef = useRef('');
+
   useEffect(() => {
     let raf = 0;
 
@@ -164,10 +181,30 @@ export function CircuitScene(props: CircuitSceneProps) {
       const { width: w, height: h } = sizeRef.current;
       const canvas = canvasRef.current;
       if (!canvas || w === 0 || h === 0) return;
-      const ctx = prepareCanvas(canvas, w, h);
-      if (!ctx) return;
 
       const { camBox, phase, round, roundIndex, elapsedT, transitions, heldInput, showReference } = propsRef.current;
+      const timeAnimated = phase === 'running' || phase === 'flying';
+      const snapshot = [
+        camBox.cx,
+        camBox.cy,
+        camBox.w,
+        camBox.h,
+        w,
+        h,
+        devicePixelRatio,
+        phase,
+        roundIndex,
+        elapsedT,
+        transitions.length,
+        heldInput,
+        showReference,
+        fontsLoadedRef.current,
+      ].join('|');
+      if (!timeAnimated && snapshot === lastSnapshotRef.current) return;
+      lastSnapshotRef.current = snapshot;
+
+      const ctx = prepareCanvas(canvas, w, h);
+      if (!ctx) return;
       const projection = fitProjection(viewBoxFromCam(camBox), w, h);
       const samples = fixture.lap.samples;
 
@@ -268,10 +305,13 @@ export function CircuitScene(props: CircuitSceneProps) {
       // big screens. Fully visible at the ~1200m overview, gone below ~700m.
       const badgeAlpha = Math.max(0, Math.min(1, (camBox.w - 700) / 300));
       if (badgeAlpha > 0) {
-        // Every corner of the upcoming round pulses, so a double (Gerlach &
-        // Hugenholtz, Bocht 9 & 10) announces both its corners at once.
+        // Every corner of the upcoming round pulses during the flight toward
+        // it, so a double (Gerlach & Hugenholtz, Bocht 9 & 10) announces both
+        // its corners at once. Only while flying: a pulse on the (modal-
+        // covered) intro map would force the idle screen to repaint at 60fps,
+        // defeating the lazy-redraw snapshot above.
         const nextRound = fixture.rounds[roundIndex];
-        const pulseCornerNumbers = new Set(phase === 'intro' || phase === 'flying' ? nextRound.cornerNumbers : []);
+        const pulseCornerNumbers = new Set(phase === 'flying' ? nextRound.cornerNumbers : []);
         fixture.corners.forEach((corner) => {
           const [x, y] = projection.toScreen(corner.x, corner.y);
           const isPulse = pulseCornerNumbers.has(corner.number);

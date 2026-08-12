@@ -6,9 +6,9 @@ import { NOSLogo } from './components/NOSLogo';
 import fixtureJson from './data/zandvoort2025.json';
 import { boxFromBounds, useCameraFlight, type CamBox } from './hooks/useCameraFlight';
 import { useCircuitGame } from './hooks/useCircuitGame';
-import { MiniComparisonMap, type SharedRoundRun } from './components/MiniComparisonMap';
 import { positionAt, sampleAt } from './lib/corner';
 import type { DrivingPhase } from './lib/phases';
+import { PHASE_COLOR } from './lib/scene';
 import {
   aggregatePhaseAccuracy,
   phasePercent,
@@ -21,7 +21,7 @@ import {
 import { decodeRunToken, decodeShareToken, encodeRunToken } from './lib/shareToken';
 import { loadScores, saveRun, type SavedRun, type SavedScores } from './lib/storage';
 import { adviceForRound, adviceForRun } from './lib/tips';
-import type { GamePhase, ZandvoortFixture } from './types';
+import type { GamePhase, GameRound, InputTransition, ZandvoortFixture } from './types';
 
 const fixture = fixtureJson as unknown as ZandvoortFixture;
 
@@ -73,6 +73,12 @@ function buildShareUrl(results: RoundResult[]): string {
     })),
   );
   return `${location.origin}${location.pathname}?r=${token}`;
+}
+
+/** One shared round on the local clock: the window plus the sharer's timeline. */
+interface SharedRoundRun {
+  round: GameRound;
+  transitions: InputTransition[];
 }
 
 interface SharedScore {
@@ -434,11 +440,14 @@ const DIAGRAM_PLAYER_SEGMENTS = [
   { color: '#10b981', widthPct: 38 },
 ];
 // Where the two bars above disagree (player brakes late, releases early, ...).
+// Marked in dark ink, NOT red: red already means "braking" one row up, and
+// playtest feedback read the red marks as brake zones instead of mistakes.
 const DIAGRAM_DIFF_STRIPS = [
   { leftPct: 28, widthPct: 6 },
   { leftPct: 54, widthPct: 2 },
   { leftPct: 62, widthPct: 6 },
 ];
+const DIAGRAM_DIFF_COLOR = '#0b1440';
 
 function DiagramZoneBar({ label, segments }: { label: string; segments: { color: string; widthPct: number }[] }) {
   return (
@@ -461,12 +470,12 @@ function ScoreDiagram() {
         <DiagramZoneBar label="Jij" segments={DIAGRAM_PLAYER_SEGMENTS} />
         <div className="flex items-center gap-2">
           <span className="w-8 shrink-0" />
-          <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-emerald-500/25">
+          <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-[#0b1440]/10">
             {DIAGRAM_DIFF_STRIPS.map((strip) => (
               <span
                 key={strip.leftPct}
-                className="absolute inset-y-0 bg-[#e61f15]"
-                style={{ left: `${strip.leftPct}%`, width: `${strip.widthPct}%` }}
+                className="absolute inset-y-0"
+                style={{ left: `${strip.leftPct}%`, width: `${strip.widthPct}%`, backgroundColor: DIAGRAM_DIFF_COLOR }}
               />
             ))}
           </div>
@@ -475,8 +484,9 @@ function ScoreDiagram() {
       <p className="mt-2 text-[11px] font-bold leading-snug text-[#1e1e1e]/60">
         <span className="font-extrabold text-emerald-600">Groen</span> = vol gas,{' '}
         <span className="font-extrabold text-[#c77b0a]">oranje</span> = uitrollen,{' '}
-        <span className="font-extrabold text-[#e61f15]">rood</span> = remmen. De onderste strook markeert waar jij iets
-        anders deed dan Max, daar verlies je punten.
+        <span className="font-extrabold text-[#e61f15]">rood</span> = remmen. De{' '}
+        <span className="font-extrabold text-[#0b1440]">donkerblauwe</span> vakjes in de onderste strook markeren waar
+        jij iets anders deed dan Max, daar verlies je punten.
       </p>
     </div>
   );
@@ -740,6 +750,9 @@ function App() {
   const liveSpeed = phase === 'running' ? Math.round(sampleAt(fixture.lap.samples, elapsedT).speedKph) : null;
   const lastResult = results.at(-1) ?? null;
   const showRoundResult = phase === 'roundResult' && lastResult !== null;
+  // The color legend shows whenever phase-colored lines are on the map: the
+  // practice corridor, the live trail, and the result comparison.
+  const legendVisible = (round.practice && phase === 'ready') || phase === 'running' || showRoundResult;
   const verdict = showRoundResult ? verdictForScore(lastResult.score) : null;
 
   let roundLabel = '';
@@ -796,6 +809,21 @@ function App() {
               className={`absolute bottom-3 right-3 rounded-full bg-white/95 px-4 py-1.5 font-extrabold tabular-nums text-ink shadow transition-opacity duration-300 sm:text-lg ${liveSpeed === null ? 'opacity-0' : 'opacity-100'}`}
             >
               {liveSpeed ?? 0} km/u
+            </div>
+
+            {/* phase-color legend, shown whenever colored lines are on the
+                map (above the scale bar in the bottom-left corner) */}
+            <div
+              aria-hidden={!legendVisible}
+              className={`pointer-events-none absolute bottom-10 left-3 flex items-center gap-2.5 rounded-full bg-white/95 px-3 py-1.5 shadow transition-opacity duration-300 ${legendVisible ? 'opacity-100' : 'opacity-0'}`}
+            >
+              {PHASE_ROWS.map((row) => (
+                <span key={row.phase} className="flex items-center gap-1">
+                  {/* dots use the exact line colors from the map, not the UI accents */}
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: PHASE_COLOR[row.phase] }} />
+                  <span className="text-[10px] font-extrabold text-ink sm:text-xs">{row.sublabel}</span>
+                </span>
+              ))}
             </div>
 
             {/* verdict banner (round result) */}
@@ -1129,26 +1157,15 @@ function App() {
             </h2>
             <p className="text-6xl font-extrabold tabular-nums">{shared?.total}</p>
             <p className="mb-3 text-sm font-bold text-ink/60">van de 100 punten</p>
-            {/* run links redraw the sharer's actual race: their line beside
-                Max's on the circuit, and their overall accuracy bars */}
-            {shared?.runs && sharedAccuracy && (
-              <>
-                <div className="mb-3 rounded-2xl bg-[#f3f3f0] p-3">
-                  <MiniComparisonMap fixture={fixture} runs={shared.runs} />
-                  <p className="mt-1.5 text-left text-[10px] font-bold leading-snug text-[#1e1e1e]/55">
-                    De lijn op de baan is Max, de lijn ernaast is de gedeelde ronde: groen = vol gas, oranje =
-                    uitrollen, rood = remmen.
-                  </p>
+            {/* run links carry the sharer's pedal timelines: their overall
+                accuracy bars are recomputed from them right here */}
+            {sharedAccuracy && (
+              <div className="mb-4 rounded-2xl bg-[#f3f3f0] px-4 py-3 text-left">
+                <p className="text-[10px] font-extrabold uppercase tracking-wide text-[#1e1e1e]/50">Gelijk met Max</p>
+                <div className="mt-1.5">
+                  <AccuracyBarsStack accuracy={sharedAccuracy} />
                 </div>
-                <div className="mb-4 rounded-2xl bg-[#f3f3f0] px-4 py-3 text-left">
-                  <p className="text-[10px] font-extrabold uppercase tracking-wide text-[#1e1e1e]/50">
-                    Gelijk met Max
-                  </p>
-                  <div className="mt-1.5">
-                    <AccuracyBarsStack accuracy={sharedAccuracy} />
-                  </div>
-                </div>
-              </>
+              </div>
             )}
             <p className="mb-5 text-sm font-bold sm:mb-6">
               Iemand daagt je uit: rem jij net zo laat als Max Verstappen op Zandvoort?

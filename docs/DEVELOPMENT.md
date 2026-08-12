@@ -173,10 +173,17 @@ off again, redo the F1 TV projection — never nudge numbers by eye.
 ## Rendering (CircuitScene)
 
 [CircuitScene.tsx](../src/components/CircuitScene.tsx) is one `<canvas>`
-running its **own rAF loop** (unlike the old per-state-change redraw): the
-camera, the run clock, and the badge pulse animate every frame anyway, so
-the loop reads the latest props from a ref and React stays out of the hot
-path. Draw order, back to front:
+running its **own rAF loop**: it reads the latest props from a ref so React
+stays out of the hot path. The loop itself is cheap and always on, but the
+scene **paints lazily**: every frame builds a snapshot string of everything
+the drawing reads (camera box, size, dpr, phase, clock, timeline length,
+fonts-loaded) and skips rasterizing when it matches the previous frame,
+unless the phase is time-animated (`running` = the clock, `flying` = the
+badge pulse). Painting unconditionally kept the main thread >50% busy on
+completely idle screens. If you add any new time-based animation to the
+canvas, either tie it to a phase in the `timeAnimated` check or put its
+driver in the snapshot — otherwise it will freeze mid-cycle. Draw order,
+back to front:
 
 ```
 sand + dunes (world space) -> green corridor + striped infield -> paddock
@@ -439,11 +446,9 @@ timeline quantized to 0.1s — one byte per pedal change (2 bits state, 6
 bits time delta), see the byte layout in
 [shareToken.ts](../src/lib/shareToken.ts). The receiving browser has the
 full fixture baked in, so the landing card recomputes the sharer's overall
-REM/LOS/GAS bars from the timeline and redraws their racelines beside Max's
-on a static SVG circuit
-([MiniComparisonMap.tsx](../src/components/MiniComparisonMap.tsx), which
-exaggerates the line offset — a realistic 4.5m collapses at full-circuit
-zoom). The displayed scores come from the token itself, not from the
+REM/LOS/GAS accuracy bars from the timeline (an earlier iteration also drew
+their racelines on a mini SVG circuit; playtesting cut it — the bars carry
+the message). The displayed scores come from the token itself, not from the
 recompute, so the number on the card always matches what the sharer saw
 (quantizing the timeline can shift a recomputed score by a point). Legacy
 scores-only links (`?d=`) still decode into a plain card without visuals.
