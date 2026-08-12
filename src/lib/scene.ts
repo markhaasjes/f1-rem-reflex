@@ -776,35 +776,6 @@ export function drawMapLabel(
   ctx.restore();
 }
 
-export function drawPin(
-  ctx: CanvasRenderingContext2D,
-  screenX: number,
-  screenY: number,
-  color: string,
-  label: string,
-  labelBelow = false,
-) {
-  ctx.beginPath();
-  ctx.arc(screenX, screenY, 6, 0, Math.PI * 2);
-  ctx.fillStyle = color;
-  ctx.strokeStyle = PALETTE.white;
-  ctx.lineWidth = 2.5;
-  ctx.fill();
-  ctx.stroke();
-
-  // Max's pins label above the dot, the player's below, so a well-timed mark
-  // (player pin landing on Max's) doesn't stack the two labels illegibly.
-  const labelY = labelBelow ? screenY + 20 : screenY - 12;
-  ctx.font = "800 13px Effra, 'Helvetica Neue', Helvetica, Arial, sans-serif";
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'alphabetic';
-  ctx.lineWidth = 4;
-  ctx.strokeStyle = PALETTE.white;
-  ctx.strokeText(label, screenX, labelY);
-  ctx.fillStyle = color;
-  ctx.fillText(label, screenX, labelY);
-}
-
 export function drawScaleBar(ctx: CanvasRenderingContext2D, projection: ScreenProjection, canvasHeight: number) {
   // pick a round meter length that lands between 40 and 110 px on screen
   const candidates = [25, 50, 100, 200, 500, 1000];

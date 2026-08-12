@@ -13,7 +13,6 @@ import {
   drawGreenSurroundings,
   drawMapLabel,
   drawPaddock,
-  drawPin,
   drawRibbon,
   drawDirectionArrow,
   drawSandBackground,
@@ -194,9 +193,9 @@ export function CircuitScene(props: CircuitSceneProps) {
       drawStartFinish(ctx, fixture.startFinish.x, fixture.startFinish.y, fixture.startFinish.headingDeg, projection);
 
       // --- practice coaching: Max's phase-colored zones drawn as a wide
-      // corridor on the road, plus pulsing markers where his braking starts
-      // and where he commits back to full throttle, so first-time players
-      // see what to match without reading anything ---
+      // corridor on the road, so first-time players see what to match
+      // without reading anything (the zones themselves say where to brake
+      // and where to get back on the gas - no point markers needed) ---
       if (round.practice && (phase === 'ready' || phase === 'running')) {
         ctx.save();
         ctx.globalAlpha = 0.55;
@@ -204,22 +203,6 @@ export function CircuitScene(props: CircuitSceneProps) {
           drawRibbon(ctx, segment.points, PHASE_COLOR[segment.phase], projection, GUIDE_WIDTH_M);
         }
         ctx.restore();
-        for (const event of round.events) {
-          const s = sampleAt(samples, event.t);
-          const [x, y] = projection.toScreen(s.x, s.y);
-          const isBrake = event.type === 'brake';
-          const color = isBrake ? '#e61f15' : '#0b7a43';
-          const pulse = (now % 1400) / 1400;
-          ctx.save();
-          ctx.globalAlpha = 1 - pulse;
-          ctx.beginPath();
-          ctx.arc(x, y, 8 + pulse * 16, 0, Math.PI * 2);
-          ctx.strokeStyle = color;
-          ctx.lineWidth = 3;
-          ctx.stroke();
-          ctx.restore();
-          drawPin(ctx, x, y, color, isBrake ? 'Rem hier!' : 'Vol gas hier!', !isBrake);
-        }
       }
 
       // --- live trail: the driven line so far, colored by what the player's
@@ -250,19 +233,6 @@ export function CircuitScene(props: CircuitSceneProps) {
         }
         for (const segment of cache.segments) {
           drawRibbon(ctx, segment.points, PHASE_COLOR[segment.phase], projection, PLAYER_LINE_WIDTH_M);
-        }
-        // Legend pins near the start of the window (nudged 1s in so the labels
-        // don't clip on the camera box edge): whose line is whose. Max's label
-        // sits above his dot, the player's below, so they stay legible even
-        // when the two lines nearly touch.
-        const legendT = round.tStart + 1;
-        const startPoint = positionAt(samples, legendT);
-        const playerStart = offsetPathPoints([startPoint, positionAt(samples, legendT + 0.5)], PLAYER_LINE_OFFSET_M)[0];
-        const [maxX, maxY] = projection.toScreen(startPoint.x, startPoint.y);
-        drawPin(ctx, maxX, maxY, '#1e1e1e', 'Max');
-        if (playerStart) {
-          const [youX, youY] = projection.toScreen(playerStart.x, playerStart.y);
-          drawPin(ctx, youX, youY, '#1a2c8f', 'Jij', true);
         }
       }
 

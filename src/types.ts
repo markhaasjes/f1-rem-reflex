@@ -24,8 +24,8 @@ interface CornerMarker extends Point {
 
 /** One of Max's reference moments: where a braking zone opens ('brake') and
  * where he commits back to sustained full throttle ('gas'). The hold-to-drive
- * gameplay scores against the full telemetry, but these anchor the practice
- * round's coaching pins and the per-round zone-count copy. */
+ * gameplay scores against the full telemetry; these only feed the per-round
+ * zone-count copy (event count / 2 = braking zones). */
 interface TargetEvent {
   type: 'brake' | 'gas';
   t: number;
