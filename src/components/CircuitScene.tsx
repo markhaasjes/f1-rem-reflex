@@ -4,9 +4,10 @@ import { viewBoxFromCam, type CamBox } from '../hooks/useCameraFlight';
 import { fitProjection, prepareCanvas } from '../lib/canvas';
 import { CAR_ART_LENGTH_UNITS, drawF1Car } from '../lib/canvasCar';
 import { headingAt, positionAt, primePathModel, sampleAt } from '../lib/corner';
-import { buildPhaseSegments, type DrivingPhase, type PhaseSegment } from '../lib/phases';
+import { buildPhaseSegments, type PhaseSegment } from '../lib/phases';
 import { buildInputSegments } from '../lib/playerInput';
 import {
+  PHASE_COLOR,
   drawCornerBadge,
   drawCornerCurbs,
   drawGravelTrap,
@@ -91,12 +92,6 @@ const LABEL_OFFSETS: Record<string, { dx: number; dy: number }> = {
   hugenholtz: { dx: -6, dy: -20 },
   'bocht9-10': { dx: 10, dy: 28 },
   hansernst: { dx: 4, dy: 30 },
-};
-
-const PHASE_COLOR: Record<DrivingPhase, string> = {
-  flat: '#12a37f',
-  coast: '#f2a11c',
-  brake: '#e61f15',
 };
 
 // The practice guide renders Max's zones wider than the trail the player

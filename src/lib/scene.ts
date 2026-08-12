@@ -14,6 +14,14 @@ const GREEN_BAND_M = 110; // grass corridor around the track, F1 TV map style
 // asphalt with a lighter worn line, paved beige-gray run-offs, khaki dune
 // sand with olive scrub, muted grass banks. Curbs are white + NOS red
 // (docs/colors.ts redNosRood) per design.
+// The flat/coast/brake colors shared by every phase-colored line: the canvas
+// ribbons (CircuitScene), the practice corridor and the shared-score mini map.
+export const PHASE_COLOR: Record<'flat' | 'coast' | 'brake', string> = {
+  flat: '#12a37f',
+  coast: '#f2a11c',
+  brake: '#e61f15',
+};
+
 const PALETTE = {
   sand: '#d8cdb2',
   sandLight: '#e4dbc6',

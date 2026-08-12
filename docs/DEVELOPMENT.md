@@ -433,13 +433,25 @@ plus `onLostPointerCapture` guarantees a press can never stick.
 
 ## Share flow
 
-No backend: the score is encoded in the URL
-(`?s=<total>&r=<r0.r1.r2.r3>`). `share()` tries `navigator.share`, falls
-back to clipboard + a "Link gekopieerd!" flash. `parseSharedScore()` renders
-the landing card for incoming links; it validates against
-`fixture.rounds.length` so malformed links fall through to the normal game.
-Anyone can forge a score URL — it's a social share, not a leaderboard; don't
-build trust on it.
+No backend: the whole run travels in the URL (`?r=<run token>`, typically
+50-80 characters). The token packs, per round, the score plus the pedal
+timeline quantized to 0.1s — one byte per pedal change (2 bits state, 6
+bits time delta), see the byte layout in
+[shareToken.ts](../src/lib/shareToken.ts). The receiving browser has the
+full fixture baked in, so the landing card recomputes the sharer's overall
+REM/LOS/GAS bars from the timeline and redraws their racelines beside Max's
+on a static SVG circuit
+([MiniComparisonMap.tsx](../src/components/MiniComparisonMap.tsx), which
+exaggerates the line offset — a realistic 4.5m collapses at full-circuit
+zoom). The displayed scores come from the token itself, not from the
+recompute, so the number on the card always matches what the sharer saw
+(quantizing the timeline can shift a recomputed score by a point). Legacy
+scores-only links (`?d=`) still decode into a plain card without visuals.
+`share()` tries `navigator.share`, falls back to clipboard + a "Link
+gekopieerd!" flash. Both token forms carry a tamper check and validate
+against `fixture.rounds.length`, so malformed links fall through to the
+normal game. Anyone who reads shareToken.ts can still forge a run — it's a
+social share, not a leaderboard; don't build trust on it.
 
 ## Extension points, roughly in order of effort
 

@@ -27,7 +27,9 @@ production code.
 4. **Bocht 9 & 10** — the slow double after Mastersbocht.
 5. **Hans Ernstbocht** — the chicane, one deep braking zone.
 6. **Eindscore** — 0–100 across the three scoring corners, plus a share link
-   that renders the same score card for whoever opens it.
+   that carries your whole run (~80 characters): whoever opens it sees your
+   racelines drawn beside Max's on a mini circuit and your overall
+   REM/LOS/GAS accuracy bars.
 
 Each corner starts the moment you first hold the gas pedal on the ready
 screen; while driving, the trail behind the car is colored by your own
@@ -92,6 +94,7 @@ src/hooks/useCircuitGame.ts      game state machine (intro/flying/ready/running/
 src/hooks/useCameraFlight.ts     animated camera box (log-space zoom, step queues)
 src/hooks/useElementSize.ts      ResizeObserver hook
 src/components/CircuitScene.tsx  the one canvas scene, own rAF loop, every zoom level
+src/components/MiniComparisonMap.tsx  static SVG circuit on the shared-score landing (Max vs sharer)
 src/components/HeroCar.tsx       side-view car for the intro (public/images/auto-zij.svg)
 src/components/NOSLogo.tsx       NOS wordmark used in the app chrome
 src/components/Brand.tsx         shared pill/badge chrome
@@ -174,8 +177,9 @@ for how the pieces fit together; the rules below are about how to change them.
 ## Known limitations (POC scope)
 
 - One driver, four fixed corner windows, by design.
-- No leaderboard/persistence; the share link encodes the score in the URL
-  and is trivially forgeable (social share, not a competition).
+- No leaderboard/persistence; the share link encodes the whole run in the
+  URL and is forgeable by anyone who reads the token code (social share,
+  not a competition).
 - Scenery (dunes, green corridor, paddock block, gravel shapes) is
   illustrative, not surveyed; the track line itself is official geometry and
   the driven line is real telemetry.

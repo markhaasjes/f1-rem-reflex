@@ -6,10 +6,19 @@ import { NOSLogo } from './components/NOSLogo';
 import fixtureJson from './data/zandvoort2025.json';
 import { boxFromBounds, useCameraFlight, type CamBox } from './hooks/useCameraFlight';
 import { useCircuitGame } from './hooks/useCircuitGame';
+import { MiniComparisonMap, type SharedRoundRun } from './components/MiniComparisonMap';
 import { positionAt, sampleAt } from './lib/corner';
 import type { DrivingPhase } from './lib/phases';
-import { phasePercent, totalScore, totalScoreFromRoundScores, verdictForScore, type RoundResult } from './lib/scoring';
-import { decodeShareToken, encodeShareToken } from './lib/shareToken';
+import {
+  aggregatePhaseAccuracy,
+  phasePercent,
+  scoreRound,
+  totalScore,
+  totalScoreFromRoundScores,
+  verdictForScore,
+  type RoundResult,
+} from './lib/scoring';
+import { decodeRunToken, decodeShareToken, encodeRunToken } from './lib/shareToken';
 import { loadScores, saveRun, type SavedRun, type SavedScores } from './lib/storage';
 import { adviceForRound, adviceForRun } from './lib/tips';
 import type { GamePhase, ZandvoortFixture } from './types';
@@ -51,24 +60,57 @@ const BTN_LIGHT = `${BTN_BASE} focus-ring-dark bg-white text-ink hover:bg-[#f3f3
 const BTN_RED = `${BTN_BASE} focus-ring-ink bg-[#e61f15] text-white hover:bg-[#ca1a11] hover:scale-[1.02]`;
 const BTN_DARK = `${BTN_BASE} bg-ink text-white hover:bg-track-blue hover:scale-[1.02]`;
 
-// The total isn't carried in the URL at all, and the per-round scores are
-// packed into one opaque token rather than sitting in the URL as plain,
-// readable numbers - see lib/shareToken.ts.
+// The share link carries the sharer's whole run - per-round scores plus the
+// pedal timelines, packed into one short opaque token (~80 characters, see
+// lib/shareToken.ts) - so the landing card can redraw their racelines and
+// accuracy bars without a backend. The total isn't carried at all; it is
+// recomputed from the round scores like everywhere else.
 function buildShareUrl(results: RoundResult[]): string {
-  const token = encodeShareToken(results.map((r) => r.score));
-  return `${location.origin}${location.pathname}?d=${token}`;
+  const token = encodeRunToken(
+    results.map((result) => ({
+      score: result.score,
+      transitions: result.transitions.map((t) => ({ offsetS: t.t - result.round.tStart, input: t.input })),
+    })),
+  );
+  return `${location.origin}${location.pathname}?r=${token}`;
 }
 
-// A score arriving via a shared link: ?d=<encodeShareToken output>. The
-// token's tamper check must match, so hand-editing it (or forging one
-// without reading lib/shareToken.ts) invalidates the link - it's then
-// treated the same as no shared score.
-function parseSharedScore(): { total: number; rounds: number[] } | null {
-  const token = new URLSearchParams(location.search).get('d');
-  if (!token) return null;
-  const roundScores = decodeShareToken(token);
+interface SharedScore {
+  total: number;
+  rounds: number[];
+  /** The sharer's pedal timelines (run links only; legacy links carry none). */
+  runs: SharedRoundRun[] | null;
+}
+
+// A score arriving via a shared link: ?r=<run token> (current) or
+// ?d=<scores-only token> (legacy links from before the run token existed).
+// Both carry a tamper check, so hand-editing the URL invalidates the link -
+// it's then treated the same as no shared score.
+function parseSharedScore(): SharedScore | null {
+  const params = new URLSearchParams(location.search);
+
+  const runToken = params.get('r');
+  const decodedRun = runToken ? decodeRunToken(runToken) : null;
+  if (decodedRun && decodedRun.length === fixture.rounds.length) {
+    const runs = decodedRun.map((sharedRound, i) => {
+      const round = fixture.rounds[i];
+      return {
+        round,
+        transitions: sharedRound.transitions.map((t) => ({
+          t: round.tStart + Math.min(t.offsetS, round.tEnd - round.tStart),
+          input: t.input,
+        })),
+      };
+    });
+    const roundScores = decodedRun.map((sharedRound) => sharedRound.score);
+    return { total: totalScoreFromRoundScores(fixture.rounds, roundScores), rounds: roundScores, runs };
+  }
+
+  const legacyToken = params.get('d');
+  if (!legacyToken) return null;
+  const roundScores = decodeShareToken(legacyToken);
   if (!roundScores || roundScores.length !== fixture.rounds.length) return null;
-  return { total: totalScoreFromRoundScores(fixture.rounds, roundScores), rounds: roundScores };
+  return { total: totalScoreFromRoundScores(fixture.rounds, roundScores), rounds: roundScores, runs: null };
 }
 
 // Display config for the three driving phases, in pedal order: brake on the
@@ -86,41 +128,53 @@ const PHASE_ROWS: { phase: DrivingPhase; label: string; sublabel: string; color:
 // `stack` puts them under each other with bigger bars (the wide side panel -
 // which also keeps the card narrower than the panel, so it can never force
 // the panel to overflow sideways).
-function RoundAccuracyCard({ result, layout }: { result: RoundResult; layout: 'row' | 'stack' }) {
-  const rows = PHASE_ROWS.map((row) => ({
-    ...row,
-    percent: phasePercent(result.phaseAccuracy[row.phase]),
-  })).filter((row) => result.phaseAccuracy[row.phase].totalS > 0.1);
+function accuracyRows(accuracy: RoundResult['phaseAccuracy']) {
+  return PHASE_ROWS.map((row) => ({ ...row, percent: phasePercent(accuracy[row.phase]) })).filter(
+    (row) => accuracy[row.phase].totalS > 0.1,
+  );
+}
 
+// The stacked bars themselves, without card chrome: the wide round-result
+// card and the shared-score landing both render these.
+function AccuracyBarsStack({ accuracy }: { accuracy: RoundResult['phaseAccuracy'] }) {
+  return (
+    <div className="flex flex-col gap-2.5">
+      {accuracyRows(accuracy).map((row) => (
+        <div key={row.phase}>
+          <div className="flex items-baseline justify-between gap-2">
+            <span>
+              <span className="text-sm font-extrabold" style={{ color: row.color }}>
+                {row.label}
+              </span>
+              <span className="ml-1.5 text-[11px] font-bold text-[#1e1e1e]/45">{row.sublabel}</span>
+            </span>
+            <span className="text-sm font-extrabold tabular-nums text-[#1e1e1e]">{row.percent}%</span>
+          </div>
+          <div className="relative mt-1 h-2.5 overflow-hidden rounded-full bg-[#ececec]">
+            <span
+              className="absolute inset-y-0 left-0 rounded-full"
+              style={{ width: `${row.percent}%`, backgroundColor: row.color }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RoundAccuracyCard({ result, layout }: { result: RoundResult; layout: 'row' | 'stack' }) {
   if (layout === 'stack') {
     return (
       <div className="w-full max-w-xs rounded-2xl bg-white px-4 py-3 text-left shadow-lg">
         <p className="text-[10px] font-extrabold uppercase tracking-wide text-[#1e1e1e]/50">Gelijk met Max</p>
-        <div className="mt-1.5 flex flex-col gap-2.5">
-          {rows.map((row) => (
-            <div key={row.phase}>
-              <div className="flex items-baseline justify-between gap-2">
-                <span>
-                  <span className="text-sm font-extrabold" style={{ color: row.color }}>
-                    {row.label}
-                  </span>
-                  <span className="ml-1.5 text-[11px] font-bold text-[#1e1e1e]/45">{row.sublabel}</span>
-                </span>
-                <span className="text-sm font-extrabold tabular-nums text-[#1e1e1e]">{row.percent}%</span>
-              </div>
-              <div className="relative mt-1 h-2.5 overflow-hidden rounded-full bg-[#ececec]">
-                <span
-                  className="absolute inset-y-0 left-0 rounded-full"
-                  style={{ width: `${row.percent}%`, backgroundColor: row.color }}
-                />
-              </div>
-            </div>
-          ))}
+        <div className="mt-1.5">
+          <AccuracyBarsStack accuracy={result.phaseAccuracy} />
         </div>
       </div>
     );
   }
 
+  const rows = accuracyRows(result.phaseAccuracy);
   return (
     <div className="rounded-2xl bg-white px-2.5 py-1.5 shadow-lg">
       <p className="text-left text-[9px] font-extrabold uppercase tracking-wide text-[#1e1e1e]/50">Gelijk met Max</p>
@@ -467,6 +521,13 @@ function App() {
 
   const camera = useCameraFlight(debugCornerBox ?? overviewBox);
   const [shared] = useState(parseSharedScore);
+  // The sharer's overall REM/LOS/GAS bars, recomputed from the timelines in
+  // the link (the displayed scores come from the token itself, so they always
+  // match what the sharer saw).
+  const sharedAccuracy = useMemo(() => {
+    if (!shared?.runs) return null;
+    return aggregatePhaseAccuracy(shared.runs.map((run) => scoreRound(run.round, fixture.lap.samples, run.transitions)));
+  }, [shared]);
   // The player's history, persisted in localStorage (this game's "cookie"):
   // the last attempt and the best run. runContext freezes what the history
   // looked like BEFORE this run was saved, for the score-card comparison.
@@ -1062,12 +1123,33 @@ function App() {
           inert={!showShared || undefined}
           className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-ink/60 p-4 backdrop-blur-[2px] transition-all duration-500 ${showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
-          <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:max-w-md sm:p-10">
+          <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:max-w-md sm:p-8">
             <h2 id="shared-title" className="text-sm font-extrabold uppercase tracking-wide text-[#e61f15]">
               Gedeelde score
             </h2>
             <p className="text-6xl font-extrabold tabular-nums">{shared?.total}</p>
             <p className="mb-3 text-sm font-bold text-ink/60">van de 100 punten</p>
+            {/* run links redraw the sharer's actual race: their line beside
+                Max's on the circuit, and their overall accuracy bars */}
+            {shared?.runs && sharedAccuracy && (
+              <>
+                <div className="mb-3 rounded-2xl bg-[#f3f3f0] p-3">
+                  <MiniComparisonMap fixture={fixture} runs={shared.runs} />
+                  <p className="mt-1.5 text-left text-[10px] font-bold leading-snug text-[#1e1e1e]/55">
+                    De lijn op de baan is Max, de lijn ernaast is de gedeelde ronde: groen = vol gas, oranje =
+                    uitrollen, rood = remmen.
+                  </p>
+                </div>
+                <div className="mb-4 rounded-2xl bg-[#f3f3f0] px-4 py-3 text-left">
+                  <p className="text-[10px] font-extrabold uppercase tracking-wide text-[#1e1e1e]/50">
+                    Gelijk met Max
+                  </p>
+                  <div className="mt-1.5">
+                    <AccuracyBarsStack accuracy={sharedAccuracy} />
+                  </div>
+                </div>
+              </>
+            )}
             <p className="mb-5 text-sm font-bold sm:mb-6">
               Iemand daagt je uit: rem jij net zo laat als Max Verstappen op Zandvoort?
             </p>

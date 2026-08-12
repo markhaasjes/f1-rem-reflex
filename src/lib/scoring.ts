@@ -33,6 +33,8 @@ interface PhaseAccuracy {
 
 export interface RoundResult {
   round: GameRound;
+  /** The pedal timeline this result was scored from (feeds the share link). */
+  transitions: InputTransition[];
   zones: ZoneResult[];
   /** Match time per phase of Max's driving (totalS 0 = phase absent). */
   phaseAccuracy: Record<DrivingPhase, PhaseAccuracy>;
@@ -113,7 +115,26 @@ export function scoreRound(round: GameRound, samples: LapSample[], transitions: 
     countedPhases.length === 0
       ? 0
       : Math.round(countedPhases.reduce((sum, accuracy) => sum + phasePercent(accuracy), 0) / countedPhases.length);
-  return { round, zones, phaseAccuracy, score };
+  return { round, transitions, zones, phaseAccuracy, score };
+}
+
+/** The whole run's match time per phase, summed over the scoring rounds -
+ * the same rounds the total reflects (practice excluded). Feeds the overall
+ * REM/LOS/GAS bars on the shared-score landing. */
+export function aggregatePhaseAccuracy(results: RoundResult[]): Record<DrivingPhase, PhaseAccuracy> {
+  const aggregate: Record<DrivingPhase, PhaseAccuracy> = {
+    flat: { matchedS: 0, totalS: 0 },
+    coast: { matchedS: 0, totalS: 0 },
+    brake: { matchedS: 0, totalS: 0 },
+  };
+  for (const result of results) {
+    if (result.round.practice) continue;
+    for (const phase of Object.keys(aggregate) as DrivingPhase[]) {
+      aggregate[phase].matchedS += result.phaseAccuracy[phase].matchedS;
+      aggregate[phase].totalS += result.phaseAccuracy[phase].totalS;
+    }
+  }
+  return aggregate;
 }
 
 const VERDICT_FALLBACK: [number, ResultTone, string] = [0, 'bad', 'Volgende keer beter.'];
