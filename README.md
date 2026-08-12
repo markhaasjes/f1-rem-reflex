@@ -18,8 +18,7 @@ production code.
 3. **Gerlach & Hugenholtz** — a double: brake, gas, brake, gas.
 4. **Bocht 9 & 10** — the slow double after Mastersbocht.
 5. **Hans Ernstbocht** — the chicane, one deep braking zone.
-6. **Eindscore** — 0–100 across the three scoring corners, revealed with
-   Max's real team radio (positive clip for a good score), plus a share link
+6. **Eindscore** — 0–100 across the three scoring corners, plus a share link
    that renders the same score card for whoever opens it.
 
 Between rounds the camera zooms back to the overview and flies to the next
@@ -62,7 +61,6 @@ updating the `DRIVER` lap reference in the script and re-running it.
 
 ```
 scripts/build-game-fixture.mjs   data pipeline: OpenF1 + official geometry -> the fixture
-scripts/fetch-team-radio.mjs     downloads Max's team-radio mp3s for the score screen
 scripts/analyze-race-line.mjs    diagnoses straight/faceted race-line corners (GPS data gaps)
 scripts/lib/geojson.mjs          shared geometry helpers (fitting, resampling, smoothing)
 src/data/zandvoort2025.json      the one fixture: circuit, full lap, rounds + target events

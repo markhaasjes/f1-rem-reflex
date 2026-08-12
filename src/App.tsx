@@ -42,13 +42,6 @@ const OVERVIEW_PAD_M = 90;
 const OVERVIEW_SEA_PAD_M = 190;
 const ROUND_PAD_M = 55;
 
-// Max's real team radio, played once on the final score screen (fetched by
-// scripts/fetch-team-radio.mjs). The negative clip is optional: until a file
-// exists at that path the weak-score result simply stays silent.
-const RADIO_POSITIVE_SRC = '/audio/radio-positive.mp3';
-const RADIO_NEGATIVE_SRC = '/audio/radio-negative.mp3';
-const RADIO_POSITIVE_THRESHOLD = 60;
-
 // Interactive states in the nos.nl style: warm-gray hover on light buttons,
 // darker NOS red on red CTAs, 150ms ease transitions, scale press feedback,
 // and a 2px offset focus outline (`.focus-ring` in index.css).
@@ -395,22 +388,10 @@ function App() {
     camera.fly([{ box: overviewBox, ms: 1200 }, { ms: 300 }, { box: roundBoxes[next], ms: 1500 }], game.arm);
   }, [game, camera, roundIndex, overviewBox, roundBoxes]);
 
-  // Max's real radio on the score reveal. Launched from the same click that
-  // finishes the game, so autoplay policies treat it as user-initiated; a
-  // missing file (negative clip pending) or blocked playback just stays quiet.
-  const radioRef = useRef<HTMLAudioElement | null>(null);
-  const stopRadio = useCallback(() => {
-    radioRef.current?.pause();
-    radioRef.current = null;
-  }, []);
-
   const showFinal = useCallback(() => {
     game.finish();
     camera.fly([{ box: overviewBox, ms: 1400 }]);
     const score = totalScore(game.results);
-    const audio = new Audio(score >= RADIO_POSITIVE_THRESHOLD ? RADIO_POSITIVE_SRC : RADIO_NEGATIVE_SRC);
-    radioRef.current = audio;
-    audio.play().catch(() => {});
 
     const previous = loadScores();
     const run: SavedRun = {
@@ -427,13 +408,12 @@ function App() {
   }, [game, camera, overviewBox]);
 
   const restart = useCallback(() => {
-    stopRadio();
     setShowShared(false);
     setRunContext(null);
     history.replaceState(null, '', location.pathname);
     game.restart();
     camera.fly([{ box: overviewBox, ms: 900 }]);
-  }, [game, camera, overviewBox, stopRadio]);
+  }, [game, camera, overviewBox]);
 
   // On phones the corner overview leaves the circuit small, so while running
   // the camera rides with the car at a tighter zoom; once the round is scored

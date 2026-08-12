@@ -375,20 +375,6 @@ feedback. Exhausted pedals get a real `disabled`, not just dimming.
   sub-pixel text heights leave it 1px "scrollable" on desktop, which macOS
   with always-visible scrollbars renders as a full useless track.
 
-## Team radio on the score screen
-
-`scripts/fetch-team-radio.mjs` downloads Max's onboard radio clips for the
-2025 Dutch GP weekend from OpenF1's `team_radio` endpoint into
-`public/audio/team-radio/` and copies the configured positive clip (default:
-the race clip at 14:26 UTC — the post-victory radio of his home win) to
-`public/audio/radio-positive.mp3`. On the score reveal, App plays
-`radio-positive.mp3` when the total is >= `RADIO_POSITIVE_THRESHOLD` (60)
-and `radio-negative.mp3` otherwise. The negative clip is not fetched by the
-script — drop a file at `public/audio/radio-negative.mp3` when one is found;
-until then a weak score simply stays silent (playback errors are swallowed).
-The audio starts inside the click handler that finishes the game, so
-browser autoplay policies count it as user-initiated.
-
 ## Share flow
 
 No backend: the score is encoded in the URL
