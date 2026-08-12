@@ -80,46 +80,67 @@ const PHASE_ROWS: { phase: DrivingPhase; label: string; sublabel: string; color:
 ];
 
 // How well the player matched each of Max's three pedal states, as one card
-// with a mini accuracy bar per phase: "van de tijd dat Max remt, zat jij X%
-// ook op de rem". Phases Max never uses in the window are left out.
-function RoundAccuracyCard({ result, compact = false }: { result: RoundResult; compact?: boolean }) {
-  const rows = PHASE_ROWS.map((row) => ({ ...row, accuracy: result.phaseAccuracy[row.phase] })).filter(
-    (row) => row.accuracy.totalS > 0.1,
-  );
+// with an accuracy bar per phase: "van de tijd dat Max remt, zat jij X% ook
+// op de rem". Phases Max never uses in the window are left out. Two layouts:
+// `row` puts the three bars side by side (compact, for the phone deck),
+// `stack` puts them under each other with bigger bars (the wide side panel -
+// which also keeps the card narrower than the panel, so it can never force
+// the panel to overflow sideways).
+function RoundAccuracyCard({ result, layout }: { result: RoundResult; layout: 'row' | 'stack' }) {
+  const rows = PHASE_ROWS.map((row) => ({
+    ...row,
+    percent: Math.round((result.phaseAccuracy[row.phase].matchedS / result.phaseAccuracy[row.phase].totalS) * 100),
+  })).filter((row) => result.phaseAccuracy[row.phase].totalS > 0.1);
 
-  return (
-    <div className={`rounded-2xl bg-white shadow-lg ${compact ? 'px-2.5 py-1.5' : 'px-3 py-2'}`}>
-      <p
-        className={`text-left font-extrabold uppercase tracking-wide text-[#1e1e1e]/50 ${compact ? 'text-[9px]' : 'text-[10px]'}`}
-      >
-        Gelijk met Max
-      </p>
-      <div className={`flex ${compact ? 'gap-2.5' : 'gap-3'}`}>
-        {rows.map((row) => {
-          const percent = Math.round((row.accuracy.matchedS / row.accuracy.totalS) * 100);
-          return (
-            <div key={row.phase} className={compact ? 'w-20' : 'w-24 sm:w-28'}>
+  if (layout === 'stack') {
+    return (
+      <div className="w-full max-w-xs rounded-2xl bg-white px-4 py-3 text-left shadow-lg">
+        <p className="text-[10px] font-extrabold uppercase tracking-wide text-[#1e1e1e]/50">Gelijk met Max</p>
+        <div className="mt-1.5 flex flex-col gap-2.5">
+          {rows.map((row) => (
+            <div key={row.phase}>
               <div className="flex items-baseline justify-between gap-2">
-                <span
-                  className={`font-extrabold ${compact ? 'text-[10px]' : 'text-xs'}`}
-                  style={{ color: row.color }}
-                >
-                  {row.label}
+                <span>
+                  <span className="text-sm font-extrabold" style={{ color: row.color }}>
+                    {row.label}
+                  </span>
+                  <span className="ml-1.5 text-[11px] font-bold text-[#1e1e1e]/45">{row.sublabel}</span>
                 </span>
-                <span className={`font-extrabold tabular-nums text-[#1e1e1e] ${compact ? 'text-[10px]' : 'text-xs'}`}>
-                  {percent}%
-                </span>
+                <span className="text-sm font-extrabold tabular-nums text-[#1e1e1e]">{row.percent}%</span>
               </div>
-              <div className={`relative mt-1.5 overflow-hidden rounded-full bg-[#ececec] ${compact ? 'h-1.5' : 'h-2'}`}>
+              <div className="relative mt-1 h-2.5 overflow-hidden rounded-full bg-[#ececec]">
                 <span
                   className="absolute inset-y-0 left-0 rounded-full"
-                  style={{ width: `${percent}%`, backgroundColor: row.color }}
+                  style={{ width: `${row.percent}%`, backgroundColor: row.color }}
                 />
               </div>
-              {!compact && <p className="mt-1 text-[10px] font-bold text-[#1e1e1e]/45">{row.sublabel}</p>}
             </div>
-          );
-        })}
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl bg-white px-2.5 py-1.5 shadow-lg">
+      <p className="text-left text-[9px] font-extrabold uppercase tracking-wide text-[#1e1e1e]/50">Gelijk met Max</p>
+      <div className="flex gap-2.5">
+        {rows.map((row) => (
+          <div key={row.phase} className="w-20">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-[10px] font-extrabold" style={{ color: row.color }}>
+                {row.label}
+              </span>
+              <span className="text-[10px] font-extrabold tabular-nums text-[#1e1e1e]">{row.percent}%</span>
+            </div>
+            <div className="relative mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#ececec]">
+              <span
+                className="absolute inset-y-0 left-0 rounded-full"
+                style={{ width: `${row.percent}%`, backgroundColor: row.color }}
+              />
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -215,7 +236,9 @@ function PedalArt({ variant, idPrefix, className }: { variant: 'brake' | 'gas'; 
 // An in-game pedal button, held rather than tapped: pointer capture keeps the
 // press alive until the finger/mouse actually lets go, even when it drifts off
 // the button. While held the pedal tilts like the real thing and shows a
-// colored ring; `highlight` marks the gas pedal as the way to start a round.
+// colored ring; `highlight` marks the gas pedal as the way to start a round -
+// a pulsing outline plus a bobbing "Houd ingedrukt!" callout, so a new player
+// sees the start control without reading the deck copy.
 function Pedal({
   variant,
   onHoldChange,
@@ -245,12 +268,27 @@ function Pedal({
       onLostPointerCapture={() => onHoldChange(false)}
       onContextMenu={(event) => event.preventDefault()}
       aria-keyshortcuts={isBrake ? 'r arrowleft' : 'g arrowright'}
-      aria-label={isBrake ? 'Rempedaal, houd ingedrukt (toets R)' : 'Gaspedaal, houd ingedrukt (toets G of spatie)'}
+      aria-label={isBrake ? 'Rempedaal, houd ingedrukt (toets R)' : 'Gaspedaal, houd ingedrukt (toets G)'}
       aria-pressed={held}
-      className={`group flex-1 select-none touch-manipulation rounded-2xl pb-1 pt-2 transition-all duration-150 focus-ring focus-ring-white hover:-translate-y-0.5 ${
+      className={`group relative flex-1 select-none touch-manipulation rounded-2xl pb-1 pt-2 transition-all duration-150 focus-ring focus-ring-white hover:-translate-y-0.5 ${
         highlight && !held ? 'ring-4 ring-white/80' : ''
       } ${held ? `ring-4 ${isBrake ? 'ring-[#e61f15]' : 'ring-[#10b981]'}` : ''}`}
     >
+      {highlight && !held && (
+        <>
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 rounded-2xl ring-4 ring-white/80 [animation:pedal-pulse_1.6s_ease-out_infinite]"
+          />
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute -top-2 left-1/2 whitespace-nowrap rounded-full bg-white px-3 py-1 text-xs font-extrabold text-[#1e1e1e] shadow-lg [animation:callout-bob_1.6s_ease-in-out_infinite] sm:text-sm"
+          >
+            Houd ingedrukt!
+            <span className="absolute left-1/2 top-full -mt-1 h-2 w-2 -translate-x-1/2 rotate-45 bg-white" />
+          </span>
+        </>
+      )}
       <PedalArt
         variant={variant}
         idPrefix="pedal"
@@ -419,6 +457,14 @@ function App() {
   // the camera rides with the car at a tighter zoom; once the round is scored
   // it flies back out so the whole driven line is visible again. Wide layouts
   // keep the static corner framing.
+  //
+  // The chase cam does NOT engage on the gas press: that snap-zoom read as
+  // disorienting in play-testing. Instead the corner overview holds for the
+  // first seconds of the run, then one eased dive brings the camera to where
+  // the car will be by the end of the dive, and only then the frame-by-frame
+  // follow takes over (from a box it is already close to, so no jump).
+  const CHASE_HOLD_MS = 2000;
+  const CHASE_DIVE_MS = 1500;
   const isWide = useWideViewport();
   const elapsedTRef = useRef(elapsedT);
   elapsedTRef.current = elapsedT;
@@ -428,12 +474,17 @@ function App() {
   const { follow: cameraFollow, fly: cameraFly, jumpTo: cameraJumpTo } = camera;
   useEffect(() => {
     if (phase === 'running' && !isWide) {
+      const round = fixture.rounds[roundIndex];
       const base = roundBoxes[roundIndex];
       const size = { w: Math.max(base.w * 0.55, 230), h: Math.max(base.h * 0.55, 230) };
-      cameraFollow(() => {
-        const p = positionAt(fixture.lap.samples, elapsedTRef.current);
-        return { cx: p.x, cy: p.y, ...size };
-      });
+      const diveT = Math.min(round.tStart + (CHASE_HOLD_MS + CHASE_DIVE_MS) / 1000, round.tEnd);
+      const divePoint = positionAt(fixture.lap.samples, diveT);
+      cameraFly([{ ms: CHASE_HOLD_MS }, { box: { cx: divePoint.x, cy: divePoint.y, ...size }, ms: CHASE_DIVE_MS }], () =>
+        cameraFollow(() => {
+          const p = positionAt(fixture.lap.samples, elapsedTRef.current);
+          return { cx: p.x, cy: p.y, ...size };
+        }),
+      );
     } else if (phase === 'running' && isWide) {
       // rotated to landscape mid-run: drop the chase cam
       cameraJumpTo(roundBoxes[roundIndex]);
@@ -443,11 +494,12 @@ function App() {
   }, [phase, isWide, cameraFollow, cameraFly, cameraJumpTo, roundBoxes, roundIndex]);
 
   // The keyboard drives the pedals like real ones: keydown presses, keyup
-  // releases. R/ArrowLeft hold the brake, G/ArrowRight/Space hold the gas
-  // (holding gas on the ready screen is also what starts the round). Outside
-  // the pedal phases Space still advances the flow; auto-repeat keydowns are
-  // ignored so a held key is one press, and Space is preventDefault-ed so a
-  // focused button never double-fires.
+  // releases. R/ArrowLeft hold the brake, G/ArrowRight hold the gas (holding
+  // gas on the ready screen is also what starts the round). Space only
+  // navigates the flow (intro, next corner) and never touches a pedal -
+  // play-testing showed a space-as-gas shortcut leaking into the next screen.
+  // Auto-repeat keydowns are ignored so a held key is one press, and Space is
+  // preventDefault-ed so a focused button never double-fires.
   useEffect(() => {
     const pedalForCode = (code: string): 'brake' | 'gas' | null => {
       if (code === 'KeyR' || code === 'ArrowLeft') return 'brake';
@@ -467,14 +519,12 @@ function App() {
       if (event.code !== 'Space') return;
       event.preventDefault();
       if (event.repeat) return;
-      if (pedalsLive) game.setPedal('gas', true);
-      else if (phase === 'intro') startGame();
+      if (phase === 'intro') startGame();
       else if (phase === 'roundResult') (isLastRound ? showFinal : nextRound)();
     };
     const onKeyUp = (event: KeyboardEvent) => {
       const pedal = pedalForCode(event.code);
       if (pedal) game.setPedal(pedal, false);
-      else if (event.code === 'Space') game.setPedal('gas', false);
     };
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
@@ -613,20 +663,15 @@ function App() {
               )}
             </div>
 
-            {/* round result: on portrait the cards overlay the stage, hugging its
-                bottom edge so they stay clear of the brake/gas pins on the map,
-                and the deck below never changes height */}
-            <div
-              inert={!showRoundResult || undefined}
-              className={`absolute inset-x-2 bottom-1.5 flex flex-col items-center gap-1.5 transition-all duration-500 wide:hidden ${showRoundResult ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-1 opacity-0'}`}
-            >
-              {lastResult && <RoundAccuracyCard result={lastResult} compact />}
-            </div>
           </div>
 
           {/* info row */}
           {/* control panel: below the stage in portrait, right column on wide */}
-          <div className="scrollbar-hidden contents wide:flex wide:min-h-0 wide:flex-col wide:gap-[clamp(0.75rem,3vh,1.75rem)] wide:overflow-y-auto wide:px-1.5">
+          {/* overflow-x-clip: the panel scrolls vertically but must never pan
+              sideways - its scrollbars are hidden, so a stray horizontal
+              trackpad swipe would otherwise stick it scrolled and clip the
+              pedals/buttons on the left */}
+          <div className="scrollbar-hidden contents wide:flex wide:min-h-0 wide:flex-col wide:gap-[clamp(0.75rem,3vh,1.75rem)] wide:overflow-y-auto wide:overflow-x-clip wide:px-1.5">
             <EventCard roundLabel={roundLabel} />
             <div
               aria-live="polite"
@@ -659,8 +704,20 @@ function App() {
                 )}
               </div>
               <p {...layer(phase === 'running', 'text-base font-extrabold sm:text-xl')}>{runningHint}</p>
-              <div {...layer(showRoundResult, 'hidden flex-wrap items-center justify-center gap-2 wide:flex sm:gap-3')}>
-                {lastResult && <RoundAccuracyCard result={lastResult} />}
+              {/* round result: the compact bar card sits in this deck row on
+                  portrait (between the stage and the next-corner button) and
+                  as a stacked card in the side panel on wide */}
+              <div {...layer(showRoundResult, 'flex w-full flex-col items-center justify-center')}>
+                {lastResult && (
+                  <>
+                    <div className="wide:hidden">
+                      <RoundAccuracyCard result={lastResult} layout="row" />
+                    </div>
+                    <div className="hidden w-full justify-center wide:flex">
+                      <RoundAccuracyCard result={lastResult} layout="stack" />
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
@@ -694,9 +751,9 @@ function App() {
 
             {/* keyboard hint (pointer-fine devices only) */}
             <p className="hidden text-center text-xs font-bold text-white/40 sm:block">
-              Toetsenbord (ingedrukt houden): <kbd className="rounded bg-white/10 px-1.5 py-0.5">R</kbd> = rem ·{' '}
-              <kbd className="rounded bg-white/10 px-1.5 py-0.5">G</kbd> of{' '}
-              <kbd className="rounded bg-white/10 px-1.5 py-0.5">spatie</kbd> = gas
+              Toetsenbord: houd <kbd className="rounded bg-white/10 px-1.5 py-0.5">R</kbd> = rem ·{' '}
+              <kbd className="rounded bg-white/10 px-1.5 py-0.5">G</kbd> = gas ·{' '}
+              <kbd className="rounded bg-white/10 px-1.5 py-0.5">spatie</kbd> = verder
             </p>
           </div>
         </main>
@@ -755,7 +812,7 @@ function App() {
                 </div>
               </div>
               <p className="mt-3 hidden text-center text-xs font-bold text-ink/60 sm:block">
-                <Key>spatie</Key> = verder, in de bocht = gas
+                <Key>spatie</Key> = verder
               </p>
             </div>
             <button

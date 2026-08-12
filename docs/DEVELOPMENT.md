@@ -47,14 +47,14 @@ ready                car waits at the window start; both pedals are live and
   v
 running              rAF clock plays lap.samples from round.tStart to tEnd in
   |                  real time; the player HOLDS the pedals (pointer capture,
-  |                  R/G/arrows, Space = gas) and every change of the combined
-  |                  state is recorded as an InputTransition on the lap clock;
-  |                  the trail behind the car is colored by the player's input
+  |                  R/G/arrows) and every change of the combined state is
+  |                  recorded as an InputTransition on the lap clock; the
+  |                  trail behind the car is colored by the player's input
   | t >= tEnd        round is scored (scoreRound) and appended to results
   v
 roundResult          Max's phase-colored line with the player's line drawn
-  |                  parallel beside it + Max/Jij legend pins, verdict banner,
-  |                  REM/LOS/GAS accuracy card
+  |                  parallel beside it, verdict banner, REM/LOS/GAS
+  |                  accuracy card
   | nextRound()      camera: corner -> overview (1.2s) -> hold -> next corner
   |                  (1.5s); back to `flying` above ... repeat for 4 rounds
   | showFinal()      after the last round: camera drifts back to overview
@@ -104,9 +104,9 @@ rounds[4]      { id, label, cornerNumbers, practice, tStart, tEnd,
                  bounds: {minX,minY,maxX,maxY} }  - the camera zoom box
 
 Scoring no longer consumes rounds[].events - the hold-to-drive comparison
-reads Max's phases straight from the telemetry channels. The events still
-anchor the practice round's coaching pins (where braking opens / where he
-commits back to full throttle) and the "twee remzones" ready-screen copy.
+reads Max's phases straight from the telemetry channels. The events only
+feed the "twee remzones" ready-screen copy these days (event count / 2 =
+braking zones).
 ```
 
 All coordinates live in one frame: the official geometry's, north-up
@@ -182,10 +182,15 @@ path. Draw order, back to front:
 sand + dunes (world space) -> green corridor + striped infield -> paddock
   -> gravel traps (GRAVEL_CORNERS) -> track ribbon (white edge, dark asphalt,
   center sheen) -> red/white curbs at all 14 corners -> start/finish checker
-  -> [practice ready/running] Max's zone corridor + coaching pins
+  -> [practice ready/running] Max's zone corridor
   -> [running] input-colored trail so far -> [result] Max's phase ribbons +
-  the player's offset line + Max/Jij legend pins -> pedal glow under the car
+  the player's offset line -> pedal glow under the car
   -> car -> corner badges + labels (fade out as you zoom in) -> scale bar
+
+There are deliberately no point markers on the road (no "rem hier" pins, no
+Max/Jij legend dots): the colored zones themselves say where braking starts
+and where the throttle opens, and extra dots on top of two parallel ribbons
+read as clutter.
 ```
 
 The sand decoration (dune patches, scrub, grass speckles) is a fixed field in
@@ -206,14 +211,17 @@ in screen space, covering any zoom-out past the decorated field.
   turns it into meter→pixel mapping per frame. Flights are step queues
   (`fly([{box, ms}, {ms: pause}, {box, ms}])`), giving the
   corner → overview → next corner two-stage move the user sees.
-- **Chase cam on phones**: `follow(getTarget)` eases 7% of the remaining
-  distance toward a moving target per frame. App engages it while `running`
-  on non-`wide` viewports (box ≈ 0.55× the corner box, centered on the car
-  via an `elapsedT` ref) and flies back to the corner box at `roundResult`
-  so the whole driven line is visible. The effect must depend on the hook's
-  **stable callbacks**, not the returned camera object — that object changes
-  identity every animated frame, which would restart the flight per render
-  and it would never land.
+- **Chase cam on phones**: while `running` on non-`wide` viewports the
+  camera rides with the car (box ≈ 0.55× the corner box, centered via an
+  `elapsedT` ref), and flies back to the corner box at `roundResult` so the
+  whole driven line is visible. It deliberately does NOT engage on the gas
+  press — that snap-zoom disoriented players. Instead: the corner overview
+  holds for the first 2s of the run, one eased 1.5s dive flies to where the
+  car will be when the dive ends, and only then `follow(getTarget)` (7% of
+  the remaining distance per frame) takes over from a box it is already
+  close to. The effect must depend on the hook's **stable callbacks**, not
+  the returned camera object — that object changes identity every animated
+  frame, which would restart the flight per render and it would never land.
 - **The outline is rotated at load** (`rotateOutline`) so index 0 sits at
   start/finish; corner slices for curbs/gravel then never wrap the closed
   loop's array boundary.
@@ -367,12 +375,13 @@ coast, else flat).
 
 The game is fully keyboard-playable, with the keys behaving like pedals:
 keydown presses, keyup releases, auto-repeat ignored. R/ArrowLeft hold the
-brake, G/ArrowRight hold the gas (`aria-keyshortcuts` on the buttons);
-Space holds the gas while a round is armed or running — which is also how a
-round starts — and advances the flow everywhere else; Enter activates the
-focused primary action. Space is preventDefault-ed globally so a focused
-button never double-fires. On `ready`, focus moves to the gas pedal. Three
-mechanisms keep Tab honest and screen readers in sync:
+brake, G/ArrowRight hold the gas (`aria-keyshortcuts` on the buttons).
+Space only navigates the flow (intro, next corner) and never touches a
+pedal — an earlier space-as-gas shortcut leaked presses into the next
+screen; Enter activates the focused primary action. Space is
+preventDefault-ed globally so a focused button never double-fires. On
+`ready`, focus moves to the gas pedal. Three mechanisms keep Tab honest and
+screen readers in sync:
 
 - **`inert` on every hidden crossfade layer** (the `layer()` helper in
   App.tsx) - layers stay mounted for the fade animation, so without inert the
@@ -407,6 +416,12 @@ plus `onLostPointerCapture` guarantees a press can never stick.
   result cards. The panel also carries `.scrollbar-hidden` (index.css):
   sub-pixel text heights leave it 1px "scrollable" on desktop, which macOS
   with always-visible scrollbars renders as a full useless track.
+- **...vertically only.** The panel also carries `wide:overflow-x-clip`:
+  `overflow-y: auto` silently makes the x-axis scrollable too, and with the
+  scrollbars hidden a stray horizontal trackpad swipe left the panel stuck
+  side-scrolled, clipping the pedals/CTA on the left. `clip` forbids all
+  horizontal scrolling. Keep every panel child narrower than the panel
+  (that's also why the wide accuracy card stacks its bars).
 
 ## Share flow
 
@@ -469,8 +484,8 @@ the scoring grace or the transition recording broke. Two traps: layered UI
 keeps hidden buttons in the DOM (`opacity-0` + `pointer-events-none`), so
 Playwright's `visible` check passes early — gate on _clickability_, not
 visibility (and match the pedals by `aria-label`, their text is just
-"REM!"/"GAS!"); and a held Space leaking into `roundResult` would advance
-the flow if keydown repeats weren't ignored — release every key at `tEnd`.
+"REM!"/"GAS!"); and Space advances the flow on `roundResult`, so drive the
+pedals with KeyG/KeyR only and release every key at `tEnd`.
 
 Hard-won additions to that pattern:
 
