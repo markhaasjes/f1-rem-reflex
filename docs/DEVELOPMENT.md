@@ -431,6 +431,15 @@ plus `onLostPointerCapture` guarantees a press can never stick.
   result). The round-result cards therefore overlay the **stage** on portrait
   (`wide:hidden` absolute layer at its bottom edge) instead of living in the
   deck; the deck copy of the cards is `hidden` + `wide:flex`.
+- **The NOS badge outranks the modals.** It sits at `z-[60]`, above every
+  dialog layer (`z-40`, score explainer `z-50`), so a backdrop never dims or
+  blurs the brand, plus `pointer-events-none` so it can't swallow a click.
+  The dialog containers therefore carry `pt-16 sm:pt-4`: a card taller than
+  the viewport starts at the padding edge (auto margins resolve to 0 with
+  negative free space), which on narrow phones put it straight under the
+  badge. 64px clears the 52px badge; from `sm:` up the centered card is
+  always right of it, so the normal `p-4` returns. Verified down to 320x568
+  on the intro, final and explainer cards.
 - **The wide side panel scrolls, never clips.** The panel is a flex column
   with `wide:overflow-y-auto` and _no_ `justify-center` (centering an
   overflowing flex container makes both ends unreachable), and the info row

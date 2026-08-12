@@ -777,7 +777,10 @@ function App() {
 
   return (
     <>
-      <div className="absolute top-0 left-4 z-10 sm:left-8 wide:left-10">
+      {/* The NOS badge stays above every modal layer (z-40/z-50) so the brand
+          is never dimmed or blurred by a backdrop; pointer-events-none keeps
+          it from swallowing clicks on a card corner it may overlap. */}
+      <div className="pointer-events-none absolute top-0 left-4 z-[60] sm:left-8 wide:left-10">
         <div className="bg-white px-[18px] pt-[12px] pb-[15px] rounded-b-[10px] shadow-[0_6px_24px_rgba(6,12,60,0.45)] inline-block">
           <NOSLogo className="w-12 h-auto text-white fill-current" />
         </div>
@@ -965,7 +968,7 @@ function App() {
           aria-modal="true"
           aria-labelledby="intro-title"
           inert={!(phase === 'intro' && !hideIntroChrome) || undefined}
-          className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-ink/70 p-4 backdrop-blur-[3px] transition-all duration-500 ${phase === 'intro' && !hideIntroChrome ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+          className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-ink/70 px-4 pb-4 pt-16 backdrop-blur-[3px] sm:pt-4 transition-all duration-500 ${phase === 'intro' && !hideIntroChrome ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
           <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:max-w-md sm:p-10">
             <HeroCar className="mx-auto h-9 w-auto sm:h-12" />
@@ -1033,7 +1036,7 @@ function App() {
           aria-modal="true"
           aria-labelledby="final-title"
           inert={!(phase === 'finished' && !showShared) || showScoreInfo || undefined}
-          className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-ink/60 p-4 backdrop-blur-[2px] transition-all duration-700 ${phase === 'finished' && !showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+          className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-ink/60 px-4 pb-4 pt-16 backdrop-blur-[2px] sm:pt-4 transition-all duration-700 ${phase === 'finished' && !showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
           <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:max-w-md sm:p-10">
             <h2 id="final-title" className="text-sm font-extrabold uppercase tracking-wide text-[#e61f15]">
@@ -1108,7 +1111,7 @@ function App() {
           aria-modal="true"
           aria-labelledby="score-info-title"
           inert={!showScoreInfo || undefined}
-          className={`fixed inset-0 z-50 backdrop-carbon flex overflow-y-auto bg-ink/70 p-4 backdrop-blur-[3px] transition-all duration-300 ${showScoreInfo ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+          className={`fixed inset-0 z-50 backdrop-carbon flex overflow-y-auto bg-ink/70 px-4 pb-4 pt-16 backdrop-blur-[3px] sm:pt-4 transition-all duration-300 ${showScoreInfo ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
           <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-left text-ink shadow-2xl sm:max-w-md sm:p-8">
             <h2 id="score-info-title" className="text-sm font-extrabold uppercase tracking-wide text-[#e61f15]">
@@ -1172,7 +1175,7 @@ function App() {
           aria-modal="true"
           aria-labelledby="shared-title"
           inert={!showShared || undefined}
-          className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-ink/60 p-4 backdrop-blur-[2px] transition-all duration-500 ${showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+          className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-ink/60 px-4 pb-4 pt-16 backdrop-blur-[2px] sm:pt-4 transition-all duration-500 ${showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
           <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:max-w-md sm:p-8">
             <h2 id="shared-title" className="text-sm font-extrabold uppercase tracking-wide text-[#e61f15]">
