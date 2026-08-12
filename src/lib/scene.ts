@@ -2,7 +2,7 @@ import type { Point } from '../types';
 import type { ScreenProjection } from './canvas';
 
 // All widths in real meters; multiply by projection.scale when drawing.
-const ROAD_WIDTH_M = 13;
+export const ROAD_WIDTH_M = 13;
 const EDGE_LINE_M = 1.6; // white edge line sticking out past the asphalt
 const CURB_WIDTH_M = 2.8;
 const CURB_EDGE_OFFSET_M = ROAD_WIDTH_M / 2 + 1.2;
@@ -40,6 +40,28 @@ const PALETTE = {
   bush: '#4c7d46',
   waterEdge: '#7aa6c4',
   beach: '#efe4c3',
+};
+
+function mixHex(a: string, b: string, t: number): string {
+  const channel = (offset: number) => {
+    const va = Number.parseInt(a.slice(offset, offset + 2), 16);
+    const vb = Number.parseInt(b.slice(offset, offset + 2), 16);
+    return Math.round(va * t + vb * (1 - t))
+      .toString(16)
+      .padStart(2, '0');
+  };
+  return `#${channel(1)}${channel(3)}${channel(5)}`;
+}
+
+// The road-tint variant of the phase colors: Max's zones paint the whole
+// asphalt band, so the colors are premixed with the asphalt and drawn opaque.
+// Real translucency would double-darken where stroke caps overlap at every
+// zone boundary; premixing gives the same muted look with crisp boundaries.
+const ROAD_TINT_STRENGTH = 0.6;
+export const PHASE_ROAD_COLOR: Record<'flat' | 'coast' | 'brake', string> = {
+  flat: mixHex(PHASE_COLOR.flat, PALETTE.asphalt, ROAD_TINT_STRENGTH),
+  coast: mixHex(PHASE_COLOR.coast, PALETTE.asphalt, ROAD_TINT_STRENGTH),
+  brake: mixHex(PHASE_COLOR.brake, PALETTE.asphalt, ROAD_TINT_STRENGTH),
 };
 
 // Deterministic PRNG so decorative speckles land in the same spots on every

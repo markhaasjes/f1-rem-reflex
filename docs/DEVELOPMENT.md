@@ -52,8 +52,8 @@ running              rAF clock plays lap.samples from round.tStart to tEnd in
   |                  trail behind the car is colored by the player's input
   | t >= tEnd        round is scored (scoreRound) and appended to results
   v
-roundResult          Max's zones as the wide practice-style corridor with the
-  |                  player's line drawn on top, verdict banner, REM/LOS/GAS
+roundResult          the road tinted in Max's zone colors with the player's
+  |                  line drawn on top, verdict banner, REM/LOS/GAS
   |                  accuracy card
   | nextRound()      camera: corner -> overview (1.2s) -> hold -> next corner
   |                  (1.5s); back to `flying` above ... repeat for 4 rounds
@@ -189,17 +189,26 @@ back to front:
 sand + dunes (world space) -> green corridor + striped infield -> paddock
   -> gravel traps (GRAVEL_CORNERS) -> track ribbon (white edge, dark asphalt,
   center sheen) -> red/white curbs at all 14 corners -> start/finish checker
-  -> [practice ready/running] Max's zone corridor
-  -> [running] input-colored trail so far -> [result] Max's zone corridor +
-  the player's line on top -> pedal glow under the car
+  -> [practice ready/running] the road tinted in Max's zone colors
+  -> [running] input-colored trail so far -> [result] road tint + the
+  player's line on top -> pedal glow under the car
   -> car -> corner badges + labels (fade out as you zoom in) -> scale bar
 
-The result comparison uses the same visual language as the practice guide:
-Max's telemetry as the wide semi-transparent corridor, the player's line on
-top of it - matching stretches sit inside their own zone color, mismatches
-stand out against the corridor. There are deliberately no point markers on
-the road (no "rem hier" pins, no Max/Jij legend dots): the colored zones
-themselves say where braking starts and where the throttle opens.
+Max's telemetry paints the asphalt band itself (practice guide and result
+comparison alike): `buildRoadZoneSegments` re-expresses his phases on the
+road centerline - snapping each moment's car position to the nearest
+outline vertex, so the tint follows the road exactly and can never
+overhang the edges the way his real racing line would at an apex - drawn
+at `ROAD_WIDTH_M` in `PHASE_ROAD_COLOR`, the phase colors premixed with
+the asphalt and painted opaque (real translucency double-darkens where
+stroke caps overlap at every zone boundary). A 6m semi-transparent
+corridor on his racing line came first and was barely visible under the
+player's line. Matching stretches of the player's full-strength line nest
+on their own muted zone color; mismatches stand out against the tinted
+road. There are deliberately no point markers (no "rem hier" pins, no
+Max/Jij legend dots): the zones themselves say where braking starts and
+where the throttle opens, and the on-map legend explains the colors and
+the band-vs-line distinction.
 ```
 
 The sand decoration (dune patches, scrub, grass speckles) is a fixed field in

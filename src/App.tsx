@@ -8,7 +8,7 @@ import { boxFromBounds, useCameraFlight, type CamBox } from './hooks/useCameraFl
 import { useCircuitGame } from './hooks/useCircuitGame';
 import { positionAt, sampleAt } from './lib/corner';
 import type { DrivingPhase } from './lib/phases';
-import { PHASE_COLOR } from './lib/scene';
+import { PHASE_COLOR, PHASE_ROAD_COLOR } from './lib/scene';
 import {
   aggregatePhaseAccuracy,
   phasePercent,
@@ -751,8 +751,11 @@ function App() {
   const lastResult = results.at(-1) ?? null;
   const showRoundResult = phase === 'roundResult' && lastResult !== null;
   // The color legend shows whenever phase-colored lines are on the map: the
-  // practice corridor, the live trail, and the result comparison.
-  const legendVisible = (round.practice && phase === 'ready') || phase === 'running' || showRoundResult;
+  // practice corridor, the live trail, and the result comparison. Its second
+  // row (wide band = Max, thin line = you) only makes sense while the
+  // corridor itself is on screen.
+  const corridorVisible = (round.practice && (phase === 'ready' || phase === 'running')) || showRoundResult;
+  const legendVisible = corridorVisible || phase === 'running';
   const verdict = showRoundResult ? verdictForScore(lastResult.score) : null;
 
   let roundLabel = '';
@@ -811,19 +814,39 @@ function App() {
               {liveSpeed ?? 0} km/u
             </div>
 
-            {/* phase-color legend, shown whenever colored lines are on the
-                map (above the scale bar in the bottom-left corner) */}
+            {/* map legend, shown whenever colored lines are on the map (above
+                the scale bar in the bottom-left corner): the three phase
+                colors, plus - when Max's corridor is on screen - what the
+                wide transparent band and the thin solid line each mean */}
             <div
               aria-hidden={!legendVisible}
-              className={`pointer-events-none absolute bottom-10 left-3 flex items-center gap-2.5 rounded-full bg-white/95 px-3 py-1.5 shadow transition-opacity duration-300 ${legendVisible ? 'opacity-100' : 'opacity-0'}`}
+              className={`pointer-events-none absolute bottom-10 left-3 flex flex-col gap-1.5 rounded-2xl bg-white/95 px-4 py-2.5 shadow transition-opacity duration-300 ${legendVisible ? 'opacity-100' : 'opacity-0'}`}
             >
-              {PHASE_ROWS.map((row) => (
-                <span key={row.phase} className="flex items-center gap-1">
-                  {/* dots use the exact line colors from the map, not the UI accents */}
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: PHASE_COLOR[row.phase] }} />
-                  <span className="text-[10px] font-extrabold text-ink sm:text-xs">{row.sublabel}</span>
-                </span>
-              ))}
+              <div className="flex items-center gap-3">
+                {PHASE_ROWS.map((row) => (
+                  <span key={row.phase} className="flex items-center gap-1.5">
+                    {/* dots use the exact line colors from the map, not the UI accents */}
+                    <span
+                      className="h-3 w-3 rounded-full sm:h-3.5 sm:w-3.5"
+                      style={{ backgroundColor: PHASE_COLOR[row.phase] }}
+                    />
+                    <span className="text-xs font-extrabold text-ink sm:text-sm">{row.sublabel}</span>
+                  </span>
+                ))}
+              </div>
+              {corridorVisible && (
+                <div className="flex items-center gap-3 border-t border-ink/10 pt-1.5">
+                  <span className="flex items-center gap-1.5">
+                    {/* the muted band = the tinted asphalt, exactly as drawn */}
+                    <span className="h-3.5 w-8 rounded-full" style={{ backgroundColor: PHASE_ROAD_COLOR.flat }} />
+                    <span className="text-xs font-extrabold text-ink sm:text-sm">de baan = Max</span>
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-1.5 w-8 rounded-full" style={{ backgroundColor: PHASE_COLOR.flat }} />
+                    <span className="text-xs font-extrabold text-ink sm:text-sm">jouw lijn</span>
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* verdict banner (round result) */}

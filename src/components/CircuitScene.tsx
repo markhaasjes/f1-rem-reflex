@@ -4,10 +4,12 @@ import { viewBoxFromCam, type CamBox } from '../hooks/useCameraFlight';
 import { fitProjection, prepareCanvas } from '../lib/canvas';
 import { CAR_ART_LENGTH_UNITS, drawF1Car } from '../lib/canvasCar';
 import { headingAt, positionAt, primePathModel, sampleAt } from '../lib/corner';
-import { buildPhaseSegments } from '../lib/phases';
+import { buildRoadZoneSegments } from '../lib/phases';
 import { buildInputSegments } from '../lib/playerInput';
 import {
   PHASE_COLOR,
+  PHASE_ROAD_COLOR,
+  ROAD_WIDTH_M,
   drawCornerBadge,
   drawCornerCurbs,
   drawGravelTrap,
@@ -93,11 +95,6 @@ const LABEL_OFFSETS: Record<string, { dx: number; dy: number }> = {
   hansernst: { dx: 4, dy: 30 },
 };
 
-// Max's zones render as a corridor wider than the line the player leaves on
-// top of it, so the reference stays visible around the driven line - during
-// practice as the guide to follow, on the result as the comparison layer.
-const GUIDE_WIDTH_M = 6;
-const GUIDE_ALPHA = 0.55;
 // The glow disc under the car while driving, colored by the held pedal.
 const GLOW_RADIUS_M = 9;
 const GLOW_MIN_RADIUS_PX = 16;
@@ -134,15 +131,16 @@ export function CircuitScene(props: CircuitSceneProps) {
   // Corners the game visits get prominent badges; the rest render minor.
   const roundCornerNumbers = useMemo(() => new Set(fixture.rounds.flatMap((r) => r.cornerNumbers)), [fixture]);
 
-  // Pre-split the whole lap into phase segments once; per round we clip by t.
-  const roundSegments = useMemo(
+  // Max's zones per round, re-expressed on the road centerline so the whole
+  // asphalt band can take his telemetry colors; built once, drawn many times.
+  const roadZoneSegments = useMemo(
     () =>
       fixture.rounds.map((round) =>
-        buildPhaseSegments(fixture.lap.samples, round.tStart, round.tEnd).filter(
+        buildRoadZoneSegments(fixture.lap.samples, outline, round.tStart, round.tEnd).filter(
           (segment) => segment.points.length >= 2,
         ),
       ),
-    [fixture],
+    [fixture, outline],
   );
 
 
@@ -214,17 +212,14 @@ export function CircuitScene(props: CircuitSceneProps) {
       }
       drawStartFinish(ctx, fixture.startFinish.x, fixture.startFinish.y, fixture.startFinish.headingDeg, projection);
 
-      // --- practice coaching: Max's phase-colored zones drawn as a wide
-      // corridor on the road, so first-time players see what to match
-      // without reading anything (the zones themselves say where to brake
-      // and where to get back on the gas - no point markers needed) ---
+      // --- practice coaching: the asphalt itself takes Max's zone colors,
+      // so first-time players see what to match without reading anything
+      // (the zones themselves say where to brake and where to get back on
+      // the gas - no point markers needed) ---
       if (round.practice && (phase === 'ready' || phase === 'running')) {
-        ctx.save();
-        ctx.globalAlpha = GUIDE_ALPHA;
-        for (const segment of roundSegments[roundIndex]) {
-          drawRibbon(ctx, segment.points, PHASE_COLOR[segment.phase], projection, GUIDE_WIDTH_M);
+        for (const segment of roadZoneSegments[roundIndex]) {
+          drawRibbon(ctx, segment.points, PHASE_ROAD_COLOR[segment.phase], projection, ROAD_WIDTH_M);
         }
-        ctx.restore();
       }
 
       // --- live trail: the driven line so far, colored by what the player's
@@ -235,17 +230,14 @@ export function CircuitScene(props: CircuitSceneProps) {
         }
       }
 
-      // --- result comparison: Max's telemetry as the same wide transparent
-      // corridor the practice round teaches with, and the player's own line
-      // drawn on top - where they match, the line sits inside its own zone
-      // color; where they differ, it stands out against the corridor ---
+      // --- result comparison: the road painted in Max's zone colors (same
+      // rendering the practice round teaches with) and the player's own line
+      // drawn on top - where they match, the line sits on its own zone
+      // color; where they differ, it stands out against the tinted road ---
       if (showReference) {
-        ctx.save();
-        ctx.globalAlpha = GUIDE_ALPHA;
-        for (const segment of roundSegments[roundIndex]) {
-          drawRibbon(ctx, segment.points, PHASE_COLOR[segment.phase], projection, GUIDE_WIDTH_M);
+        for (const segment of roadZoneSegments[roundIndex]) {
+          drawRibbon(ctx, segment.points, PHASE_ROAD_COLOR[segment.phase], projection, ROAD_WIDTH_M);
         }
-        ctx.restore();
         for (const segment of buildInputSegments(samples, transitions, round.tStart, round.tEnd)) {
           drawRibbon(ctx, segment.points, PHASE_COLOR[segment.phase], projection);
         }
@@ -340,7 +332,7 @@ export function CircuitScene(props: CircuitSceneProps) {
 
     raf = requestAnimationFrame(render);
     return () => cancelAnimationFrame(raf);
-  }, [fixture, outline, cornerIndices, roundSegments, roundCornerNumbers]);
+  }, [fixture, outline, cornerIndices, roadZoneSegments, roundCornerNumbers]);
 
   return (
     <div ref={containerRef} className="relative h-full w-full">

@@ -1,3 +1,4 @@
+import { positionAt } from './corner';
 import { buildSegments, type DrivingPhase, type PhaseSegment } from './phases';
 import type { InputTransition, LapSample, PedalInput } from '../types';
 
@@ -31,5 +32,10 @@ export function buildInputSegments(
   tStart: number,
   tEnd: number,
 ): PhaseSegment[] {
-  return buildSegments(samples, tStart, tEnd, (t) => inputToPhase(inputAt(transitions, t)));
+  return buildSegments(
+    tStart,
+    tEnd,
+    (t) => inputToPhase(inputAt(transitions, t)),
+    (t) => positionAt(samples, t),
+  );
 }

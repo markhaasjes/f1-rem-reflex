@@ -19,9 +19,9 @@ production code.
 
 1. **Overview**: the full circuit, oriented like Google Maps, drawn in the
    F1 TV map style (green surroundings, dark asphalt, corner badges).
-2. **Tarzanbocht** — practice corner (does not count): Max's brake, coast
-   and full-throttle zones are drawn on the road as a colored corridor to
-   drive over.
+2. **Tarzanbocht** — practice corner (does not count): the asphalt itself
+   takes the colors of Max's brake, coast and full-throttle zones, so you
+   drive over the telemetry you have to match.
 3. **Gerlach & Hugenholtz** — a double: two braking zones, two returns to
    throttle.
 4. **Bocht 9 & 10** — the slow double after Mastersbocht.
@@ -32,9 +32,8 @@ production code.
 
 Each corner starts the moment you first hold the gas pedal on the ready
 screen; while driving, the trail behind the car is colored by your own
-input, and the result view lays your line over Max's zones, drawn as the
-same wide transparent corridor the practice corner teaches with, plus a
-REM/LOS/GAS accuracy card.
+input, and the result view paints the road in Max's zone colors with your
+line laid on top, plus a REM/LOS/GAS accuracy card and an on-map legend.
 
 Between rounds the camera zooms back to the overview and flies to the next
 corner — one continuous map, no separate per-corner artwork.
