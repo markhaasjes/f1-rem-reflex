@@ -3,9 +3,11 @@
 Proof of concept for a browser reflex game built on real Formula 1 telemetry
 from [OpenF1](https://openf1.org). You fly over Circuit Zandvoort like the
 F1 TV race map, zoom into four corners of Max Verstappen's real pole lap,
-and hit the **REM!** and **GAS!** pedals at the moments you think he braked
-and got back on the throttle. Every brake/gas moment is scored by how close you are
-to his real point (in meters); the final score is shareable via a link.
+and drive them with held pedals: keep **GAS!** pressed where Max is flat
+out, release everything where he coasts, and hold **REM!** through his
+braking zones. Your pedal timeline is compared against his real telemetry
+moment by moment; the score is the share of the corner you matched him,
+and the final score is shareable via a link.
 
 This is a POC for a nos.nl feature around the Dutch Grand Prix, not
 production code.
@@ -14,12 +16,20 @@ production code.
 
 1. **Overview**: the full circuit, oriented like Google Maps, drawn in the
    F1 TV map style (green surroundings, dark asphalt, corner badges).
-2. **Tarzanbocht** — practice corner (does not count): one brake, one gas.
-3. **Gerlach & Hugenholtz** — a double: brake, gas, brake, gas.
+2. **Tarzanbocht** — practice corner (does not count): Max's brake, coast
+   and full-throttle zones are drawn on the road as a colored corridor to
+   drive over.
+3. **Gerlach & Hugenholtz** — a double: two braking zones, two returns to
+   throttle.
 4. **Bocht 9 & 10** — the slow double after Mastersbocht.
 5. **Hans Ernstbocht** — the chicane, one deep braking zone.
 6. **Eindscore** — 0–100 across the three scoring corners, plus a share link
    that renders the same score card for whoever opens it.
+
+Each corner starts the moment you first hold the gas pedal on the ready
+screen; while driving, the trail behind the car is colored by your own
+input, and the result view draws your line parallel to Max's phase-colored
+racing line, with a REM/LOS/GAS accuracy card.
 
 Between rounds the camera zooms back to the overview and flies to the next
 corner — one continuous map, no separate per-corner artwork.
@@ -70,10 +80,11 @@ src/lib/geometry.ts              the ViewBox type shared by canvas.ts and the ca
 src/lib/scene.ts                 illustrated scene: sand, green corridor, paddock, track, curbs, gravel, badges
 src/lib/canvasCar.ts             draws the top-down car SVG (public/images/auto-boven.svg) on the canvas
 src/lib/corner.ts                sampling/interpolation + GPS-stall-proof car motion
-src/lib/phases.ts                flat/coast/brake segmentation of the driven line
-src/lib/scoring.ts               per-event scores (0-100) + Dutch verdicts
+src/lib/phases.ts                flat/coast/brake segmentation (Max's telemetry or any phase source)
+src/lib/playerInput.ts           the player's pedal timeline: state lookup + colored segments
+src/lib/scoring.ts               zone-match scoring (0-100 share matched) + Dutch verdicts
 src/lib/storage.ts               localStorage persistence for the last run + best run
-src/lib/tips.ts                  turns a round's worst event into a Dutch coaching tip
+src/lib/tips.ts                  turns a round's worst zone into a Dutch coaching tip
 src/hooks/useCircuitGame.ts      game state machine (intro/flying/ready/running/result/finished)
 src/hooks/useCameraFlight.ts     animated camera box (log-space zoom, step queues)
 src/hooks/useElementSize.ts      ResizeObserver hook

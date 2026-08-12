@@ -40,17 +40,21 @@ intro                overview map, all 14 corner badges, pulsing badge on the
 flying               "Onderweg naar de <bocht>..." — no interactive controls
   | camera done -> game.arm()
   v
-ready                car waits at the window start; "Start de oefenbocht" /
-  |                  "Start bocht N"
-  | startRun()
+ready                car waits at the window start; both pedals are live and
+  |                  the gas pedal is ringed: "Houd GAS ingedrukt om te
+  |                  starten" — the first gas press IS the start
+  | setPedal('gas', true)
   v
 running              rAF clock plays lap.samples from round.tStart to tEnd in
-  |                  real time; one button (REM! / VOL GAS!) answers Max's
-  |                  events in order; Space = same button
+  |                  real time; the player HOLDS the pedals (pointer capture,
+  |                  R/G/arrows, Space = gas) and every change of the combined
+  |                  state is recorded as an InputTransition on the lap clock;
+  |                  the trail behind the car is colored by the player's input
   | t >= tEnd        round is scored (scoreRound) and appended to results
   v
-roundResult          Max's phase-colored line + brake/gas pins + player pins,
-  |                  verdict banner, per-event delta chips
+roundResult          Max's phase-colored line with the player's line drawn
+  |                  parallel beside it + Max/Jij legend pins, verdict banner,
+  |                  REM/LOS/GAS accuracy card
   | nextRound()      camera: corner -> overview (1.2s) -> hold -> next corner
   |                  (1.5s); back to `flying` above ... repeat for 4 rounds
   | showFinal()      after the last round: camera drifts back to overview
@@ -67,16 +71,23 @@ Things worth knowing before changing the flow:
 
 - **Practice does not count.** The Tarzanbocht round (`practice: true`) is
   played and scored like any other and shown on the final card, but
-  `totalScore` excludes practice rounds from the overall 0-100.
-- **Two pedals.** REM! and GAS! are separate buttons (keyboard: R and G;
-  Space presses whichever pedal Max needs next). Each press is typed by its
-  pedal; scoring pairs the k-th brake press with Max's k-th brake event and
-  the k-th gas press with his k-th gas event (`scoreRound`). A pedal stops
-  registering (and dims) once used as often as Max uses it in the round.
-- **Marks are mirrored in a ref** (`marksRef`) because two presses can land
-  within one frame; never read the React state inside `press()`.
+  `totalScore` excludes practice rounds from the overall 0-100. During
+  practice, Max's zones render as a wide colored corridor on the road.
+- **Held pedals, one 3-state input.** REM! and GAS! are held, not tapped
+  (pointer capture keeps a press alive when the finger drifts off; keyboard
+  is keydown/keyup with auto-repeat ignored). The combined state is a single
+  `PedalInput` — brake wins when both pedals are down — and only *changes*
+  of that state are recorded (`InputTransition[]` on the lap clock), so a
+  round's timeline stays a handful of entries.
+- **A round starts on the first gas press.** There is no start button: on
+  `ready`, `setPedal('gas', true)` flips the phase to `running` and opens
+  the timeline at `round.tStart` with whatever the player is holding.
+- **The timeline is mirrored in a ref** (`transitionsRef`) because a pedal
+  change must read the up-to-date list immediately; never read the React
+  state inside `setPedal()`.
 - **A round always plays to `tEnd`.** There is no early exit and no crash
-  state; missing events simply score 0 ("Niet geremd" / "Geen gas gegeven").
+  state; touching nothing simply scores whatever share of the window
+  'coast' happens to match.
 
 ## The fixture shape
 
@@ -91,6 +102,11 @@ lap.samples    ~1670 x { t, x, y, distanceM, speedKph, throttle, brakeActive, ge
 rounds[4]      { id, label, cornerNumbers, practice, tStart, tEnd,
                  events: [{ type: 'brake'|'gas', t, distanceM, speedKph }],
                  bounds: {minX,minY,maxX,maxY} }  - the camera zoom box
+
+Scoring no longer consumes rounds[].events - the hold-to-drive comparison
+reads Max's phases straight from the telemetry channels. The events still
+anchor the practice round's coaching pins (where braking opens / where he
+commits back to full throttle) and the "twee remzones" ready-screen copy.
 ```
 
 All coordinates live in one frame: the official geometry's, north-up
@@ -166,7 +182,9 @@ path. Draw order, back to front:
 sand + dunes (world space) -> green corridor + striped infield -> paddock
   -> gravel traps (GRAVEL_CORNERS) -> track ribbon (white edge, dark asphalt,
   center sheen) -> red/white curbs at all 14 corners -> start/finish checker
-  -> [running] driven line so far -> [result] phase ribbons + pins
+  -> [practice ready/running] Max's zone corridor + coaching pins
+  -> [running] input-colored trail so far -> [result] Max's phase ribbons +
+  the player's offset line + Max/Jij legend pins -> pedal glow under the car
   -> car -> corner badges + labels (fade out as you zoom in) -> scale bar
 ```
 
@@ -213,9 +231,14 @@ in screen space, covering any zoom-out past the decorated field.
   readability; at overview zoom a minimum pixel length kicks in
   (`CAR_MIN_LENGTH_PX`), so it stays spottable when parked on the grid.
 - **Ribbons are drawn from the smoothed car path**, never from raw samples:
-  `smoothPathPoints`/`buildPhaseSegments` sample `positionAt` at 0.05s steps,
-  so the driven line and Max's phase-colored line carry none of the 20 Hz GPS
-  jitter that used to show through slow corners.
+  `buildSegments` (phases.ts) samples `positionAt` at 0.05s steps with a
+  pluggable phase source — Max's telemetry (`buildPhaseSegments`) and the
+  player's pedal timeline (`buildInputSegments`) render through the same
+  machinery — so no drawn line carries the 20 Hz GPS jitter that used to
+  show through slow corners.
+- **The result comparison caches per timeline**: the player's offset line
+  (`offsetPathPoints`, one road-half beside Max's) is rebuilt only when a new
+  `transitions` array arrives (`comparisonRef`), not per frame.
 - **Offset geometry self-protects on hairpins**: `offsetPolyline` prunes
   folded/bunched points, and curbs use `offsetPolylineRuns`, which _splits_
   the curb wherever the bend is tighter than the offset reaches instead of
@@ -308,40 +331,48 @@ origin; return the endpoint instead.
 
 ## Scoring
 
-[scoring.ts](../src/lib/scoring.ts). Two layers:
+[scoring.ts](../src/lib/scoring.ts). The comparison is time-based: the round
+window is walked on the same 0.05s grid the ribbons render at, and at every
+step the player's pedal state (from the transition timeline) is compared
+against Max's phase (`classifyAt`: brakeActive → brake, throttle < 95 →
+coast, else flat).
 
-- **Numeric**: `scoreEvent(deltaM)` — 100 points within 2m of Max, linear to
-  0 at 50m, 0 for a missed event. `scoreRound` averages a round's events;
-  `totalScore` averages the **scoring rounds' rounded scores** (equal round
-  weight, practice excluded). It used to be event-weighted, which made the
-  total unverifiable from the card's listed round scores — players read that
-  as a calculation bug. Note the deliberate property that distance-based
-  scoring is stricter at higher speed (0.15s late = ~13m at Tarzan but ~5m
-  at a slow gas point); the result gauges surface both meters and seconds.
+- **Numeric**: the round score is simply the matched share of time, 0-100.
+  A step also counts as matched when the player's state matches Max's phase
+  0.2s to either side (`REACTION_GRACE_S`), so human reaction lag at every
+  zone boundary is forgiven without rewarding a wrong pedal held through a
+  whole zone — a scripted playthrough that mirrors the telemetry with 120ms
+  lag scores 100, holding only gas scores ~50. `totalScore` averages the
+  **scoring rounds' rounded scores** (equal round weight, practice excluded)
+  so the total stays verifiable from the card's listed round scores.
+- **Zones**: the same walk is grouped into contiguous same-phase zones
+  (`ZoneResult`: match fraction + the dominant wrong input) and into
+  per-phase totals (`phaseAccuracy`), which feed the REM/LOS/GAS accuracy
+  card and the tips.
 - **History**: [storage.ts](../src/lib/storage.ts) persists the last attempt
   and the best run in localStorage (key `nos-rem-reflex:scores`); the intro
   shows the stored bests, the score card compares against them and tips the
   weakest corner of the current run.
-- **Tips**: [tips.ts](../src/lib/tips.ts) turns a round's worst event into a
-  specific Dutch instruction ("je remde 27m te laat - rem iets eerder"; no
-  tip when the worst event scores ≥90). The score card shows the weakest
-  round's tip, and the per-round tips are saved with the run (`SavedRun.
-advice`) so the next play shows "Vorige keer: ..." on that corner's ready
-  screen — the feedback loop that makes replaying feel like practicing.
-- **Verbal (Dutch)**: `describeBrakeAttempt` / `describeGasAttempt` bucket
-  the same delta into tones (perfect ≤3m/≤5m, good, okay, bad) for the
-  verdict banner; `combineResults` takes the _worst_ tone of a round.
-
-Marks pair to events strictly by order (press #i answers event #i). If you
-ever allow more presses than events, revisit that pairing.
+- **Tips**: [tips.ts](../src/lib/tips.ts) turns a round's worst zone (≥0.5s
+  long, match < 85%) into a specific Dutch instruction keyed on what the
+  player mostly did instead ("je gaf nog gas waar Max al remt, rem eerder").
+  The score card shows the weakest round's tip, and the per-round tips are
+  saved with the run (`SavedRun.advice`) so the next play shows "Vorige
+  keer: ..." on that corner's ready screen — the feedback loop that makes
+  replaying feel like practicing.
+- **Verbal (Dutch)**: `verdictForScore` buckets the round score into tones
+  (≥90 perfect, ≥72 good, ≥45 okay, else bad) for the verdict banner.
 
 ## Accessibility
 
-The game is fully keyboard-playable: Space advances the flow and presses the
-pedal Max needs next; R/ArrowLeft and G/ArrowRight hit a specific pedal
-(`aria-keyshortcuts` on the buttons); Enter activates the focused primary
-action. Space is preventDefault-ed globally so a focused button never
-double-fires. Three mechanisms keep Tab honest and screen readers in sync:
+The game is fully keyboard-playable, with the keys behaving like pedals:
+keydown presses, keyup releases, auto-repeat ignored. R/ArrowLeft hold the
+brake, G/ArrowRight hold the gas (`aria-keyshortcuts` on the buttons);
+Space holds the gas while a round is armed or running — which is also how a
+round starts — and advances the flow everywhere else; Enter activates the
+focused primary action. Space is preventDefault-ed globally so a focused
+button never double-fires. On `ready`, focus moves to the gas pedal. Three
+mechanisms keep Tab honest and screen readers in sync:
 
 - **`inert` on every hidden crossfade layer** (the `layer()` helper in
   App.tsx) - layers stay mounted for the fade animation, so without inert the
@@ -356,7 +387,9 @@ Buttons share nos.nl-style interactive states (`BTN_*` constants + the
 `.focus-ring` utilities in index.css): 2px solid focus outline with 2px
 offset - NOS red on light surfaces, ink on red CTAs, white on the pedals -
 warm-gray/darker-red hover backgrounds, 150ms transitions, scale press
-feedback. Exhausted pedals get a real `disabled`, not just dimming.
+feedback. A held pedal tilts (the same perspective transform the old
+`:active` state used) and shows a ring in its accent color; pointer capture
+plus `onLostPointerCapture` guarantees a press can never stick.
 
 ## Layout invariants (portrait / landscape)
 
@@ -425,14 +458,19 @@ build trust on it.
 
 For any change to the flow or scene: drive the real app, don't trust the
 build. The pattern that works (see the session scratchpad's
-`playthrough.mjs`): start `npm run dev`, script Playwright to click through
-all four rounds **reading press timings from the fixture JSON**
-(`event.t - round.tStart` + ~150ms), screenshot each phase, and look at
-the screenshots. Two traps: layered UI keeps hidden buttons in the DOM
-(`opacity-0` + `pointer-events-none`), so Playwright's `visible` check
-passes early — gate on _clickability_, not visibility; and a Space press
-after a round ends advances the flow, so mistimed presses silently skip
-phases.
+`playthrough.mjs`): start `npm run dev`, script Playwright to play all four
+rounds with **held keys** — derive Max's phase spans from the fixture's
+telemetry channels (`brakeActive` / `throttle < 95`), start each round with
+`keyboard.down('KeyG')`, then walk the spans with `keyboard.down`/`up` on
+KeyR/KeyG about 120ms late (inside the 0.2s scoring grace) — screenshot
+each phase, and look at the screenshots. A telemetry-mirroring run must
+score 100 on every round and a gas-only run around ~50; if either drifts,
+the scoring grace or the transition recording broke. Two traps: layered UI
+keeps hidden buttons in the DOM (`opacity-0` + `pointer-events-none`), so
+Playwright's `visible` check passes early — gate on _clickability_, not
+visibility (and match the pedals by `aria-label`, their text is just
+"REM!"/"GAS!"); and a held Space leaking into `roundResult` would advance
+the flow if keydown repeats weren't ignored — release every key at `tEnd`.
 
 Hard-won additions to that pattern:
 
