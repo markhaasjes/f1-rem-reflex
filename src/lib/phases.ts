@@ -54,42 +54,12 @@ export function buildSegments(
   return segments;
 }
 
-// The car advances monotonically, so each lookup only scans a short stretch
-// ahead of the previous hit instead of the whole ~1400-point outline.
-function nearestOutlineIndex(outline: Point[], p: Point, hint: number): number {
-  const from = hint < 0 ? 0 : Math.max(0, hint - 5);
-  const to = hint < 0 ? outline.length - 1 : Math.min(outline.length - 1, hint + 40);
-  let best = from;
-  let bestDist = Infinity;
-  for (let i = from; i <= to; i++) {
-    const d = (outline[i].x - p.x) ** 2 + (outline[i].y - p.y) ** 2;
-    if (d < bestDist) {
-      bestDist = d;
-      best = i;
-    }
-  }
-  return best;
-}
-
-/** Max's phases re-expressed on the road centerline, for tinting the whole
- * asphalt band in his zone colors: the geometry snaps each moment's car
- * position to the nearest outline vertex (~3m spacing), so the tint follows
- * the road exactly and can never overhang the edges the way his real racing
- * line would at an apex. */
-export function buildRoadZoneSegments(
-  samples: LapSample[],
-  outline: Point[],
-  tStart: number,
-  tEnd: number,
-): PhaseSegment[] {
-  let lastIndex = -1;
+/** Max's phases along his smoothed driven line. */
+export function buildPhaseSegments(samples: LapSample[], tStart: number, tEnd: number): PhaseSegment[] {
   return buildSegments(
     tStart,
     tEnd,
     (t) => classifyAt(samples, t),
-    (t) => {
-      lastIndex = nearestOutlineIndex(outline, positionAt(samples, t), lastIndex);
-      return outline[lastIndex];
-    },
+    (t) => positionAt(samples, t),
   );
 }

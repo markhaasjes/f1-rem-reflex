@@ -1,15 +1,13 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useElementSize } from '../hooks/useElementSize';
 import { viewBoxFromCam, type CamBox } from '../hooks/useCameraFlight';
-import { fitProjection, prepareCanvas } from '../lib/canvas';
+import { fitProjection, prepareCanvas, type ScreenProjection } from '../lib/canvas';
 import { CAR_ART_LENGTH_UNITS, drawF1Car } from '../lib/canvasCar';
 import { headingAt, positionAt, primePathModel, sampleAt } from '../lib/corner';
-import { buildRoadZoneSegments } from '../lib/phases';
+import { buildPhaseSegments } from '../lib/phases';
 import { buildInputSegments } from '../lib/playerInput';
 import {
   PHASE_COLOR,
-  PHASE_ROAD_COLOR,
-  ROAD_WIDTH_M,
   drawCornerBadge,
   drawCornerCurbs,
   drawGravelTrap,
@@ -25,6 +23,7 @@ import {
   drawStartFinish,
   drawTrackRibbon,
   nearestIndex,
+  offsetPathPoints,
   rotateOutline,
 } from '../lib/scene';
 import type { GamePhase, GameRound, InputTransition, PedalInput, ZandvoortFixture } from '../types';
@@ -95,6 +94,13 @@ const LABEL_OFFSETS: Record<string, { dx: number; dy: number }> = {
   hansernst: { dx: 4, dy: 30 },
 };
 
+// Max's reference line runs one road-half beside the driven line, thinner and
+// dashed: the dash pattern is what separates his line from the player's solid
+// one at a glance, without needing labels on the map.
+const MAX_LINE_OFFSET_M = 4.6;
+const MAX_LINE_WIDTH_M = 2.2;
+const MAX_LINE_DASH_M: [number, number] = [5, 3.5];
+
 // The glow disc under the car while driving, colored by the held pedal.
 const GLOW_RADIUS_M = 9;
 const GLOW_MIN_RADIUS_PX = 16;
@@ -131,16 +137,17 @@ export function CircuitScene(props: CircuitSceneProps) {
   // Corners the game visits get prominent badges; the rest render minor.
   const roundCornerNumbers = useMemo(() => new Set(fixture.rounds.flatMap((r) => r.cornerNumbers)), [fixture]);
 
-  // Max's zones per round, re-expressed on the road centerline so the whole
-  // asphalt band can take his telemetry colors; built once, drawn many times.
-  const roadZoneSegments = useMemo(
+  // Max's reference line per round: his phase-colored line shifted one
+  // road-half aside, so it runs beside the player's line instead of under it.
+  // Offsetting is geometry work, so it happens once here, not per frame.
+  const maxReferenceSegments = useMemo(
     () =>
       fixture.rounds.map((round) =>
-        buildRoadZoneSegments(fixture.lap.samples, outline, round.tStart, round.tEnd).filter(
-          (segment) => segment.points.length >= 2,
-        ),
+        buildPhaseSegments(fixture.lap.samples, round.tStart, round.tEnd)
+          .map((segment) => ({ phase: segment.phase, points: offsetPathPoints(segment.points, MAX_LINE_OFFSET_M) }))
+          .filter((segment) => segment.points.length >= 2),
       ),
-    [fixture, outline],
+    [fixture],
   );
 
 
@@ -163,6 +170,12 @@ export function CircuitScene(props: CircuitSceneProps) {
 
   useEffect(() => {
     let raf = 0;
+
+    const drawMaxReference = (ctx: CanvasRenderingContext2D, projection: ScreenProjection, roundIndex: number) => {
+      for (const segment of maxReferenceSegments[roundIndex]) {
+        drawRibbon(ctx, segment.points, PHASE_COLOR[segment.phase], projection, MAX_LINE_WIDTH_M, MAX_LINE_DASH_M);
+      }
+    };
 
     const render = (now: number) => {
       raf = requestAnimationFrame(render);
@@ -212,14 +225,12 @@ export function CircuitScene(props: CircuitSceneProps) {
       }
       drawStartFinish(ctx, fixture.startFinish.x, fixture.startFinish.y, fixture.startFinish.headingDeg, projection);
 
-      // --- practice coaching: the asphalt itself takes Max's zone colors,
-      // so first-time players see what to match without reading anything
-      // (the zones themselves say where to brake and where to get back on
-      // the gas - no point markers needed) ---
+      // --- practice coaching: Max's dashed reference line runs beside the
+      // player's, so first-time players see what to match without reading
+      // anything (the zone colors say where to brake and where to get back
+      // on the gas - no point markers needed) ---
       if (round.practice && (phase === 'ready' || phase === 'running')) {
-        for (const segment of roadZoneSegments[roundIndex]) {
-          drawRibbon(ctx, segment.points, PHASE_ROAD_COLOR[segment.phase], projection, ROAD_WIDTH_M);
-        }
+        drawMaxReference(ctx, projection, roundIndex);
       }
 
       // --- live trail: the driven line so far, colored by what the player's
@@ -230,14 +241,12 @@ export function CircuitScene(props: CircuitSceneProps) {
         }
       }
 
-      // --- result comparison: the road painted in Max's zone colors (same
-      // rendering the practice round teaches with) and the player's own line
-      // drawn on top - where they match, the line sits on its own zone
-      // color; where they differ, it stands out against the tinted road ---
+      // --- result comparison: Max's dashed line beside the player's solid
+      // one (same pairing the practice round teaches with), so matching
+      // stretches read as two same-colored lines running together and a
+      // mismatch shows as two different colors side by side ---
       if (showReference) {
-        for (const segment of roadZoneSegments[roundIndex]) {
-          drawRibbon(ctx, segment.points, PHASE_ROAD_COLOR[segment.phase], projection, ROAD_WIDTH_M);
-        }
+        drawMaxReference(ctx, projection, roundIndex);
         for (const segment of buildInputSegments(samples, transitions, round.tStart, round.tEnd)) {
           drawRibbon(ctx, segment.points, PHASE_COLOR[segment.phase], projection);
         }
@@ -332,7 +341,7 @@ export function CircuitScene(props: CircuitSceneProps) {
 
     raf = requestAnimationFrame(render);
     return () => cancelAnimationFrame(raf);
-  }, [fixture, outline, cornerIndices, roadZoneSegments, roundCornerNumbers]);
+  }, [fixture, outline, cornerIndices, maxReferenceSegments, roundCornerNumbers]);
 
   return (
     <div ref={containerRef} className="relative h-full w-full">

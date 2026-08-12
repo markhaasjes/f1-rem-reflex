@@ -8,7 +8,7 @@ import { boxFromBounds, useCameraFlight, type CamBox } from './hooks/useCameraFl
 import { useCircuitGame } from './hooks/useCircuitGame';
 import { positionAt, sampleAt } from './lib/corner';
 import type { DrivingPhase } from './lib/phases';
-import { PHASE_COLOR, PHASE_ROAD_COLOR } from './lib/scene';
+import { PHASE_COLOR } from './lib/scene';
 import {
   aggregatePhaseAccuracy,
   phasePercent,
@@ -750,12 +750,11 @@ function App() {
   const liveSpeed = phase === 'running' ? Math.round(sampleAt(fixture.lap.samples, elapsedT).speedKph) : null;
   const lastResult = results.at(-1) ?? null;
   const showRoundResult = phase === 'roundResult' && lastResult !== null;
-  // The color legend shows whenever phase-colored lines are on the map: the
-  // practice corridor, the live trail, and the result comparison. Its second
-  // row (wide band = Max, thin line = you) only makes sense while the
-  // corridor itself is on screen.
-  const corridorVisible = (round.practice && (phase === 'ready' || phase === 'running')) || showRoundResult;
-  const legendVisible = corridorVisible || phase === 'running';
+  // The color legend shows whenever phase-colored lines are on the map: Max's
+  // reference line, the live trail, and the result comparison. Its second row
+  // (dashed = Max, solid = you) only makes sense while both lines can appear.
+  const referenceVisible = (round.practice && (phase === 'ready' || phase === 'running')) || showRoundResult;
+  const legendVisible = referenceVisible || phase === 'running';
   const verdict = showRoundResult ? verdictForScore(lastResult.score) : null;
 
   let roundLabel = '';
@@ -764,7 +763,7 @@ function App() {
   }
 
   const runningHint = round.practice
-    ? 'Volg de kleuren op de baan: rood = remmen, oranje = los, groen = vol gas!'
+    ? 'Volg de streepjeslijn van Max: rood = remmen, oranje = los, groen = vol gas!'
     : 'Rem, rol uit en geef gas precies zoals Max!';
 
   // Crossfading layers stay mounted for the animation, so hidden ones must be
@@ -837,12 +836,17 @@ function App() {
                   </span>
                 ))}
               </div>
-              {corridorVisible && (
+              {referenceVisible && (
                 <div className="flex items-center gap-3 border-t border-ink/10 pt-1.5">
                   <span className="flex items-center gap-1.5">
-                    {/* the muted band = the tinted asphalt, exactly as drawn */}
-                    <span className="h-3.5 w-8 rounded-full" style={{ backgroundColor: PHASE_ROAD_COLOR.flat }} />
-                    <span className="text-xs font-extrabold text-ink sm:text-sm">de baan = Max</span>
+                    {/* dashes, matching how Max's reference line is drawn */}
+                    <span
+                      className="h-1.5 w-8"
+                      style={{
+                        backgroundImage: `repeating-linear-gradient(90deg, ${PHASE_COLOR.flat} 0 6px, transparent 6px 10px)`,
+                      }}
+                    />
+                    <span className="text-xs font-extrabold text-ink sm:text-sm">lijn van Max</span>
                   </span>
                   <span className="flex items-center gap-1.5">
                     <span className="h-1.5 w-8 rounded-full" style={{ backgroundColor: PHASE_COLOR.flat }} />
@@ -899,7 +903,8 @@ function App() {
                   </p>
                 ) : (
                   <p className="text-xs font-bold text-white/85 sm:text-base">
-                    {round.practice && 'Rijd de kleuren na: groen = vol gas, oranje = los, rood = remmen!'}
+                    {round.practice &&
+                      'Rijd de streepjeslijn van Max na: groen = vol gas, oranje = los, rood = remmen!'}
                     {!round.practice &&
                       (round.events.length / 2 === 1
                         ? 'Rem, rol uit en geef weer gas precies waar Max dat doet!'

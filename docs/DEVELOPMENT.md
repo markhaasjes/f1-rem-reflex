@@ -52,9 +52,8 @@ running              rAF clock plays lap.samples from round.tStart to tEnd in
   |                  trail behind the car is colored by the player's input
   | t >= tEnd        round is scored (scoreRound) and appended to results
   v
-roundResult          the road tinted in Max's zone colors with the player's
-  |                  line drawn on top, verdict banner, REM/LOS/GAS
-  |                  accuracy card
+roundResult          Max's dashed zone line beside the player's solid line,
+  |                  verdict banner, REM/LOS/GAS accuracy card
   | nextRound()      camera: corner -> overview (1.2s) -> hold -> next corner
   |                  (1.5s); back to `flying` above ... repeat for 4 rounds
   | showFinal()      after the last round: camera drifts back to overview
@@ -189,26 +188,28 @@ back to front:
 sand + dunes (world space) -> green corridor + striped infield -> paddock
   -> gravel traps (GRAVEL_CORNERS) -> track ribbon (white edge, dark asphalt,
   center sheen) -> red/white curbs at all 14 corners -> start/finish checker
-  -> [practice ready/running] the road tinted in Max's zone colors
-  -> [running] input-colored trail so far -> [result] road tint + the
-  player's line on top -> pedal glow under the car
+  -> [practice ready/running] Max's dashed reference line
+  -> [running] input-colored trail so far -> [result] Max's dashed line +
+  the player's solid line -> pedal glow under the car
   -> car -> corner badges + labels (fade out as you zoom in) -> scale bar
 
-Max's telemetry paints the asphalt band itself (practice guide and result
-comparison alike): `buildRoadZoneSegments` re-expresses his phases on the
-road centerline - snapping each moment's car position to the nearest
-outline vertex, so the tint follows the road exactly and can never
-overhang the edges the way his real racing line would at an apex - drawn
-at `ROAD_WIDTH_M` in `PHASE_ROAD_COLOR`, the phase colors premixed with
-the asphalt and painted opaque (real translucency double-darkens where
-stroke caps overlap at every zone boundary). A 6m semi-transparent
-corridor on his racing line came first and was barely visible under the
-player's line. Matching stretches of the player's full-strength line nest
-on their own muted zone color; mismatches stand out against the tinted
-road. There are deliberately no point markers (no "rem hier" pins, no
-Max/Jij legend dots): the zones themselves say where braking starts and
-where the throttle opens, and the on-map legend explains the colors and
-the band-vs-line distinction.
+Max's telemetry is a **dashed** phase-colored line one road-half beside the
+driven line (`MAX_LINE_OFFSET_M`/`WIDTH_M`/`DASH_M` in CircuitScene, offset
+via `offsetPathPoints`), the player's own line is solid on the driven line.
+The dash pattern - not width, position or opacity - is what tells the two
+apart, so both can stay thin and full-strength: matching stretches read as
+two same-colored lines running together, a mismatch as two colors side by
+side. `drawRibbon`'s `dashM` is in **meters** so dashes keep their
+road-relative size at every zoom, and dashed ribbons switch to butt caps
+(round caps grow each dash by half the line width at both ends and close
+the gaps). Two earlier attempts are worth not repeating: a 6m
+semi-transparent corridor on his racing line vanished under the player's
+line, and tinting the whole asphalt band in his zone colors drowned the
+map's own colors. Offsetting is geometry work, so the offset segments are
+built once per fixture in a memo, never per frame. There are deliberately
+no point markers (no "rem hier" pins, no Max/Jij dots on the road): the
+zone colors say where braking starts and where the throttle opens, and the
+on-map legend covers the colors plus the dashed-vs-solid distinction.
 ```
 
 The sand decoration (dune patches, scrub, grass speckles) is a fixed field in
