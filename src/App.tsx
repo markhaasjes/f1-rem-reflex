@@ -8,7 +8,7 @@ import { boxFromBounds, useCameraFlight, type CamBox } from './hooks/useCameraFl
 import { useCircuitGame } from './hooks/useCircuitGame';
 import { positionAt, sampleAt } from './lib/corner';
 import type { DrivingPhase } from './lib/phases';
-import { totalScore, totalScoreFromRoundScores, verdictForScore, type RoundResult } from './lib/scoring';
+import { phasePercent, totalScore, totalScoreFromRoundScores, verdictForScore, type RoundResult } from './lib/scoring';
 import { decodeShareToken, encodeShareToken } from './lib/shareToken';
 import { loadScores, saveRun, type SavedRun, type SavedScores } from './lib/storage';
 import { adviceForRound, adviceForRun } from './lib/tips';
@@ -89,7 +89,7 @@ const PHASE_ROWS: { phase: DrivingPhase; label: string; sublabel: string; color:
 function RoundAccuracyCard({ result, layout }: { result: RoundResult; layout: 'row' | 'stack' }) {
   const rows = PHASE_ROWS.map((row) => ({
     ...row,
-    percent: Math.round((result.phaseAccuracy[row.phase].matchedS / result.phaseAccuracy[row.phase].totalS) * 100),
+    percent: phasePercent(result.phaseAccuracy[row.phase]),
   })).filter((row) => result.phaseAccuracy[row.phase].totalS > 0.1);
 
   if (layout === 'stack') {
@@ -363,6 +363,71 @@ function TipBadge() {
   );
 }
 
+// The zone-match idea in one picture: Max's pedal zones and a player's slightly
+// shifted attempt as two parallel bars on the same time axis, with the moments
+// they disagree marked in red on the strip below. Illustrative proportions,
+// deliberately not live data - the point is the mechanism, not this round.
+const DIAGRAM_MAX_SEGMENTS = [
+  { color: '#10b981', widthPct: 28 },
+  { color: '#e61f15', widthPct: 26 },
+  { color: '#f2a11c', widthPct: 14 },
+  { color: '#10b981', widthPct: 32 },
+];
+const DIAGRAM_PLAYER_SEGMENTS = [
+  { color: '#10b981', widthPct: 34 },
+  { color: '#e61f15', widthPct: 22 },
+  { color: '#f2a11c', widthPct: 6 },
+  { color: '#10b981', widthPct: 38 },
+];
+// Where the two bars above disagree (player brakes late, releases early, ...).
+const DIAGRAM_DIFF_STRIPS = [
+  { leftPct: 28, widthPct: 6 },
+  { leftPct: 54, widthPct: 2 },
+  { leftPct: 62, widthPct: 6 },
+];
+
+function DiagramZoneBar({ label, segments }: { label: string; segments: { color: string; widthPct: number }[] }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-8 shrink-0 text-right text-[11px] font-extrabold text-[#1e1e1e]/60">{label}</span>
+      <div className="flex h-4 flex-1 overflow-hidden rounded-full">
+        {segments.map((segment, i) => (
+          <span key={i} style={{ width: `${segment.widthPct}%`, backgroundColor: segment.color }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ScoreDiagram() {
+  return (
+    <div className="rounded-2xl bg-[#f3f3f0] p-3.5">
+      <div className="flex flex-col gap-1.5">
+        <DiagramZoneBar label="Max" segments={DIAGRAM_MAX_SEGMENTS} />
+        <DiagramZoneBar label="Jij" segments={DIAGRAM_PLAYER_SEGMENTS} />
+        <div className="flex items-center gap-2">
+          <span className="w-8 shrink-0" />
+          <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-emerald-500/25">
+            {DIAGRAM_DIFF_STRIPS.map((strip) => (
+              <span
+                key={strip.leftPct}
+                className="absolute inset-y-0 bg-[#e61f15]"
+                style={{ left: `${strip.leftPct}%`, width: `${strip.widthPct}%` }}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+      <p className="mt-2 text-[11px] font-bold leading-snug text-[#1e1e1e]/60">
+        <span className="font-extrabold text-emerald-600">Groen</span> = vol gas,{' '}
+        <span className="font-extrabold text-[#c77b0a]">oranje</span> = uitrollen,{' '}
+        <span className="font-extrabold text-[#e61f15]">rood</span> = remmen. De onderste strook markeert waar jij iets
+        anders deed dan Max, daar verlies je punten.
+      </p>
+    </div>
+  );
+}
+
 function scoreSentence(total: number): string {
   if (total >= 90) return 'Wereldklasse, jij remt als Max zelf!';
   if (total >= 70) return 'Sterke ronde, bijna kwalificatiewaardig.';
@@ -408,6 +473,7 @@ function App() {
   const [savedScores, setSavedScores] = useState<SavedScores>(loadScores);
   const [runContext, setRunContext] = useState<{ previousLast: SavedRun | null; isNewBest: boolean } | null>(null);
   const [showShared, setShowShared] = useState(shared !== null);
+  const [showScoreInfo, setShowScoreInfo] = useState(false);
   const [copied, setCopied] = useState(false);
   const hideIntroChrome = showShared || debugCornerBox !== null;
 
@@ -447,6 +513,7 @@ function App() {
 
   const restart = useCallback(() => {
     setShowShared(false);
+    setShowScoreInfo(false);
     setRunContext(null);
     history.replaceState(null, '', location.pathname);
     game.restart();
@@ -510,6 +577,10 @@ function App() {
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (showShared) return;
+      if (showScoreInfo) {
+        if (event.code === 'Escape') setShowScoreInfo(false);
+        return;
+      }
       const pedal = pedalForCode(event.code);
       if (pedal && pedalsLive) {
         event.preventDefault();
@@ -532,7 +603,7 @@ function App() {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
     };
-  }, [phase, showShared, game, startGame, nextRound, showFinal, isLastRound]);
+  }, [phase, showShared, showScoreInfo, game, startGame, nextRound, showFinal, isLastRound]);
 
   // Move keyboard focus along with the flow, so Tab/Enter always lands on the
   // primary action and screen-reader users follow the game without hunting.
@@ -541,6 +612,24 @@ function App() {
   const nextBtnRef = useRef<HTMLButtonElement>(null);
   const shareBtnRef = useRef<HTMLButtonElement>(null);
   const sharedBtnRef = useRef<HTMLButtonElement>(null);
+  const scoreInfoOpenRef = useRef<HTMLButtonElement>(null);
+  const scoreInfoCloseRef = useRef<HTMLButtonElement>(null);
+  // Focus dives into the explainer when it opens and returns to the link that
+  // opened it when it closes; the wasOpen ref keeps this from stealing the
+  // score card's initial focus (which belongs to the share button).
+  const scoreInfoWasOpenRef = useRef(false);
+  useEffect(() => {
+    if (showScoreInfo) {
+      scoreInfoWasOpenRef.current = true;
+      const id = setTimeout(() => scoreInfoCloseRef.current?.focus({ preventScroll: true }), 120);
+      return () => clearTimeout(id);
+    }
+    if (scoreInfoWasOpenRef.current) {
+      scoreInfoWasOpenRef.current = false;
+      const id = setTimeout(() => scoreInfoOpenRef.current?.focus({ preventScroll: true }), 120);
+      return () => clearTimeout(id);
+    }
+  }, [showScoreInfo]);
 
   useEffect(() => {
     const byPhase: Partial<Record<GamePhase, React.RefObject<HTMLButtonElement | null>>> = {
@@ -831,7 +920,7 @@ function App() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="final-title"
-          inert={!(phase === 'finished' && !showShared) || undefined}
+          inert={!(phase === 'finished' && !showShared) || showScoreInfo || undefined}
           className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-ink/60 p-4 backdrop-blur-[2px] transition-all duration-700 ${phase === 'finished' && !showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
           <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:max-w-md sm:p-10">
@@ -889,6 +978,79 @@ function App() {
                 Nog een keer
               </button>
             </div>
+            <button
+              ref={scoreInfoOpenRef}
+              type="button"
+              onClick={() => setShowScoreInfo(true)}
+              className="mx-auto mt-3 block rounded text-xs font-bold text-ink/60 underline underline-offset-2 transition-colors hover:text-ink focus-ring focus-ring-dark"
+            >
+              Hoe wordt je score berekend?
+            </button>
+          </div>
+        </div>
+
+        {/* score explanation + about-this-game disclaimer, opened from the
+            final card; sits above it (z-50) with its own backdrop */}
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="score-info-title"
+          inert={!showScoreInfo || undefined}
+          className={`fixed inset-0 z-50 backdrop-carbon flex overflow-y-auto bg-ink/70 p-4 backdrop-blur-[3px] transition-all duration-300 ${showScoreInfo ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+        >
+          <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-left text-ink shadow-2xl sm:max-w-md sm:p-8">
+            <h2 id="score-info-title" className="text-sm font-extrabold uppercase tracking-wide text-[#e61f15]">
+              Zo werkt je score
+            </h2>
+            <div className="mt-3">
+              <ScoreDiagram />
+            </div>
+            <ul className="mt-4 list-disc space-y-2 pl-4 text-sm font-bold leading-snug text-[#1e1e1e]/80">
+              <li>
+                Tijdens de bocht vergelijken we jouw pedalen 20 keer per seconde met de echte telemetrie van Max: remt
+                hij, rolt hij uit of geeft hij vol gas.
+              </li>
+              <li>Reactietijd krijg je cadeau: zit je bij een overgang maximaal 0,2 seconde naast Max, dan telt dat gewoon als goed.</li>
+              <li>
+                Per pedaalstand krijg je zo een percentage, de drie balken op je bochtkaart. Je bochtscore is het
+                gemiddelde van die drie, zo weegt de korte remzone net zo zwaar als het lange stuk vol gas.
+              </li>
+              <li>Je eindscore is het gemiddelde van de drie echte bochten, de oefenbocht telt niet mee.</li>
+            </ul>
+            <div className="mt-5 border-t border-ink/10 pt-4">
+              <h3 className="text-xs font-extrabold uppercase tracking-wide text-[#1e1e1e]/50">Over dit spel</h3>
+              <p className="mt-2 text-xs font-bold leading-snug text-[#1e1e1e]/70">
+                Dit spel is gemaakt met hulp van AI (Claude). De rijdata is de echte poleronde van Max Verstappen:
+                ronde {fixture.meta.lapNumber} uit de kwalificatie van de {fixture.meta.meetingName} {fixture.meta.year}
+                , opgehaald via{' '}
+                <a
+                  href={fixture.meta.source}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-extrabold text-track-blue underline underline-offset-2 hover:text-ink"
+                >
+                  OpenF1
+                </a>
+                . De baanlayout komt uit de officiële circuitgeometrie van{' '}
+                <a
+                  href={fixture.meta.trackOutlineSource}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-extrabold text-track-blue underline underline-offset-2 hover:text-ink"
+                >
+                  f1-circuits
+                </a>
+                .
+              </p>
+            </div>
+            <button
+              ref={scoreInfoCloseRef}
+              type="button"
+              onClick={() => setShowScoreInfo(false)}
+              className={`${BTN_RED} mt-5 w-full px-6 py-3`}
+            >
+              Terug naar je score
+            </button>
           </div>
         </div>
 

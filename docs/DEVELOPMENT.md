@@ -345,14 +345,22 @@ step the player's pedal state (from the transition timeline) is compared
 against Max's phase (`classifyAt`: brakeActive → brake, throttle < 95 →
 coast, else flat).
 
-- **Numeric**: the round score is simply the matched share of time, 0-100.
-  A step also counts as matched when the player's state matches Max's phase
-  0.2s to either side (`REACTION_GRACE_S`), so human reaction lag at every
-  zone boundary is forgiven without rewarding a wrong pedal held through a
-  whole zone — a scripted playthrough that mirrors the telemetry with 120ms
-  lag scores 100, holding only gas scores ~50. `totalScore` averages the
-  **scoring rounds' rounded scores** (equal round weight, practice excluded)
-  so the total stays verifiable from the card's listed round scores.
+- **Numeric**: the round score is the equal-weight average of the three
+  per-phase match percentages (the REM/LOS/GAS bars on the result card),
+  rounded per phase before averaging so the card exactly verifies the score.
+  It is deliberately NOT the matched share of time: Max is flat out for
+  40-55% of every window, so time-weighted matching handed ~50 points to
+  anyone who just held the gas down — the long easy stretches drowned out
+  the short braking zones where the skill sits. With equal phase weight a
+  one-pedal strategy lands around 40 (the boundary grace lifts it above the
+  naive 33) and a telemetry-mirroring playthrough with 120ms lag still
+  scores 100. A step counts as matched when the
+  player's state matches Max's phase directly or 0.2s to either side
+  (`REACTION_GRACE_S`), forgiving human reaction lag at zone boundaries
+  without rewarding a wrong pedal held through a whole zone; phases shorter
+  than `MIN_PHASE_S` in a window are left out of the average. `totalScore`
+  averages the **scoring rounds' rounded scores** (equal round weight,
+  practice excluded), so the total stays verifiable from the card too.
 - **Zones**: the same walk is grouped into contiguous same-phase zones
   (`ZoneResult`: match fraction + the dominant wrong input) and into
   per-phase totals (`phaseAccuracy`), which feed the REM/LOS/GAS accuracy
@@ -479,8 +487,8 @@ telemetry channels (`brakeActive` / `throttle < 95`), start each round with
 `keyboard.down('KeyG')`, then walk the spans with `keyboard.down`/`up` on
 KeyR/KeyG about 120ms late (inside the 0.2s scoring grace) — screenshot
 each phase, and look at the screenshots. A telemetry-mirroring run must
-score 100 on every round and a gas-only run around ~50; if either drifts,
-the scoring grace or the transition recording broke. Two traps: layered UI
+score 100 on every round and a gas-only run around ~40; if either drifts,
+the scoring grace, the phase averaging or the transition recording broke. Two traps: layered UI
 keeps hidden buttons in the DOM (`opacity-0` + `pointer-events-none`), so
 Playwright's `visible` check passes early — gate on _clickability_, not
 visibility (and match the pedals by `aria-label`, their text is just

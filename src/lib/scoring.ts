@@ -10,6 +10,11 @@ export type ResultTone = 'perfect' | 'good' | 'okay' | 'bad';
 // wrong pedal held through a whole zone.
 const REACTION_GRACE_S = 0.2;
 
+// A phase must fill at least this much of the window to count toward the
+// score average - guards against a future fixture where a one-blip phase
+// would otherwise carry a third of a round's score.
+const MIN_PHASE_S = 0.5;
+
 /** One contiguous stretch of the round where Max holds the same phase, with
  * how much of it the player's pedals agreed. */
 export interface ZoneResult {
@@ -31,14 +36,28 @@ export interface RoundResult {
   zones: ZoneResult[];
   /** Match time per phase of Max's driving (totalS 0 = phase absent). */
   phaseAccuracy: Record<DrivingPhase, PhaseAccuracy>;
-  /** 0-100: the share of the round the player's pedals matched Max. */
+  /** 0-100: the average of the per-phase match percentages. */
   score: number;
 }
 
+/** A phase's match share as the whole percentage the result card shows. */
+export function phasePercent(accuracy: PhaseAccuracy): number {
+  return accuracy.totalS === 0 ? 0 : Math.round((accuracy.matchedS / accuracy.totalS) * 100);
+}
+
 // Walks the round window on the same grid the ribbons render at and compares
-// the player's pedal timeline against Max's telemetry moment by moment. The
-// score is simply the matched share of time; zones and per-phase accuracy are
-// the same comparison grouped two ways for the result UI and the tips.
+// the player's pedal timeline against Max's telemetry moment by moment.
+//
+// The score is the equal-weight average of the three per-phase match
+// percentages (the REM/LOS/GAS bars on the result card), NOT the matched
+// share of time: Max is flat out for 40-55% of every window, so time-weighted
+// matching handed ~50 points to anyone who simply held the gas down and let
+// the long easy stretches drown out the short braking zones where the actual
+// skill sits. Equal phase weight puts a 2s braking zone on par with a 4s
+// flat-out run (one-pedal strategies now land around 40 - the reaction grace
+// at zone edges lifts them above the naive 33), and averaging the *rounded*
+// percentages keeps the score verifiable from the card the player sees - the
+// same property totalScore keeps for the final card.
 export function scoreRound(round: GameRound, samples: LapSample[], transitions: InputTransition[]): RoundResult {
   const zones: ZoneResult[] = [];
   const phaseAccuracy: Record<DrivingPhase, PhaseAccuracy> = {
@@ -47,8 +66,6 @@ export function scoreRound(round: GameRound, samples: LapSample[], transitions: 
     brake: { matchedS: 0, totalS: 0 },
   };
 
-  let matchedS = 0;
-  let totalS = 0;
   let zone: { phase: DrivingPhase; tStart: number; tEnd: number; matchedS: number; totalS: number } | null = null;
   let zoneWrong: Record<PedalInput, number> | null = null;
 
@@ -81,11 +98,9 @@ export function scoreRound(round: GameRound, samples: LapSample[], transitions: 
     }
     zone.tEnd = t;
     zone.totalS += STEP_S;
-    totalS += STEP_S;
     phaseAccuracy[maxPhase].totalS += STEP_S;
     if (matched) {
       zone.matchedS += STEP_S;
-      matchedS += STEP_S;
       phaseAccuracy[maxPhase].matchedS += STEP_S;
     } else if (zoneWrong) {
       zoneWrong[playerInput] += STEP_S;
@@ -93,7 +108,11 @@ export function scoreRound(round: GameRound, samples: LapSample[], transitions: 
   }
   closeZone();
 
-  const score = totalS === 0 ? 0 : Math.round((matchedS / totalS) * 100);
+  const countedPhases = Object.values(phaseAccuracy).filter((accuracy) => accuracy.totalS >= MIN_PHASE_S);
+  const score =
+    countedPhases.length === 0
+      ? 0
+      : Math.round(countedPhases.reduce((sum, accuracy) => sum + phasePercent(accuracy), 0) / countedPhases.length);
   return { round, zones, phaseAccuracy, score };
 }
 
