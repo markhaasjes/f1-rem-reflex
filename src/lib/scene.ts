@@ -101,6 +101,13 @@ function offsetPolyline(points: Point[], from: number, to: number, offsetM: numb
   return result;
 }
 
+/** A parallel copy of an open path, shifted `offsetM` to one side: the result
+ * comparison draws the player's line next to Max's instead of on top of it.
+ * Reuses offsetPolyline, so fold-backs on tight bends are pruned, not drawn. */
+export function offsetPathPoints(points: Point[], offsetM: number): Point[] {
+  return offsetPolyline(points, 0, points.length - 1, offsetM, 1);
+}
+
 // Like offsetPolyline, but splits into separate runs wherever the bend is
 // tighter than the offset reaches (offsetting past the local center of
 // curvature would put the line across the track - hairpin inside curbs).

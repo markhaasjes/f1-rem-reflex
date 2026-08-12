@@ -3,8 +3,9 @@ import { useElementSize } from '../hooks/useElementSize';
 import { viewBoxFromCam, type CamBox } from '../hooks/useCameraFlight';
 import { fitProjection, prepareCanvas } from '../lib/canvas';
 import { CAR_ART_LENGTH_UNITS, drawF1Car } from '../lib/canvasCar';
-import { headingAt, positionAt, primePathModel, sampleAt, smoothPathPoints } from '../lib/corner';
-import { buildPhaseSegments, type DrivingPhase } from '../lib/phases';
+import { headingAt, positionAt, primePathModel, sampleAt } from '../lib/corner';
+import { buildPhaseSegments, type DrivingPhase, type PhaseSegment } from '../lib/phases';
+import { buildInputSegments } from '../lib/playerInput';
 import {
   drawCornerBadge,
   drawCornerCurbs,
@@ -22,9 +23,10 @@ import {
   drawStartFinish,
   drawTrackRibbon,
   nearestIndex,
+  offsetPathPoints,
   rotateOutline,
 } from '../lib/scene';
-import type { GamePhase, GameRound, PlayerMark, ZandvoortFixture } from '../types';
+import type { GamePhase, GameRound, InputTransition, PedalInput, ZandvoortFixture } from '../types';
 
 interface CircuitSceneProps {
   fixture: ZandvoortFixture;
@@ -33,8 +35,11 @@ interface CircuitSceneProps {
   round: GameRound;
   roundIndex: number;
   elapsedT: number;
-  marks: PlayerMark[];
-  /** Reveal Max's line, phase colors and brake/gas pins (round result). */
+  /** The player's recorded pedal timeline for the current round. */
+  transitions: InputTransition[];
+  /** The combined pedal state held right now (colors the live car glow). */
+  heldInput: PedalInput;
+  /** Reveal the Max-vs-player comparison ribbons (round result). */
   showReference: boolean;
 }
 
@@ -95,6 +100,21 @@ const PHASE_COLOR: Record<DrivingPhase, string> = {
   brake: '#e61f15',
 };
 
+// The practice guide renders Max's zones wider than the trail the player
+// leaves on top of it, so the corridor stays visible around the driven line.
+const GUIDE_WIDTH_M = 6;
+// The result comparison shifts the player's line one road-half beside Max's;
+// same phase palette, slightly narrower so Max's line reads as the reference.
+const PLAYER_LINE_OFFSET_M = 4.5;
+const PLAYER_LINE_WIDTH_M = 2.6;
+// The glow disc under the car while driving, colored by the held pedal.
+const GLOW_RADIUS_M = 9;
+const GLOW_MIN_RADIUS_PX = 16;
+const GLOW_COLOR: Record<'gas' | 'brake', string> = {
+  gas: 'rgba(18, 163, 127, 0.35)',
+  brake: 'rgba(230, 31, 21, 0.4)',
+};
+
 // The scene renders on its own requestAnimationFrame loop, reading the
 // latest props from a ref: the camera, the run clock and the badge pulse all
 // animate every frame anyway, and this keeps React out of the hot path.
@@ -134,6 +154,14 @@ export function CircuitScene(props: CircuitSceneProps) {
     [fixture],
   );
 
+  // The player's offset comparison line for the result view, rebuilt only when
+  // a new timeline arrives (the render loop runs every frame; this must not).
+  const comparisonRef = useRef<{
+    transitions: InputTransition[];
+    roundIndex: number;
+    segments: PhaseSegment[];
+  } | null>(null);
+
   useEffect(() => {
     let raf = 0;
 
@@ -145,7 +173,7 @@ export function CircuitScene(props: CircuitSceneProps) {
       const ctx = prepareCanvas(canvas, w, h);
       if (!ctx) return;
 
-      const { camBox, phase, round, roundIndex, elapsedT, marks, showReference } = propsRef.current;
+      const { camBox, phase, round, roundIndex, elapsedT, transitions, heldInput, showReference } = propsRef.current;
       const projection = fitProjection(viewBoxFromCam(camBox), w, h);
       const samples = fixture.lap.samples;
 
@@ -165,10 +193,17 @@ export function CircuitScene(props: CircuitSceneProps) {
       }
       drawStartFinish(ctx, fixture.startFinish.x, fixture.startFinish.y, fixture.startFinish.headingDeg, projection);
 
-      // --- practice coaching: pulsing markers where Max brakes and gets
-      // back on the gas, so first-time players see what to do without
-      // reading anything ---
+      // --- practice coaching: Max's phase-colored zones drawn as a wide
+      // corridor on the road, plus pulsing markers where his braking starts
+      // and where he commits back to full throttle, so first-time players
+      // see what to match without reading anything ---
       if (round.practice && (phase === 'ready' || phase === 'running')) {
+        ctx.save();
+        ctx.globalAlpha = 0.55;
+        for (const segment of roundSegments[roundIndex]) {
+          drawRibbon(ctx, segment.points, PHASE_COLOR[segment.phase], projection, GUIDE_WIDTH_M);
+        }
+        ctx.restore();
         for (const event of round.events) {
           const s = sampleAt(samples, event.t);
           const [x, y] = projection.toScreen(s.x, s.y);
@@ -183,30 +218,52 @@ export function CircuitScene(props: CircuitSceneProps) {
           ctx.lineWidth = 3;
           ctx.stroke();
           ctx.restore();
-          drawPin(ctx, x, y, color, isBrake ? 'Rem hier!' : 'Gas hier!', !isBrake);
+          drawPin(ctx, x, y, color, isBrake ? 'Rem hier!' : 'Vol gas hier!', !isBrake);
         }
       }
 
-      // --- run/result overlays ---
+      // --- live trail: the driven line so far, colored by what the player's
+      // pedals said at each moment (green = gas, amber = los, red = remmen) ---
       if (phase === 'running' && elapsedT > round.tStart) {
-        drawRibbon(ctx, smoothPathPoints(samples, round.tStart, elapsedT), 'rgba(230, 31, 21, 0.85)', projection);
+        for (const segment of buildInputSegments(samples, transitions, round.tStart, elapsedT)) {
+          drawRibbon(ctx, segment.points, PHASE_COLOR[segment.phase], projection);
+        }
       }
 
+      // --- result comparison: Max's phase-colored line on his racing line,
+      // the player's timeline as a parallel line beside it ---
       if (showReference) {
         for (const segment of roundSegments[roundIndex]) {
           drawRibbon(ctx, segment.points, PHASE_COLOR[segment.phase], projection);
         }
-        // Pins are placed via the path model (not raw samples) so they sit on
-        // the drawn line, also inside the repaired Gerlach/Hugenholtz stretch.
-        for (const event of round.events) {
-          const p = positionAt(samples, event.t);
-          const [x, y] = projection.toScreen(p.x, p.y);
-          drawPin(ctx, x, y, '#0b7a43', event.type === 'brake' ? 'Max rem' : 'Max gas');
+        let cache = comparisonRef.current;
+        if (!cache || cache.transitions !== transitions || cache.roundIndex !== roundIndex) {
+          cache = {
+            transitions,
+            roundIndex,
+            segments: buildInputSegments(samples, transitions, round.tStart, round.tEnd).map((segment) => ({
+              phase: segment.phase,
+              points: offsetPathPoints(segment.points, PLAYER_LINE_OFFSET_M),
+            })),
+          };
+          comparisonRef.current = cache;
         }
-        for (const mark of marks) {
-          const p = positionAt(samples, mark.t);
-          const [x, y] = projection.toScreen(p.x, p.y);
-          drawPin(ctx, x, y, '#1a2c8f', mark.type === 'brake' ? 'Jij rem' : 'Jij gas', true);
+        for (const segment of cache.segments) {
+          drawRibbon(ctx, segment.points, PHASE_COLOR[segment.phase], projection, PLAYER_LINE_WIDTH_M);
+        }
+        // Legend pins at the start of the window: whose line is whose. Max's
+        // label sits above his dot, the player's below, so they stay legible
+        // even when the two lines nearly touch.
+        const startPoint = positionAt(samples, round.tStart);
+        const playerStart = offsetPathPoints(
+          [startPoint, positionAt(samples, round.tStart + 0.5)],
+          PLAYER_LINE_OFFSET_M,
+        )[0];
+        const [maxX, maxY] = projection.toScreen(startPoint.x, startPoint.y);
+        drawPin(ctx, maxX, maxY, '#1e1e1e', 'Max');
+        if (playerStart) {
+          const [youX, youY] = projection.toScreen(playerStart.x, playerStart.y);
+          drawPin(ctx, youX, youY, '#1a2c8f', 'Jij', true);
         }
       }
 
@@ -220,6 +277,15 @@ export function CircuitScene(props: CircuitSceneProps) {
       else if (phase === 'roundResult' || phase === 'finished') carT = round.tEnd;
       const carState = sampleAt(samples, carT);
       const carPos = positionAt(samples, carT);
+      // Immediate pedal feedback at the car itself: a colored glow under it
+      // while the player is on the gas or the brake (nothing while coasting).
+      if (phase === 'running' && heldInput !== 'coast') {
+        const [glowX, glowY] = projection.toScreen(carPos.x, carPos.y);
+        ctx.beginPath();
+        ctx.arc(glowX, glowY, Math.max(GLOW_RADIUS_M * projection.scale, GLOW_MIN_RADIUS_PX), 0, Math.PI * 2);
+        ctx.fillStyle = GLOW_COLOR[heldInput];
+        ctx.fill();
+      }
       const minScale = CAR_MIN_LENGTH_PX / (CAR_ART_LENGTH_UNITS * projection.scale);
       drawF1Car(ctx, {
         x: carPos.x,

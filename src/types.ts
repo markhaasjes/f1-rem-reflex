@@ -22,8 +22,11 @@ interface CornerMarker extends Point {
   distanceM: number;
 }
 
-/** One of Max's brake/gas moments the player has to match. */
-export interface TargetEvent {
+/** One of Max's reference moments: where a braking zone opens ('brake') and
+ * where he commits back to sustained full throttle ('gas'). The hold-to-drive
+ * gameplay scores against the full telemetry, but these anchor the practice
+ * round's coaching pins and the per-round zone-count copy. */
+interface TargetEvent {
   type: 'brake' | 'gas';
   t: number;
   distanceM: number;
@@ -85,10 +88,11 @@ export interface ZandvoortFixture {
 
 export type GamePhase = 'intro' | 'flying' | 'ready' | 'running' | 'roundResult' | 'finished';
 
-/** A player press during a run, matched to a target event by order. */
-export interface PlayerMark {
-  type: 'brake' | 'gas';
+/** What the player's pedals say at a moment: gas held, brake held, or neither. */
+export type PedalInput = 'gas' | 'brake' | 'coast';
+
+/** One change of the player's pedal state during a run, on the lap clock. */
+export interface InputTransition {
   t: number;
-  distanceM: number;
-  speedKph: number;
+  input: PedalInput;
 }

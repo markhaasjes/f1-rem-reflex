@@ -7,13 +7,8 @@ import fixtureJson from './data/zandvoort2025.json';
 import { boxFromBounds, useCameraFlight, type CamBox } from './hooks/useCameraFlight';
 import { useCircuitGame } from './hooks/useCircuitGame';
 import { positionAt, sampleAt } from './lib/corner';
-import {
-  combineResults,
-  totalScore,
-  totalScoreFromRoundScores,
-  type EventResult,
-  type RoundResult,
-} from './lib/scoring';
+import type { DrivingPhase } from './lib/phases';
+import { totalScore, totalScoreFromRoundScores, verdictForScore, type RoundResult } from './lib/scoring';
 import { decodeShareToken, encodeShareToken } from './lib/shareToken';
 import { loadScores, saveRun, type SavedRun, type SavedScores } from './lib/storage';
 import { adviceForRound, adviceForRun } from './lib/tips';
@@ -83,113 +78,57 @@ function parseSharedScore(): { total: number; rounds: number[] } | null {
   return { total: totalScoreFromRoundScores(fixture.rounds, roundScores), rounds: roundScores };
 }
 
-// How far the gauge scale reaches on either side of Max's point.
-const GAUGE_RANGE_M = 25;
+// Display config for the three driving phases, in pedal order: brake on the
+// left like the REM pedal, full throttle on the right like the GAS pedal.
+const PHASE_ROWS: { phase: DrivingPhase; label: string; sublabel: string; color: string }[] = [
+  { phase: 'brake', label: 'REM', sublabel: 'remmen', color: '#e61f15' },
+  { phase: 'coast', label: 'LOS', sublabel: 'uitrollen', color: '#f2a11c' },
+  { phase: 'flat', label: 'GAS', sublabel: 'vol gas', color: '#10b981' },
+];
 
-const TONE_DOT: Record<EventResult['description']['tone'], string> = {
-  perfect: '#10b981',
-  good: '#22c55e',
-  okay: '#f59e0b',
-  bad: '#e61f15',
-};
-
-// One brake/gas moment, visualized: a gauge with Max's point as the center
-// tick and the player's press as a colored dot early (left) or late (right)
-// of it, with the distance and time gaps spelled out. Card chrome lives on
-// the per-corner group (RoundResultCards); `compact` is the phone variant.
-function EventResultGauge({ er, compact = false }: { er: EventResult; compact?: boolean }) {
-  const isBrake = er.event.type === 'brake';
-  const label = isBrake ? 'REM' : 'GAS';
-  const accent = isBrake ? '#e61f15' : '#10b981';
-  const width = compact ? 'w-28' : 'w-32 sm:w-36';
-
-  if (er.deltaM === null || er.mark === null) {
-    return (
-      <div className={`${width} text-left`}>
-        <span className="text-xs font-extrabold" style={{ color: accent }}>
-          {label}
-        </span>
-        <p className="text-xs font-extrabold text-[#1e1e1e]">{isBrake ? 'Niet geremd' : 'Geen gas gegeven'}</p>
-      </div>
-    );
-  }
-
-  const late = er.deltaM > 0;
-  const meters = Math.abs(Math.round(er.deltaM));
-  let deltaLabel = 'perfect!';
-  if (meters > 0) {
-    deltaLabel = `${meters}m ${late ? 'te laat' : 'te vroeg'}`;
-  }
-  const seconds = Math.abs(er.mark.t - er.event.t)
-    .toFixed(2)
-    .replace('.', ',');
-  const dotPercent = 50 + (Math.max(-GAUGE_RANGE_M, Math.min(GAUGE_RANGE_M, er.deltaM)) / GAUGE_RANGE_M) * 50;
-
-  return (
-    <div className={width}>
-      <div className="flex items-baseline justify-between gap-2">
-        <span className={`font-extrabold ${compact ? 'text-[10px]' : 'text-xs'}`} style={{ color: accent }}>
-          {label}
-        </span>
-        <span className={`font-extrabold text-[#1e1e1e] ${compact ? 'text-[10px]' : 'text-xs'}`}>{deltaLabel}</span>
-      </div>
-      <div className={`relative mt-1.5 rounded-full bg-[#ececec] ${compact ? 'h-1.5' : 'h-2'}`}>
-        <span className="absolute left-1/2 top-1/2 h-3.5 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded bg-[#1e1e1e]/50" />
-        <span
-          className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow ${compact ? 'h-3 w-3' : 'h-3.5 w-3.5'}`}
-          style={{ left: `${dotPercent}%`, backgroundColor: TONE_DOT[er.description.tone] }}
-        />
-      </div>
-      {compact ? (
-        <p className="mt-0.5 text-center text-[10px] font-extrabold tabular-nums text-[#1e1e1e]/75">{seconds}s</p>
-      ) : (
-        <div className="mt-1 flex items-center justify-between text-[10px] font-bold text-[#1e1e1e]/45">
-          <span>te vroeg</span>
-          <span className="text-[11px] font-extrabold tabular-nums text-[#1e1e1e]/75">{seconds}s</span>
-          <span>te laat</span>
-        </div>
-      )}
-    </div>
+// How well the player matched each of Max's three pedal states, as one card
+// with a mini accuracy bar per phase: "van de tijd dat Max remt, zat jij X%
+// ook op de rem". Phases Max never uses in the window are left out.
+function RoundAccuracyCard({ result, compact = false }: { result: RoundResult; compact?: boolean }) {
+  const rows = PHASE_ROWS.map((row) => ({ ...row, accuracy: result.phaseAccuracy[row.phase] })).filter(
+    (row) => row.accuracy.totalS > 0.1,
   );
-}
-
-// A round's result cards, one white card per braking zone (brake + gas pair),
-// so on a double corner it's clear which REM belongs to which GAS. When the
-// round covers as many corners as zones, each card is titled with its corner.
-function RoundResultCards({ result, compact = false }: { result: RoundResult; compact?: boolean }) {
-  const pairs: EventResult[][] = [];
-  for (const er of result.eventResults) {
-    const currentPair = pairs.at(-1);
-    if (!currentPair || currentPair.length === 2) pairs.push([er]);
-    else currentPair.push(er);
-  }
-  const zoneNames =
-    pairs.length > 1 && result.round.cornerNumbers.length === pairs.length
-      ? result.round.cornerNumbers.map((n) => fixture.corners.find((c) => c.number === n)?.name ?? `Bocht ${n}`)
-      : null;
 
   return (
-    <>
-      {pairs.map((pair, i) => (
-        <div
-          key={pair[0].event.t}
-          className={`rounded-2xl bg-white shadow-lg ${compact ? 'px-2.5 py-1.5' : 'px-3 py-2'}`}
-        >
-          {zoneNames && (
-            <p
-              className={`text-left font-extrabold uppercase tracking-wide text-[#1e1e1e]/50 ${compact ? 'text-[9px]' : 'text-[10px]'}`}
-            >
-              {zoneNames[i]}
-            </p>
-          )}
-          <div className={`flex ${compact ? 'gap-2.5' : 'gap-3'}`}>
-            {pair.map((er) => (
-              <EventResultGauge key={er.event.t} er={er} compact={compact} />
-            ))}
-          </div>
-        </div>
-      ))}
-    </>
+    <div className={`rounded-2xl bg-white shadow-lg ${compact ? 'px-2.5 py-1.5' : 'px-3 py-2'}`}>
+      <p
+        className={`text-left font-extrabold uppercase tracking-wide text-[#1e1e1e]/50 ${compact ? 'text-[9px]' : 'text-[10px]'}`}
+      >
+        Gelijk met Max
+      </p>
+      <div className={`flex ${compact ? 'gap-2.5' : 'gap-3'}`}>
+        {rows.map((row) => {
+          const percent = Math.round((row.accuracy.matchedS / row.accuracy.totalS) * 100);
+          return (
+            <div key={row.phase} className={compact ? 'w-20' : 'w-24 sm:w-28'}>
+              <div className="flex items-baseline justify-between gap-2">
+                <span
+                  className={`font-extrabold ${compact ? 'text-[10px]' : 'text-xs'}`}
+                  style={{ color: row.color }}
+                >
+                  {row.label}
+                </span>
+                <span className={`font-extrabold tabular-nums text-[#1e1e1e] ${compact ? 'text-[10px]' : 'text-xs'}`}>
+                  {percent}%
+                </span>
+              </div>
+              <div className={`relative mt-1.5 overflow-hidden rounded-full bg-[#ececec] ${compact ? 'h-1.5' : 'h-2'}`}>
+                <span
+                  className="absolute inset-y-0 left-0 rounded-full"
+                  style={{ width: `${percent}%`, backgroundColor: row.color }}
+                />
+              </div>
+              {!compact && <p className="mt-1 text-[10px] font-bold text-[#1e1e1e]/45">{row.sublabel}</p>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -280,38 +219,50 @@ function PedalArt({ variant, idPrefix, className }: { variant: 'brake' | 'gas'; 
   );
 }
 
-// An in-game pedal button. Pressing tilts the pedal like the real thing; the
-// pedal Max needs next gets a white ring.
+// An in-game pedal button, held rather than tapped: pointer capture keeps the
+// press alive until the finger/mouse actually lets go, even when it drifts off
+// the button. While held the pedal tilts like the real thing and shows a
+// colored ring; `highlight` marks the gas pedal as the way to start a round.
 function Pedal({
   variant,
-  onPress,
-  disabled,
+  onHoldChange,
+  held,
   highlight,
+  buttonRef,
 }: {
   variant: 'brake' | 'gas';
-  onPress: () => void;
-  disabled: boolean;
+  onHoldChange: (pressed: boolean) => void;
+  held: boolean;
   highlight: boolean;
+  buttonRef?: React.RefObject<HTMLButtonElement | null>;
 }) {
   const isBrake = variant === 'brake';
   const accent = isBrake ? '#e61f15' : '#10b981';
 
   return (
     <button
+      ref={buttonRef}
       type="button"
-      onClick={onPress}
-      disabled={disabled}
+      onPointerDown={(event) => {
+        event.currentTarget.setPointerCapture(event.pointerId);
+        onHoldChange(true);
+      }}
+      onPointerUp={() => onHoldChange(false)}
+      onPointerCancel={() => onHoldChange(false)}
+      onLostPointerCapture={() => onHoldChange(false)}
+      onContextMenu={(event) => event.preventDefault()}
       aria-keyshortcuts={isBrake ? 'r arrowleft' : 'g arrowright'}
-      aria-label={isBrake ? 'Rempedaal (toets R)' : 'Gaspedaal (toets G)'}
-      className={`group flex-1 select-none touch-manipulation rounded-2xl pb-1 pt-2 transition-all duration-150 focus-ring focus-ring-white ${
-        disabled ? 'opacity-50 saturate-50' : 'hover:-translate-y-0.5'
-      } ${highlight ? 'ring-4 ring-white/80' : ''}`}
+      aria-label={isBrake ? 'Rempedaal, houd ingedrukt (toets R)' : 'Gaspedaal, houd ingedrukt (toets G of spatie)'}
+      aria-pressed={held}
+      className={`group flex-1 select-none touch-manipulation rounded-2xl pb-1 pt-2 transition-all duration-150 focus-ring focus-ring-white hover:-translate-y-0.5 ${
+        highlight && !held ? 'ring-4 ring-white/80' : ''
+      } ${held ? `ring-4 ${isBrake ? 'ring-[#e61f15]' : 'ring-[#10b981]'}` : ''}`}
     >
       <PedalArt
         variant={variant}
         idPrefix="pedal"
         className={`mx-auto h-16 w-auto drop-shadow-[0_6px_10px_rgba(6,12,60,0.5)] transition-transform duration-100 sm:h-28 wide:h-[clamp(6rem,30vh,10rem)] ${
-          disabled ? '' : 'group-active:[transform:perspective(360px)_rotateX(22deg)] group-active:origin-bottom'
+          held ? '[transform:perspective(360px)_rotateX(22deg)] origin-bottom' : ''
         }`}
       />
       <span
@@ -390,7 +341,7 @@ function scoreSentence(total: number): string {
 
 function App() {
   const game = useCircuitGame(fixture);
-  const { phase, round, roundIndex, elapsedT, marks, results, nextEvent } = game;
+  const { phase, round, roundIndex, elapsedT, transitions, results, heldInput } = game;
 
   const overviewBox = useMemo<CamBox>(() => {
     const xs = fixture.trackOutline.map((p) => p.x);
@@ -511,38 +462,52 @@ function App() {
     }
   }, [phase, isWide, cameraFollow, cameraFly, cameraJumpTo, roundBoxes, roundIndex]);
 
-  // Space advances the flow; while running it presses the pedal Max needs
-  // next. R/ArrowLeft and G/ArrowRight hit a specific pedal (like the
-  // on-screen buttons). Space is preventDefault-ed, so a focused button never
-  // double-fires; Enter activates the focused button natively.
+  // The keyboard drives the pedals like real ones: keydown presses, keyup
+  // releases. R/ArrowLeft hold the brake, G/ArrowRight/Space hold the gas
+  // (holding gas on the ready screen is also what starts the round). Outside
+  // the pedal phases Space still advances the flow; auto-repeat keydowns are
+  // ignored so a held key is one press, and Space is preventDefault-ed so a
+  // focused button never double-fires.
   useEffect(() => {
+    const pedalForCode = (code: string): 'brake' | 'gas' | null => {
+      if (code === 'KeyR' || code === 'ArrowLeft') return 'brake';
+      if (code === 'KeyG' || code === 'ArrowRight') return 'gas';
+      return null;
+    };
+    const pedalsLive = phase === 'ready' || phase === 'running';
+
     const onKeyDown = (event: KeyboardEvent) => {
       if (showShared) return;
-      if (phase === 'running' && (event.code === 'KeyR' || event.code === 'ArrowLeft')) {
+      const pedal = pedalForCode(event.code);
+      if (pedal && pedalsLive) {
         event.preventDefault();
-        game.press('brake');
-        return;
-      }
-      if (phase === 'running' && (event.code === 'KeyG' || event.code === 'ArrowRight')) {
-        event.preventDefault();
-        game.press('gas');
+        if (!event.repeat) game.setPedal(pedal, true);
         return;
       }
       if (event.code !== 'Space') return;
       event.preventDefault();
-      if (phase === 'intro') startGame();
-      else if (phase === 'ready') game.startRun();
-      else if (phase === 'running' && nextEvent) game.press(nextEvent.type);
+      if (event.repeat) return;
+      if (pedalsLive) game.setPedal('gas', true);
+      else if (phase === 'intro') startGame();
       else if (phase === 'roundResult') (isLastRound ? showFinal : nextRound)();
     };
+    const onKeyUp = (event: KeyboardEvent) => {
+      const pedal = pedalForCode(event.code);
+      if (pedal) game.setPedal(pedal, false);
+      else if (event.code === 'Space') game.setPedal('gas', false);
+    };
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [phase, showShared, game, nextEvent, startGame, nextRound, showFinal, isLastRound]);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, [phase, showShared, game, startGame, nextRound, showFinal, isLastRound]);
 
   // Move keyboard focus along with the flow, so Tab/Enter always lands on the
   // primary action and screen-reader users follow the game without hunting.
   const introBtnRef = useRef<HTMLButtonElement>(null);
-  const startBtnRef = useRef<HTMLButtonElement>(null);
+  const gasPedalRef = useRef<HTMLButtonElement>(null);
   const nextBtnRef = useRef<HTMLButtonElement>(null);
   const shareBtnRef = useRef<HTMLButtonElement>(null);
   const sharedBtnRef = useRef<HTMLButtonElement>(null);
@@ -550,7 +515,7 @@ function App() {
   useEffect(() => {
     const byPhase: Partial<Record<GamePhase, React.RefObject<HTMLButtonElement | null>>> = {
       intro: introBtnRef,
-      ready: startBtnRef,
+      ready: gasPedalRef,
       roundResult: nextBtnRef,
       finished: shareBtnRef,
     };
@@ -577,7 +542,7 @@ function App() {
 
   const share = useCallback(async () => {
     const url = buildShareUrl(results);
-    const text = `Ik scoorde ${total}/100 in NOS Rem Reflex, rem jij net zo laat als Max Verstappen op Zandvoort?`;
+    const text = `Ik scoorde ${total}/100 in NOS Rem Reflex, rem en geef jij gas zoals Max Verstappen op Zandvoort?`;
     try {
       if (navigator.share) {
         await navigator.share({ title: 'NOS Rem Reflex', text, url });
@@ -595,16 +560,16 @@ function App() {
   const liveSpeed = phase === 'running' ? Math.round(sampleAt(fixture.lap.samples, elapsedT).speedKph) : null;
   const lastResult = results.at(-1) ?? null;
   const showRoundResult = phase === 'roundResult' && lastResult !== null;
-  const verdict = showRoundResult ? combineResults(lastResult.eventResults.map((r) => r.description)) : null;
+  const verdict = showRoundResult ? verdictForScore(lastResult.score) : null;
 
   let roundLabel = '';
   if (phase !== 'intro' && phase !== 'finished') {
     roundLabel = round.practice ? `Oefenbocht · ${round.label}` : `Bocht ${scoringRoundNumber} van 3 · ${round.label}`;
   }
 
-  let runningHint = 'Uitrijden...';
-  if (nextEvent?.type === 'brake') runningHint = 'Wachten... rem op het juiste moment';
-  else if (nextEvent?.type === 'gas') runningHint = 'Nu weer op het gas!';
+  const runningHint = round.practice
+    ? 'Volg de kleuren op de baan: rood = remmen, oranje = los, groen = vol gas!'
+    : 'Rem, rol uit en geef gas precies zoals Max!';
 
   // Crossfading layers stay mounted for the animation, so hidden ones must be
   // `inert`: otherwise invisible buttons stay in the Tab order and invisible
@@ -640,7 +605,8 @@ function App() {
               round={round}
               roundIndex={roundIndex}
               elapsedT={elapsedT}
-              marks={marks}
+              transitions={transitions}
+              heldInput={heldInput}
               showReference={phase === 'roundResult' || phase === 'finished'}
             />
 
@@ -674,7 +640,7 @@ function App() {
               inert={!showRoundResult || undefined}
               className={`absolute inset-x-2 bottom-1.5 flex flex-col items-center gap-1.5 transition-all duration-500 wide:hidden ${showRoundResult ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-1 opacity-0'}`}
             >
-              {lastResult && <RoundResultCards result={lastResult} compact />}
+              {lastResult && <RoundAccuracyCard result={lastResult} compact />}
             </div>
           </div>
 
@@ -691,13 +657,11 @@ function App() {
               </p>
               <div {...layer(phase === 'ready', 'flex flex-col items-center gap-3')}>
                 <div className="flex items-center gap-2 rounded-full bg-white px-4 py-1.5 shadow-lg">
-                  <span className="rounded-full bg-[#e61f15] px-3 py-0.5 text-sm font-extrabold text-white sm:text-base">
-                    {round.events.length / 2}&times; REM
-                  </span>
-                  <span className="font-extrabold text-ink/40">&middot;</span>
+                  <span className="text-sm font-extrabold text-ink sm:text-base">Houd</span>
                   <span className="rounded-full bg-emerald-500 px-3 py-0.5 text-sm font-extrabold text-white sm:text-base">
-                    {round.events.length / 2}&times; GAS
+                    GAS
                   </span>
+                  <span className="text-sm font-extrabold text-ink sm:text-base">ingedrukt om te starten</span>
                 </div>
                 {lastRoundAdvice ? (
                   <p className="text-xs font-bold text-white sm:text-base">
@@ -706,42 +670,36 @@ function App() {
                   </p>
                 ) : (
                   <p className="text-xs font-bold text-white/85 sm:text-base">
-                    {round.practice && 'Rem bij het rode punt en geef weer gas bij het groene punt!'}
+                    {round.practice && 'Rijd de kleuren na: groen = vol gas, oranje = los, rood = remmen!'}
                     {!round.practice &&
                       (round.events.length / 2 === 1
-                        ? 'Let op de bocht en druk op het juiste moment!'
-                        : 'Een dubbele: let goed op waar Max remt en weer gas geeft!')}
+                        ? 'Rem, rol uit en geef weer gas precies waar Max dat doet!'
+                        : 'Een dubbele: twee remzones, en twee keer terug op het gas!')}
                   </p>
                 )}
               </div>
               <p {...layer(phase === 'running', 'text-base font-extrabold sm:text-xl')}>{runningHint}</p>
               <div {...layer(showRoundResult, 'hidden flex-wrap items-center justify-center gap-2 wide:flex sm:gap-3')}>
-                {lastResult && <RoundResultCards result={lastResult} />}
+                {lastResult && <RoundAccuracyCard result={lastResult} />}
               </div>
             </div>
 
-            {/* action row */}
+            {/* action row: the pedals are the controls from the moment a round
+                is armed - holding GAS on the ready screen is what starts it */}
             <div className="grid h-24 place-items-center sm:h-44 wide:h-auto wide:min-h-[clamp(6rem,34vh,14rem)]">
-              <button
-                {...layer(phase === 'ready', `${BTN_LIGHT} w-full max-w-sm px-8 py-4 text-lg sm:text-xl`)}
-                ref={startBtnRef}
-                type="button"
-                onClick={game.startRun}
-              >
-                {round.practice ? 'Start de oefenbocht' : `Start bocht ${scoringRoundNumber}`}
-              </button>
-              <div {...layer(phase === 'running', 'flex w-full max-w-sm gap-4 wide:gap-6')}>
+              <div {...layer(phase === 'ready' || phase === 'running', 'flex w-full max-w-sm gap-4 wide:gap-6')}>
                 <Pedal
                   variant="brake"
-                  onPress={() => game.press('brake')}
-                  disabled={nextEvent?.type !== 'brake'}
-                  highlight={phase === 'running' && nextEvent?.type === 'brake'}
+                  onHoldChange={(pressed) => game.setPedal('brake', pressed)}
+                  held={heldInput === 'brake'}
+                  highlight={false}
                 />
                 <Pedal
                   variant="gas"
-                  onPress={() => game.press('gas')}
-                  disabled={nextEvent?.type !== 'gas'}
-                  highlight={phase === 'running' && nextEvent?.type === 'gas'}
+                  onHoldChange={(pressed) => game.setPedal('gas', pressed)}
+                  held={heldInput === 'gas'}
+                  highlight={phase === 'ready'}
+                  buttonRef={gasPedalRef}
                 />
               </div>
               <button
@@ -756,9 +714,9 @@ function App() {
 
             {/* keyboard hint (pointer-fine devices only) */}
             <p className="hidden text-center text-xs font-bold text-white/40 sm:block">
-              Toetsenbord: <kbd className="rounded bg-white/10 px-1.5 py-0.5">spatie</kbd> = actie ·{' '}
-              <kbd className="rounded bg-white/10 px-1.5 py-0.5">R</kbd> = rem ·{' '}
-              <kbd className="rounded bg-white/10 px-1.5 py-0.5">G</kbd> = gas
+              Toetsenbord (ingedrukt houden): <kbd className="rounded bg-white/10 px-1.5 py-0.5">R</kbd> = rem ·{' '}
+              <kbd className="rounded bg-white/10 px-1.5 py-0.5">G</kbd> of{' '}
+              <kbd className="rounded bg-white/10 px-1.5 py-0.5">spatie</kbd> = gas
             </p>
           </div>
         </main>
@@ -778,7 +736,7 @@ function App() {
             </h1>
             <p className="mt-2 text-sm font-bold leading-snug text-ink/70 sm:mt-3 sm:text-base">
               Rijd zijn echte poleronde over Zandvoort. Eerst oefenen in de Tarzanbocht, daarna drie bochten voor de
-              punten: rem en geef weer gas op precies het juiste moment.
+              punten: houd gas en rem precies daar ingedrukt waar Max dat doet.
             </p>
             {savedScores.best && (
               <p className="mt-3 text-sm font-extrabold text-[#1e1e1e]">
@@ -795,6 +753,9 @@ function App() {
                 on larger screens, touch players just see what to expect */}
             <div className="mt-4 rounded-2xl bg-[#f3f3f0] p-3.5 sm:mt-5 sm:p-5">
               <p className="text-left text-xs font-extrabold uppercase tracking-wide text-ink/50">Zo speel je</p>
+              <p className="mt-2 text-left text-xs font-bold leading-snug text-ink/60 sm:text-sm">
+                Houd een pedaal ingedrukt om gas te geven of te remmen, laat beide los om uit te rollen.
+              </p>
               <div className="mt-2 flex items-end justify-center gap-10 sm:mt-3 sm:gap-14">
                 <div className="flex flex-col items-center gap-1">
                   <PedalArt variant="brake" idPrefix="intro" className="h-14 w-auto sm:h-20" />
@@ -814,7 +775,7 @@ function App() {
                 </div>
               </div>
               <p className="mt-3 hidden text-center text-xs font-bold text-ink/60 sm:block">
-                <Key>spatie</Key> = verder / actie
+                <Key>spatie</Key> = verder, in de bocht = gas
               </p>
             </div>
             <button
