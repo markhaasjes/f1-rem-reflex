@@ -251,14 +251,13 @@ export function CircuitScene(props: CircuitSceneProps) {
         for (const segment of cache.segments) {
           drawRibbon(ctx, segment.points, PHASE_COLOR[segment.phase], projection, PLAYER_LINE_WIDTH_M);
         }
-        // Legend pins at the start of the window: whose line is whose. Max's
-        // label sits above his dot, the player's below, so they stay legible
-        // even when the two lines nearly touch.
-        const startPoint = positionAt(samples, round.tStart);
-        const playerStart = offsetPathPoints(
-          [startPoint, positionAt(samples, round.tStart + 0.5)],
-          PLAYER_LINE_OFFSET_M,
-        )[0];
+        // Legend pins near the start of the window (nudged 1s in so the labels
+        // don't clip on the camera box edge): whose line is whose. Max's label
+        // sits above his dot, the player's below, so they stay legible even
+        // when the two lines nearly touch.
+        const legendT = round.tStart + 1;
+        const startPoint = positionAt(samples, legendT);
+        const playerStart = offsetPathPoints([startPoint, positionAt(samples, legendT + 0.5)], PLAYER_LINE_OFFSET_M)[0];
         const [maxX, maxY] = projection.toScreen(startPoint.x, startPoint.y);
         drawPin(ctx, maxX, maxY, '#1e1e1e', 'Max');
         if (playerStart) {
