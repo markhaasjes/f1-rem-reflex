@@ -52,8 +52,8 @@ running              rAF clock plays lap.samples from round.tStart to tEnd in
   |                  trail behind the car is colored by the player's input
   | t >= tEnd        round is scored (scoreRound) and appended to results
   v
-roundResult          Max's phase-colored line with the player's line drawn
-  |                  parallel beside it, verdict banner, REM/LOS/GAS
+roundResult          Max's zones as the wide practice-style corridor with the
+  |                  player's line drawn on top, verdict banner, REM/LOS/GAS
   |                  accuracy card
   | nextRound()      camera: corner -> overview (1.2s) -> hold -> next corner
   |                  (1.5s); back to `flying` above ... repeat for 4 rounds
@@ -190,14 +190,16 @@ sand + dunes (world space) -> green corridor + striped infield -> paddock
   -> gravel traps (GRAVEL_CORNERS) -> track ribbon (white edge, dark asphalt,
   center sheen) -> red/white curbs at all 14 corners -> start/finish checker
   -> [practice ready/running] Max's zone corridor
-  -> [running] input-colored trail so far -> [result] Max's phase ribbons +
-  the player's offset line -> pedal glow under the car
+  -> [running] input-colored trail so far -> [result] Max's zone corridor +
+  the player's line on top -> pedal glow under the car
   -> car -> corner badges + labels (fade out as you zoom in) -> scale bar
 
-There are deliberately no point markers on the road (no "rem hier" pins, no
-Max/Jij legend dots): the colored zones themselves say where braking starts
-and where the throttle opens, and extra dots on top of two parallel ribbons
-read as clutter.
+The result comparison uses the same visual language as the practice guide:
+Max's telemetry as the wide semi-transparent corridor, the player's line on
+top of it - matching stretches sit inside their own zone color, mismatches
+stand out against the corridor. There are deliberately no point markers on
+the road (no "rem hier" pins, no Max/Jij legend dots): the colored zones
+themselves say where braking starts and where the throttle opens.
 ```
 
 The sand decoration (dune patches, scrub, grass speckles) is a fixed field in
@@ -251,9 +253,6 @@ in screen space, covering any zoom-out past the decorated field.
   player's pedal timeline (`buildInputSegments`) render through the same
   machinery — so no drawn line carries the 20 Hz GPS jitter that used to
   show through slow corners.
-- **The result comparison caches per timeline**: the player's offset line
-  (`offsetPathPoints`, one road-half beside Max's) is rebuilt only when a new
-  `transitions` array arrives (`comparisonRef`), not per frame.
 - **Offset geometry self-protects on hairpins**: `offsetPolyline` prunes
   folded/bunched points, and curbs use `offsetPolylineRuns`, which _splits_
   the curb wherever the bend is tighter than the offset reaches instead of

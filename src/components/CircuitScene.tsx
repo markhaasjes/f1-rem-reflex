@@ -4,7 +4,7 @@ import { viewBoxFromCam, type CamBox } from '../hooks/useCameraFlight';
 import { fitProjection, prepareCanvas } from '../lib/canvas';
 import { CAR_ART_LENGTH_UNITS, drawF1Car } from '../lib/canvasCar';
 import { headingAt, positionAt, primePathModel, sampleAt } from '../lib/corner';
-import { buildPhaseSegments, type PhaseSegment } from '../lib/phases';
+import { buildPhaseSegments } from '../lib/phases';
 import { buildInputSegments } from '../lib/playerInput';
 import {
   PHASE_COLOR,
@@ -23,7 +23,6 @@ import {
   drawStartFinish,
   drawTrackRibbon,
   nearestIndex,
-  offsetPathPoints,
   rotateOutline,
 } from '../lib/scene';
 import type { GamePhase, GameRound, InputTransition, PedalInput, ZandvoortFixture } from '../types';
@@ -94,13 +93,11 @@ const LABEL_OFFSETS: Record<string, { dx: number; dy: number }> = {
   hansernst: { dx: 4, dy: 30 },
 };
 
-// The practice guide renders Max's zones wider than the trail the player
-// leaves on top of it, so the corridor stays visible around the driven line.
+// Max's zones render as a corridor wider than the line the player leaves on
+// top of it, so the reference stays visible around the driven line - during
+// practice as the guide to follow, on the result as the comparison layer.
 const GUIDE_WIDTH_M = 6;
-// The result comparison shifts the player's line one road-half beside Max's;
-// same phase palette, slightly narrower so Max's line reads as the reference.
-const PLAYER_LINE_OFFSET_M = 4.5;
-const PLAYER_LINE_WIDTH_M = 2.6;
+const GUIDE_ALPHA = 0.55;
 // The glow disc under the car while driving, colored by the held pedal.
 const GLOW_RADIUS_M = 9;
 const GLOW_MIN_RADIUS_PX = 16;
@@ -148,13 +145,6 @@ export function CircuitScene(props: CircuitSceneProps) {
     [fixture],
   );
 
-  // The player's offset comparison line for the result view, rebuilt only when
-  // a new timeline arrives (the render loop runs every frame; this must not).
-  const comparisonRef = useRef<{
-    transitions: InputTransition[];
-    roundIndex: number;
-    segments: PhaseSegment[];
-  } | null>(null);
 
   // Redraws happen lazily: the rAF loop keeps running (cheap), but the scene
   // - sand field, corridor, track, curbs, everything - is only rasterized
@@ -230,7 +220,7 @@ export function CircuitScene(props: CircuitSceneProps) {
       // and where to get back on the gas - no point markers needed) ---
       if (round.practice && (phase === 'ready' || phase === 'running')) {
         ctx.save();
-        ctx.globalAlpha = 0.55;
+        ctx.globalAlpha = GUIDE_ALPHA;
         for (const segment of roundSegments[roundIndex]) {
           drawRibbon(ctx, segment.points, PHASE_COLOR[segment.phase], projection, GUIDE_WIDTH_M);
         }
@@ -245,26 +235,19 @@ export function CircuitScene(props: CircuitSceneProps) {
         }
       }
 
-      // --- result comparison: Max's phase-colored line on his racing line,
-      // the player's timeline as a parallel line beside it ---
+      // --- result comparison: Max's telemetry as the same wide transparent
+      // corridor the practice round teaches with, and the player's own line
+      // drawn on top - where they match, the line sits inside its own zone
+      // color; where they differ, it stands out against the corridor ---
       if (showReference) {
+        ctx.save();
+        ctx.globalAlpha = GUIDE_ALPHA;
         for (const segment of roundSegments[roundIndex]) {
+          drawRibbon(ctx, segment.points, PHASE_COLOR[segment.phase], projection, GUIDE_WIDTH_M);
+        }
+        ctx.restore();
+        for (const segment of buildInputSegments(samples, transitions, round.tStart, round.tEnd)) {
           drawRibbon(ctx, segment.points, PHASE_COLOR[segment.phase], projection);
-        }
-        let cache = comparisonRef.current;
-        if (!cache || cache.transitions !== transitions || cache.roundIndex !== roundIndex) {
-          cache = {
-            transitions,
-            roundIndex,
-            segments: buildInputSegments(samples, transitions, round.tStart, round.tEnd).map((segment) => ({
-              phase: segment.phase,
-              points: offsetPathPoints(segment.points, PLAYER_LINE_OFFSET_M),
-            })),
-          };
-          comparisonRef.current = cache;
-        }
-        for (const segment of cache.segments) {
-          drawRibbon(ctx, segment.points, PHASE_COLOR[segment.phase], projection, PLAYER_LINE_WIDTH_M);
         }
       }
 

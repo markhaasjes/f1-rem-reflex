@@ -32,8 +32,9 @@ production code.
 
 Each corner starts the moment you first hold the gas pedal on the ready
 screen; while driving, the trail behind the car is colored by your own
-input, and the result view draws your line parallel to Max's phase-colored
-racing line, with a REM/LOS/GAS accuracy card.
+input, and the result view lays your line over Max's zones, drawn as the
+same wide transparent corridor the practice corner teaches with, plus a
+REM/LOS/GAS accuracy card.
 
 Between rounds the camera zooms back to the overview and flies to the next
 corner — one continuous map, no separate per-corner artwork.
