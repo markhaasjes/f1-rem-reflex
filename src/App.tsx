@@ -152,7 +152,7 @@ function AccuracyBarsStack({ accuracy }: { accuracy: RoundResult['phaseAccuracy'
               <span className="text-base font-extrabold" style={{ color: row.color }}>
                 {row.label}
               </span>
-              <span className="ml-1.5 text-base font-bold text-[#1e1e1e]/45">{row.sublabel}</span>
+              <span className="ml-1.5 text-sm font-bold text-[#1e1e1e]/45 sm:text-base">{row.sublabel}</span>
             </span>
             <span className="text-base font-extrabold tabular-nums text-[#1e1e1e]">{row.percent}%</span>
           </div>
@@ -172,7 +172,7 @@ function RoundAccuracyCard({ result, layout }: { result: RoundResult; layout: 'r
   if (layout === 'stack') {
     return (
       <div className="w-full max-w-xs rounded-2xl bg-white px-4 py-3 text-left shadow-lg">
-        <p className="text-base font-extrabold uppercase tracking-wide text-[#1e1e1e]/50">Gelijk met Max</p>
+        <p className="text-sm font-extrabold uppercase tracking-wide text-[#1e1e1e]/50 sm:text-base">Gelijk met Max</p>
         <div className="mt-1.5">
           <AccuracyBarsStack accuracy={result.phaseAccuracy} />
         </div>
@@ -183,15 +183,17 @@ function RoundAccuracyCard({ result, layout }: { result: RoundResult; layout: 'r
   const rows = accuracyRows(result.phaseAccuracy);
   return (
     <div className="rounded-2xl bg-white px-2.5 py-1.5 shadow-lg">
-      <p className="text-left text-base font-extrabold uppercase tracking-wide text-[#1e1e1e]/50">Gelijk met Max</p>
+      <p className="text-left text-sm font-extrabold uppercase tracking-wide text-[#1e1e1e]/50 sm:text-base">
+        Gelijk met Max
+      </p>
       <div className="flex gap-2.5">
         {rows.map((row) => (
           <div key={row.phase} className="w-20">
             <div className="flex items-baseline justify-between gap-2">
-              <span className="text-base font-extrabold" style={{ color: row.color }}>
+              <span className="text-sm font-extrabold sm:text-base" style={{ color: row.color }}>
                 {row.label}
               </span>
-              <span className="text-base font-extrabold tabular-nums text-[#1e1e1e]">{row.percent}%</span>
+              <span className="text-sm font-extrabold tabular-nums text-[#1e1e1e] sm:text-base">{row.percent}%</span>
             </div>
             <div className="relative mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#ececec]">
               <span
@@ -408,7 +410,7 @@ function EventCard({ roundLabel }: { roundLabel: string }) {
 // Visual keycap for the keyboard explainer in the intro modal.
 function Key({ children }: { children: React.ReactNode }) {
   return (
-    <kbd className="inline-block min-w-7 rounded-md border border-ink/15 bg-white px-1.5 py-0.5 text-center text-base font-extrabold text-ink shadow-[0_2px_0_rgba(30,30,30,0.15)]">
+    <kbd className="inline-block min-w-7 rounded-md border border-ink/15 bg-white px-1.5 py-0.5 text-center text-sm font-extrabold text-ink sm:text-base shadow-[0_2px_0_rgba(30,30,30,0.15)]">
       {children}
     </kbd>
   );
@@ -417,7 +419,7 @@ function Key({ children }: { children: React.ReactNode }) {
 // The yellow TIP marker, shared by the ready-screen advice and the score card.
 function TipBadge() {
   return (
-    <span className="mr-1.5 rounded-full bg-[#ffc828] px-2 py-0.5 align-middle text-base font-extrabold text-[#1e1e1e]">
+    <span className="mr-1.5 rounded-full bg-[#ffc828] px-2 py-0.5 align-middle text-sm font-extrabold text-[#1e1e1e] sm:text-base">
       TIP
     </span>
   );
@@ -452,7 +454,7 @@ const DIAGRAM_DIFF_COLOR = '#1e1e1e';
 function DiagramZoneBar({ label, segments }: { label: string; segments: { color: string; widthPct: number }[] }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="w-8 shrink-0 text-right text-base font-extrabold text-[#1e1e1e]/60">{label}</span>
+      <span className="w-8 shrink-0 text-right text-sm font-extrabold text-[#1e1e1e]/60 sm:text-base">{label}</span>
       <div className="flex h-4 flex-1 overflow-hidden rounded-full">
         {segments.map((segment, i) => (
           <span key={i} style={{ width: `${segment.widthPct}%`, backgroundColor: segment.color }} />
@@ -481,7 +483,7 @@ function ScoreDiagram() {
           </div>
         </div>
       </div>
-      <p className="mt-2 text-base font-bold leading-snug text-[#1e1e1e]/60">
+      <p className="mt-2 text-sm font-bold leading-snug text-[#1e1e1e]/60 sm:text-base">
         <span className="font-extrabold text-emerald-600">Groen</span> = vol gas,{' '}
         <span className="font-extrabold text-[#c77b0a]">oranje</span> = uitrollen,{' '}
         <span className="font-extrabold text-[#e61f15]">rood</span> = remmen. De{' '}
@@ -803,7 +805,7 @@ function App() {
         <Pill className="gap-3 text-base max-[359px]:hidden wide:hidden">{fixture.meta.circuit}</Pill>
 
         <div
-          className={`rounded-full px-4 py-1 text-base font-extrabold tracking-wide transition-opacity wide:hidden ${roundLabel ? 'opacity-100' : 'opacity-0'} ${round?.practice ? 'bg-ink/25 text-white' : 'bg-[#e61f15] text-white'}`}
+          className={`rounded-full px-4 py-1 text-sm font-extrabold tracking-wide transition-opacity sm:text-base wide:hidden ${roundLabel ? 'opacity-100' : 'opacity-0'} ${round?.practice ? 'bg-ink/25 text-white' : 'bg-[#e61f15] text-white'}`}
         >
           <span className="min-[360px]:hidden">{roundLabelShort || '·'}</span>
           <span className="hidden min-[360px]:inline">{roundLabel || '·'}</span>
@@ -835,8 +837,8 @@ function App() {
               aria-hidden={!round.practice || phase === 'roundResult'}
               className={`pointer-events-none absolute left-3 top-3 flex items-center gap-2 rounded-full bg-[#ffc828] px-3 py-1.5 shadow transition-opacity duration-300 ${round.practice && (phase === 'flying' || phase === 'ready' || phase === 'running') ? 'opacity-100' : 'opacity-0'}`}
             >
-              <span className="text-base font-extrabold uppercase tracking-wide text-ink">Oefenbocht</span>
-              <span className="text-base font-bold text-ink/70">telt niet mee</span>
+              <span className="text-sm font-extrabold uppercase tracking-wide text-ink sm:text-base">Oefenbocht</span>
+              <span className="text-sm font-bold text-ink/70 sm:text-base">telt niet mee</span>
             </div>
 
             {/* Bottom-right stack, same on every viewport: the map legend hugs
@@ -870,7 +872,7 @@ function App() {
                         className="h-1.5 w-1.5 rounded-full sm:h-3.5 sm:w-3.5"
                         style={{ backgroundColor: PHASE_COLOR[row.phase] }}
                       />
-                      <span className="text-base font-extrabold leading-tight text-ink">
+                      <span className="text-sm font-extrabold leading-tight text-ink sm:text-base">
                         <span className="sm:hidden">{row.label.toLowerCase()}</span>
                         <span className="hidden sm:inline">{row.sublabel}</span>
                       </span>
@@ -887,7 +889,7 @@ function App() {
                           backgroundImage: `repeating-linear-gradient(90deg, ${PHASE_COLOR.flat} 0 6px, transparent 6px 10px)`,
                         }}
                       />
-                      <span className="text-base font-extrabold leading-tight text-ink">
+                      <span className="text-sm font-extrabold leading-tight text-ink sm:text-base">
                         <span className="sm:hidden">Max</span>
                         <span className="hidden sm:inline">lijn van Max</span>
                       </span>
@@ -897,7 +899,7 @@ function App() {
                         className="h-1 w-4 rounded-full sm:h-1.5 sm:w-8"
                         style={{ backgroundColor: PHASE_COLOR.flat }}
                       />
-                      <span className="text-base font-extrabold leading-tight text-ink">
+                      <span className="text-sm font-extrabold leading-tight text-ink sm:text-base">
                         <span className="sm:hidden">jij</span>
                         <span className="hidden sm:inline">jouw lijn</span>
                       </span>
@@ -914,7 +916,7 @@ function App() {
             >
               <h2 className="text-lg font-extrabold text-white sm:text-xl">{verdict?.title}</h2>
               {lastResult && (
-                <p className="text-base text-white/90">
+                <p className="text-sm text-white/90 sm:text-base">
                   {round.practice ? 'Oefenbocht' : round.label}:{' '}
                   <span className="font-extrabold">{lastResult.score}</span>
                   /100 punten
@@ -940,12 +942,11 @@ function App() {
               </p>
               <div {...layer(phase === 'ready', 'flex flex-col items-center gap-3')}>
                 <div className="flex items-center gap-2 rounded-full bg-white px-4 py-1.5 shadow-lg">
-                  <span className="text-base font-extrabold text-ink">Houd</span>
-                  <span className="rounded-full bg-emerald-500 px-3 py-0.5 text-base font-extrabold text-white">
+                  <span className="text-sm font-extrabold text-ink sm:text-base">Houd</span>
+                  <span className="rounded-full bg-emerald-500 px-3 py-0.5 text-sm font-extrabold text-white sm:text-base">
                     GAS
                   </span>
-                  <span className="text-base font-extrabold text-ink">ingedrukt</span>
-                  <span className="hidden text-base font-extrabold text-ink sm:inline">om te starten</span>
+                  <span className="text-sm font-extrabold text-ink sm:text-base">ingedrukt om te starten</span>
                 </div>
                 {lastRoundAdvice ? (
                   <p className="text-base font-bold text-white">
@@ -1049,7 +1050,9 @@ function App() {
             {/* the two pedals the game is played with; keyboard hints join in
                 on larger screens, touch players just see what to expect */}
             <div className="mt-4 rounded-2xl bg-[#f3f3f0] p-3.5 sm:mt-5 sm:p-5">
-              <p className="text-left text-base font-extrabold uppercase tracking-wide text-ink/50">Zo speel je</p>
+              <p className="text-left text-sm font-extrabold uppercase tracking-wide text-ink/50 sm:text-base">
+                Zo speel je
+              </p>
               <p className="mt-2 text-left text-base font-bold leading-snug text-ink/60">
                 Houd een pedaal ingedrukt om gas te geven of te remmen, laat beide los om uit te rollen.
               </p>
@@ -1101,7 +1104,7 @@ function App() {
             <p className="text-6xl font-extrabold tabular-nums">{total}</p>
             <p className="mb-3 text-base font-bold text-ink/60">van de 100 punten</p>
             <p className="mb-4 text-base font-bold sm:mb-5">{scoreSentence(total)}</p>
-            <ul className="mb-5 space-y-1 text-left text-base font-bold sm:mb-6 sm:space-y-1.5">
+            <ul className="mb-5 space-y-1 text-left text-sm font-bold sm:mb-6 sm:space-y-1.5 sm:text-base">
               {results.map((r) => (
                 <li key={r.round.id} className="flex justify-between gap-3">
                   <span className={r.round.practice ? 'text-ink/50' : ''}>
@@ -1114,18 +1117,22 @@ function App() {
             {runContext && savedScores.best && (
               <div className="mb-3 grid grid-cols-1 gap-2 text-left min-[360px]:grid-cols-2 sm:mb-4">
                 <div className="rounded-2xl bg-[#f3f3f0] px-3 py-2">
-                  <p className="text-base font-extrabold uppercase tracking-wide text-[#1e1e1e]/50">Beste score</p>
+                  <p className="text-sm font-extrabold uppercase tracking-wide text-[#1e1e1e]/50 sm:text-base">
+                    Beste score
+                  </p>
                   <p className="text-xl font-extrabold tabular-nums text-[#1e1e1e]">
                     {savedScores.best.total}
                     {runContext.isNewBest && (
-                      <span className="ml-2 whitespace-nowrap rounded-full bg-emerald-500 px-2 py-0.5 align-middle text-base font-extrabold text-white">
+                      <span className="ml-2 whitespace-nowrap rounded-full bg-emerald-500 px-2 py-0.5 align-middle text-sm font-extrabold text-white sm:text-base">
                         nieuw record!
                       </span>
                     )}
                   </p>
                 </div>
                 <div className="rounded-2xl bg-[#f3f3f0] px-3 py-2">
-                  <p className="text-base font-extrabold uppercase tracking-wide text-[#1e1e1e]/50">Vorige poging</p>
+                  <p className="text-sm font-extrabold uppercase tracking-wide text-[#1e1e1e]/50 sm:text-base">
+                    Vorige poging
+                  </p>
                   <p className="text-xl font-extrabold tabular-nums text-[#1e1e1e]">
                     {runContext.previousLast ? runContext.previousLast.total : '\u2014'}
                   </p>
@@ -1133,7 +1140,7 @@ function App() {
               </div>
             )}
             {improvementTip && (
-              <p className="mb-4 text-base font-bold text-[#1e1e1e]/70 sm:mb-5">
+              <p className="mb-4 text-sm font-bold text-[#1e1e1e]/70 sm:mb-5 sm:text-base">
                 <TipBadge />
                 In de <span className="font-extrabold">{improvementTip.round.label}</span>
                 {adviceForRound(improvementTip)
@@ -1247,7 +1254,9 @@ function App() {
                 accuracy bars are recomputed from them right here */}
             {sharedAccuracy && (
               <div className="mb-4 rounded-2xl bg-[#f3f3f0] px-4 py-3 text-left">
-                <p className="text-base font-extrabold uppercase tracking-wide text-[#1e1e1e]/50">Gelijk met Max</p>
+                <p className="text-sm font-extrabold uppercase tracking-wide text-[#1e1e1e]/50 sm:text-base">
+                  Gelijk met Max
+                </p>
                 <div className="mt-1.5">
                   <AccuracyBarsStack accuracy={sharedAccuracy} />
                 </div>

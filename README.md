@@ -134,6 +134,10 @@ for how the pieces fit together; the rules below are about how to change them.
   exceptions (the Dutch flag's official colors, the photo-sampled scenery
   greys, the brake/coast/throttle signal colors), lives in
   [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#brand-palette).
+- **Type floor: 14px on phones, 16px from `sm:` up.** Dense chrome takes the
+  14px step; primary copy stays 16px everywhere. See
+  [the layout notes](docs/DEVELOPMENT.md#layout-invariants-portrait--landscape)
+  before shrinking anything.
 - **Pills, badges and buttons hug their label.** They are sized by their
   content (`BTN_BASE` carries `w-fit`), never stretched to the container, so
   the rounded end starts right after the text. Progress bars, cards and the

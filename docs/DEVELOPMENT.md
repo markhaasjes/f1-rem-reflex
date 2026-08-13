@@ -490,16 +490,23 @@ Rules that keep it that way:
   result). The round-result cards therefore overlay the **stage** on portrait
   (`wide:hidden` absolute layer at its bottom edge) instead of living in the
   deck; the deck copy of the cards is `hidden` + `wide:flex`.
-- **No text below 16px.** Every UI string sits at `text-base` or larger,
-  including the map legend, the badges and the keyboard hint; canvas labels
-  (map names 16-17px, scale bar 16px, corner numerals 12-18px with the circle
-  radii grown to match) follow the same floor. It is a hard floor, not a
-  preference, so copy gets shortened rather than shrunk: at 16px the legend
-  uses `rem/los/gas` and `Max/jij` on phones and the full words from `sm:` up,
-  the start pill drops "om te starten" below `sm:`, the round label drops the
-  corner name below 360px, and the "Houd ingedrukt!" callout is `sm:`-only
-  (on phones it collided with the hint line, and the deck pill right above
-  the pedals already says the same thing).
+- **Type floor: 14px on phones, 16px from `sm:` up.** Nothing renders below
+  that anywhere, canvas labels included (map names 14px on a compact canvas
+  and 17px otherwise, scale bar 16px). Dense or secondary chrome takes the
+  14px step (`text-sm sm:text-base`): the legend, the round label, the stage
+  practice badge, the accuracy bars' eyebrow/sublabels, the score card's round
+  list and stat tiles, keycaps and section eyebrows. Primary copy keeps 16px
+  everywhere: the deck hints, the intro paragraph, the explainer bullets and
+  the score sentence. The floor is a floor, so where 16px genuinely did not
+  fit the copy shortened rather than shrank, and some of that survives at
+  14px because it also reads better: the legend uses `rem/los/gas` and
+  `Max/jij` on phones (full words from `sm:`), the round label drops the
+  corner name below 360px where it slid under the NOS badge (smaller there
+  too), and the "Houd ingedrukt!" callout stays `sm:`-only because on phones
+  it collided with the hint line and the pill above the pedals says the same
+  thing. Corner-number badges are map pins rather than text and stay sized to
+  their circles. Measured, not eyeballed: a probe walks every text node and
+  reports the smallest rendered size (14px at 320/390, 16px at 1280).
 - **The practice round marks the stage, not just the deck.** A yellow
   `OEFENBOCHT · telt niet mee` badge sits at the stage's top-left for the
   whole practice round: the deck label alone was missed because the player is
