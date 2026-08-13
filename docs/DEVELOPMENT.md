@@ -40,17 +40,22 @@ intro                overview map, all 14 corner badges, pulsing badge on the
 flying               "Onderweg naar de <bocht>..." — no interactive controls
   | camera done -> game.arm()
   v
-ready                car waits at the window start; "Start de oefenbocht" /
-  |                  "Start bocht N"
-  | startRun()
+ready                car waits at the window start; both pedals are live and
+  |                  the gas pedal is ringed: "Houd GAS ingedrukt om te
+  |                  starten" — the first gas press IS the start. On phones
+  |                  the camera holds the corner overview, then dives onto
+  |                  the car, so driving starts zoomed in (see Rendering)
+  | setPedal('gas', true)
   v
 running              rAF clock plays lap.samples from round.tStart to tEnd in
-  |                  real time; one button (REM! / VOL GAS!) answers Max's
-  |                  events in order; Space = same button
+  |                  real time; the player HOLDS the pedals (pointer capture,
+  |                  R/G/arrows) and every change of the combined state is
+  |                  recorded as an InputTransition on the lap clock; the
+  |                  trail behind the car is colored by the player's input
   | t >= tEnd        round is scored (scoreRound) and appended to results
   v
-roundResult          Max's phase-colored line + brake/gas pins + player pins,
-  |                  verdict banner, per-event delta chips
+roundResult          Max's dashed zone line beside the player's solid line,
+  |                  verdict banner, REM/LOS/GAS accuracy card
   | nextRound()      camera: corner -> overview (1.2s) -> hold -> next corner
   |                  (1.5s); back to `flying` above ... repeat for 4 rounds
   | showFinal()      after the last round: camera drifts back to overview
@@ -67,16 +72,23 @@ Things worth knowing before changing the flow:
 
 - **Practice does not count.** The Tarzanbocht round (`practice: true`) is
   played and scored like any other and shown on the final card, but
-  `totalScore` excludes practice rounds from the overall 0-100.
-- **Two pedals.** REM! and GAS! are separate buttons (keyboard: R and G;
-  Space presses whichever pedal Max needs next). Each press is typed by its
-  pedal; scoring pairs the k-th brake press with Max's k-th brake event and
-  the k-th gas press with his k-th gas event (`scoreRound`). A pedal stops
-  registering (and dims) once used as often as Max uses it in the round.
-- **Marks are mirrored in a ref** (`marksRef`) because two presses can land
-  within one frame; never read the React state inside `press()`.
+  `totalScore` excludes practice rounds from the overall 0-100. During
+  practice, Max's zones render as a wide colored corridor on the road.
+- **Held pedals, one 3-state input.** REM! and GAS! are held, not tapped
+  (pointer capture keeps a press alive when the finger drifts off; keyboard
+  is keydown/keyup with auto-repeat ignored). The combined state is a single
+  `PedalInput` — brake wins when both pedals are down — and only _changes_
+  of that state are recorded (`InputTransition[]` on the lap clock), so a
+  round's timeline stays a handful of entries.
+- **A round starts on the first gas press.** There is no start button: on
+  `ready`, `setPedal('gas', true)` flips the phase to `running` and opens
+  the timeline at `round.tStart` with whatever the player is holding.
+- **The timeline is mirrored in a ref** (`transitionsRef`) because a pedal
+  change must read the up-to-date list immediately; never read the React
+  state inside `setPedal()`.
 - **A round always plays to `tEnd`.** There is no early exit and no crash
-  state; missing events simply score 0 ("Niet geremd" / "Geen gas gegeven").
+  state; touching nothing simply scores whatever share of the window
+  'coast' happens to match.
 
 ## The fixture shape
 
@@ -91,6 +103,11 @@ lap.samples    ~1670 x { t, x, y, distanceM, speedKph, throttle, brakeActive, ge
 rounds[4]      { id, label, cornerNumbers, practice, tStart, tEnd,
                  events: [{ type: 'brake'|'gas', t, distanceM, speedKph }],
                  bounds: {minX,minY,maxX,maxY} }  - the camera zoom box
+
+Scoring no longer consumes rounds[].events - the hold-to-drive comparison
+reads Max's phases straight from the telemetry channels. The events only
+feed the "twee remzones" ready-screen copy these days (event count / 2 =
+braking zones).
 ```
 
 All coordinates live in one frame: the official geometry's, north-up
@@ -157,17 +174,45 @@ off again, redo the F1 TV projection — never nudge numbers by eye.
 ## Rendering (CircuitScene)
 
 [CircuitScene.tsx](../src/components/CircuitScene.tsx) is one `<canvas>`
-running its **own rAF loop** (unlike the old per-state-change redraw): the
-camera, the run clock, and the badge pulse animate every frame anyway, so
-the loop reads the latest props from a ref and React stays out of the hot
-path. Draw order, back to front:
+running its **own rAF loop**: it reads the latest props from a ref so React
+stays out of the hot path. The loop itself is cheap and always on, but the
+scene **paints lazily**: every frame builds a snapshot string of everything
+the drawing reads (camera box, size, dpr, phase, clock, timeline length,
+fonts-loaded) and skips rasterizing when it matches the previous frame,
+unless the phase is time-animated (`running` = the clock, `flying` = the
+badge pulse). Painting unconditionally kept the main thread >50% busy on
+completely idle screens. If you add any new time-based animation to the
+canvas, either tie it to a phase in the `timeAnimated` check or put its
+driver in the snapshot — otherwise it will freeze mid-cycle. Draw order,
+back to front:
 
 ```
 sand + dunes (world space) -> green corridor + striped infield -> paddock
   -> gravel traps (GRAVEL_CORNERS) -> track ribbon (white edge, dark asphalt,
   center sheen) -> red/white curbs at all 14 corners -> start/finish checker
-  -> [running] driven line so far -> [result] phase ribbons + pins
+  -> [practice ready/running] Max's dashed reference line
+  -> [running] input-colored trail so far -> [result] Max's dashed line +
+  the player's solid line -> pedal glow under the car
   -> car -> corner badges + labels (fade out as you zoom in) -> scale bar
+  (bottom-left; the HTML legend and speed badge stack in the bottom-right)
+
+Max's telemetry is a **dashed** phase-colored line one road-half beside the
+driven line (`MAX_LINE_OFFSET_M`/`WIDTH_M`/`DASH_M` in CircuitScene, offset
+via `offsetPathPoints`), the player's own line is solid on the driven line.
+The dash pattern - not width, position or opacity - is what tells the two
+apart, so both can stay thin and full-strength: matching stretches read as
+two same-colored lines running together, a mismatch as two colors side by
+side. `drawRibbon`'s `dashM` is in **meters** so dashes keep their
+road-relative size at every zoom, and dashed ribbons switch to butt caps
+(round caps grow each dash by half the line width at both ends and close
+the gaps). Two earlier attempts are worth not repeating: a 6m
+semi-transparent corridor on his racing line vanished under the player's
+line, and tinting the whole asphalt band in his zone colors drowned the
+map's own colors. Offsetting is geometry work, so the offset segments are
+built once per fixture in a memo, never per frame. There are deliberately
+no point markers (no "rem hier" pins, no Max/Jij dots on the road): the
+zone colors say where braking starts and where the throttle opens, and the
+on-map legend covers the colors plus the dashed-vs-solid distinction.
 ```
 
 The sand decoration (dune patches, scrub, grass speckles) is a fixed field in
@@ -188,14 +233,20 @@ in screen space, covering any zoom-out past the decorated field.
   turns it into meter→pixel mapping per frame. Flights are step queues
   (`fly([{box, ms}, {ms: pause}, {box, ms}])`), giving the
   corner → overview → next corner two-stage move the user sees.
-- **Chase cam on phones**: `follow(getTarget)` eases 7% of the remaining
-  distance toward a moving target per frame. App engages it while `running`
-  on non-`wide` viewports (box ≈ 0.55× the corner box, centered on the car
-  via an `elapsedT` ref) and flies back to the corner box at `roundResult`
-  so the whole driven line is visible. The effect must depend on the hook's
-  **stable callbacks**, not the returned camera object — that object changes
-  identity every animated frame, which would restart the flight per render
-  and it would never land.
+- **Chase cam on phones**: on non-`wide` viewports the zoom happens
+  **before** the player drives. On `ready` the camera holds the corner
+  overview for `CHASE_HOLD_MS` (2.5s, long enough to read the corner) and
+  then eases down onto the parked car over `CHASE_DIVE_MS` (1.6s), so
+  `running` starts already zoomed in and `follow(getTarget)` (7% of the
+  remaining distance per frame) takes over with nothing to travel. Starting
+  early is allowed: a gas press mid-storyboard flips the phase, and
+  `chaseZoomedRef` tells `running` whether it still has ground to cover — if
+  so it flies the rest in `CHASE_SNAP_MS` (0.65s) before following. Two
+  earlier versions were worse: engaging the follow on the gas press (a
+  snap-zoom that disoriented players) and running the hold+dive _during_ the
+  first seconds of the lap (the player drove the opening blind). The effect must depend on the hook's **stable callbacks**, not
+  the returned camera object — that object changes identity every animated
+  frame, which would restart the flight per render and it would never land.
 - **The outline is rotated at load** (`rotateOutline`) so index 0 sits at
   start/finish; corner slices for curbs/gravel then never wrap the closed
   loop's array boundary.
@@ -213,9 +264,11 @@ in screen space, covering any zoom-out past the decorated field.
   readability; at overview zoom a minimum pixel length kicks in
   (`CAR_MIN_LENGTH_PX`), so it stays spottable when parked on the grid.
 - **Ribbons are drawn from the smoothed car path**, never from raw samples:
-  `smoothPathPoints`/`buildPhaseSegments` sample `positionAt` at 0.05s steps,
-  so the driven line and Max's phase-colored line carry none of the 20 Hz GPS
-  jitter that used to show through slow corners.
+  `buildSegments` (phases.ts) samples `positionAt` at 0.05s steps with a
+  pluggable phase source — Max's telemetry (`buildPhaseSegments`) and the
+  player's pedal timeline (`buildInputSegments`) render through the same
+  machinery — so no drawn line carries the 20 Hz GPS jitter that used to
+  show through slow corners.
 - **Offset geometry self-protects on hairpins**: `offsetPolyline` prunes
   folded/bunched points, and curbs use `offsetPolylineRuns`, which _splits_
   the curb wherever the bend is tighter than the offset reaches instead of
@@ -224,7 +277,8 @@ in screen space, covering any zoom-out past the decorated field.
 - **Palette + curb realism come from photos**: `PALETTE` in scene.ts is
   sampled from the aerial/broadcast screenshots in `docs/corners` (medium-gray
   asphalt, paved beige-gray run-offs, khaki dunes with olive scrub, muted
-  grass); curbs are white + `redNosRood` from `docs/colors.ts`, with
+  grass); the sea and the lakes are the brand blues (see
+  [Brand palette](#brand-palette)); curbs are white + `redNosRood` from `docs/colors.ts`, with
   per-corner extents in `CURB_TUNING` (CircuitScene) positioned against those
   photos. Corner badges split into prominent (playable corners) and `minor`
   (everything else); round-label screen offsets live in `LABEL_OFFSETS` so
@@ -308,40 +362,57 @@ origin; return the endpoint instead.
 
 ## Scoring
 
-[scoring.ts](../src/lib/scoring.ts). Two layers:
+[scoring.ts](../src/lib/scoring.ts). The comparison is time-based: the round
+window is walked on the same 0.05s grid the ribbons render at, and at every
+step the player's pedal state (from the transition timeline) is compared
+against Max's phase (`classifyAt`: brakeActive → brake, throttle < 95 →
+coast, else flat).
 
-- **Numeric**: `scoreEvent(deltaM)` — 100 points within 2m of Max, linear to
-  0 at 50m, 0 for a missed event. `scoreRound` averages a round's events;
-  `totalScore` averages the **scoring rounds' rounded scores** (equal round
-  weight, practice excluded). It used to be event-weighted, which made the
-  total unverifiable from the card's listed round scores — players read that
-  as a calculation bug. Note the deliberate property that distance-based
-  scoring is stricter at higher speed (0.15s late = ~13m at Tarzan but ~5m
-  at a slow gas point); the result gauges surface both meters and seconds.
+- **Numeric**: the round score is the equal-weight average of the three
+  per-phase match percentages (the REM/LOS/GAS bars on the result card),
+  rounded per phase before averaging so the card exactly verifies the score.
+  It is deliberately NOT the matched share of time: Max is flat out for
+  40-55% of every window, so time-weighted matching handed ~50 points to
+  anyone who just held the gas down — the long easy stretches drowned out
+  the short braking zones where the skill sits. With equal phase weight a
+  one-pedal strategy lands around 40 (the boundary grace lifts it above the
+  naive 33) and a telemetry-mirroring playthrough with 120ms lag still
+  scores 100. A step counts as matched when the
+  player's state matches Max's phase directly or 0.2s to either side
+  (`REACTION_GRACE_S`), forgiving human reaction lag at zone boundaries
+  without rewarding a wrong pedal held through a whole zone; phases shorter
+  than `MIN_PHASE_S` in a window are left out of the average. `totalScore`
+  averages the **scoring rounds' rounded scores** (equal round weight,
+  practice excluded), so the total stays verifiable from the card too.
+- **Zones**: the same walk is grouped into contiguous same-phase zones
+  (`ZoneResult`: match fraction + the dominant wrong input) and into
+  per-phase totals (`phaseAccuracy`), which feed the REM/LOS/GAS accuracy
+  card and the tips.
 - **History**: [storage.ts](../src/lib/storage.ts) persists the last attempt
   and the best run in localStorage (key `nos-rem-reflex:scores`); the intro
   shows the stored bests, the score card compares against them and tips the
   weakest corner of the current run.
-- **Tips**: [tips.ts](../src/lib/tips.ts) turns a round's worst event into a
-  specific Dutch instruction ("je remde 27m te laat - rem iets eerder"; no
-  tip when the worst event scores ≥90). The score card shows the weakest
-  round's tip, and the per-round tips are saved with the run (`SavedRun.
-advice`) so the next play shows "Vorige keer: ..." on that corner's ready
-  screen — the feedback loop that makes replaying feel like practicing.
-- **Verbal (Dutch)**: `describeBrakeAttempt` / `describeGasAttempt` bucket
-  the same delta into tones (perfect ≤3m/≤5m, good, okay, bad) for the
-  verdict banner; `combineResults` takes the _worst_ tone of a round.
-
-Marks pair to events strictly by order (press #i answers event #i). If you
-ever allow more presses than events, revisit that pairing.
+- **Tips**: [tips.ts](../src/lib/tips.ts) turns a round's worst zone (≥0.5s
+  long, match < 85%) into a specific Dutch instruction keyed on what the
+  player mostly did instead ("je gaf nog gas waar Max al remt, rem eerder").
+  The score card shows the weakest round's tip, and the per-round tips are
+  saved with the run (`SavedRun.advice`) so the next play shows "Vorige
+  keer: ..." on that corner's ready screen — the feedback loop that makes
+  replaying feel like practicing.
+- **Verbal (Dutch)**: `verdictForScore` buckets the round score into tones
+  (≥90 perfect, ≥72 good, ≥45 okay, else bad) for the verdict banner.
 
 ## Accessibility
 
-The game is fully keyboard-playable: Space advances the flow and presses the
-pedal Max needs next; R/ArrowLeft and G/ArrowRight hit a specific pedal
-(`aria-keyshortcuts` on the buttons); Enter activates the focused primary
-action. Space is preventDefault-ed globally so a focused button never
-double-fires. Three mechanisms keep Tab honest and screen readers in sync:
+The game is fully keyboard-playable, with the keys behaving like pedals:
+keydown presses, keyup releases, auto-repeat ignored. R/ArrowLeft hold the
+brake, G/ArrowRight hold the gas (`aria-keyshortcuts` on the buttons).
+Space only navigates the flow (intro, next corner) and never touches a
+pedal — an earlier space-as-gas shortcut leaked presses into the next
+screen; Enter activates the focused primary action. Space is
+preventDefault-ed globally so a focused button never double-fires. On
+`ready`, focus moves to the gas pedal. Three mechanisms keep Tab honest and
+screen readers in sync:
 
 - **`inert` on every hidden crossfade layer** (the `layer()` helper in
   App.tsx) - layers stay mounted for the fade animation, so without inert the
@@ -356,7 +427,50 @@ Buttons share nos.nl-style interactive states (`BTN_*` constants + the
 `.focus-ring` utilities in index.css): 2px solid focus outline with 2px
 offset - NOS red on light surfaces, ink on red CTAs, white on the pedals -
 warm-gray/darker-red hover backgrounds, 150ms transitions, scale press
-feedback. Exhausted pedals get a real `disabled`, not just dimming.
+feedback. A held pedal tilts (the same perspective transform the old
+`:active` state used) and shows a ring in its accent color; pointer capture
+plus `onLostPointerCapture` guarantees a press can never stick.
+
+## Brand palette
+
+The whole app runs on three brand colors plus neutrals, declared as Tailwind
+theme tokens in [index.css](../src/index.css):
+
+| Token             | Value     | Used for                                                   |
+| ----------------- | --------- | ---------------------------------------------------------- |
+| `light-blue`      | `#3ca0ff` | the page surface, water                                    |
+| `track-blue`      | `#284bbe` | the hatch lines on it, modal scrims, links, the car livery |
+| `ink`             | `#1e1e1e` | all text, dark buttons, shadows, illustration outlines     |
+| (NOS red, inline) | `#e61f15` | CTAs, curbs, the brake signal color                        |
+
+Rules that keep it that way:
+
+- **No third blue and no second black.** `ink` used to be a navy (`#0b1440`)
+  and the hatch a darker blue (`#001189`); both are gone. A darker or lighter
+  shade is expressed with **alpha over these colors**, never a new hex — the
+  hatch is translucent light blue, the water is `rgba(60,160,255,0.72)` so the
+  lakes stop out-glowing the car, and the pedal artwork's greys were
+  re-neutralized so `#1e1e1e` is the darkest tone in it.
+- **The page surface is dark, so page-level chrome is white, never ink.**
+  White on `track-blue` is 7.3:1; ink would be 2.3:1. Translucency is fine
+  here but has a floor: `white/85` is 5.8:1 and `white/75` 4.9:1 (both pass),
+  while the `white/40` the keyboard hint used to carry was 2.5:1, and a
+  `white/15` pill with `white/90` text (the old practice label) only 4.4:1 -
+  that label is now an `ink/25` pill with white text at 9.3:1, still reading
+  as secondary. Text on other surfaces states its own color: white on NOS red
+  (4.6:1), ink on white cards (16.7:1), `track-blue` links on white (7.3:1).
+  Only the hatch lines are allowed below AA (2.0:1) because they are texture,
+  not text. **The surface has flipped once already** (light blue base with
+  sport-blue lines), so if it flips again, re-check every `text-white*` and
+  `text-ink*` on the page against the numbers above - contrast is the whole
+  reason those two sets exist.
+- **Scrims are blue, not black.** A `#1e1e1e` wash over the brand blue reads
+  as slate grey; the modal backdrops use `bg-track-blue/80..85` instead.
+- **Deliberate exceptions**, all outside the brand system: the Dutch flag
+  keeps its official `#ae1c28`/`#21468b` (recoloring a national flag would be
+  wrong), the scenery greys/sands/greens stay photo-sampled (see the
+  Rendering section), and brake/coast/throttle keep their signal colors
+  (`PHASE_COLOR`: red, amber, green) because they encode data, not brand.
 
 ## Layout invariants (portrait / landscape)
 
@@ -366,6 +480,25 @@ feedback. Exhausted pedals get a real `disabled`, not just dimming.
   result). The round-result cards therefore overlay the **stage** on portrait
   (`wide:hidden` absolute layer at its bottom edge) instead of living in the
   deck; the deck copy of the cards is `hidden` + `wide:flex`.
+- **Controls are sized by their label.** `BTN_BASE` carries
+  `mx-auto block w-fit max-w-full`, so every button hugs its text (the pill's
+  rounded end starts right after the label) and still cannot outgrow a narrow
+  phone. The verdict banner does the same with `w-fit` inside `inset-x-3`.
+  Deliberately still full width: the accuracy **bars** (they are meters, the
+  fill length is the data), the modal cards, and the two pedals (a hugged
+  pedal would shrink the touch target that the whole game runs on). A pill
+  that could wrap mid-phrase gets `whitespace-nowrap` plus room to sit on one
+  line — see the "nieuw record!" badge, which stacks its stat tiles below
+  360px rather than breaking in half.
+- **The NOS badge outranks the modals.** It sits at `z-[60]`, above every
+  dialog layer (`z-40`, score explainer `z-50`), so a backdrop never dims or
+  blurs the brand, plus `pointer-events-none` so it can't swallow a click.
+  The dialog containers therefore carry `pt-16 sm:pt-4`: a card taller than
+  the viewport starts at the padding edge (auto margins resolve to 0 with
+  negative free space), which on narrow phones put it straight under the
+  badge. 64px clears the 52px badge; from `sm:` up the centered card is
+  always right of it, so the normal `p-4` returns. Verified down to 320x568
+  on the intro, final and explainer cards.
 - **The wide side panel scrolls, never clips.** The panel is a flex column
   with `wide:overflow-y-auto` and _no_ `justify-center` (centering an
   overflowing flex container makes both ends unreachable), and the info row
@@ -374,30 +507,32 @@ feedback. Exhausted pedals get a real `disabled`, not just dimming.
   result cards. The panel also carries `.scrollbar-hidden` (index.css):
   sub-pixel text heights leave it 1px "scrollable" on desktop, which macOS
   with always-visible scrollbars renders as a full useless track.
-
-## Team radio on the score screen
-
-`scripts/fetch-team-radio.mjs` downloads Max's onboard radio clips for the
-2025 Dutch GP weekend from OpenF1's `team_radio` endpoint into
-`public/audio/team-radio/` and copies the configured positive clip (default:
-the race clip at 14:26 UTC — the post-victory radio of his home win) to
-`public/audio/radio-positive.mp3`. On the score reveal, App plays
-`radio-positive.mp3` when the total is >= `RADIO_POSITIVE_THRESHOLD` (60)
-and `radio-negative.mp3` otherwise. The negative clip is not fetched by the
-script — drop a file at `public/audio/radio-negative.mp3` when one is found;
-until then a weak score simply stays silent (playback errors are swallowed).
-The audio starts inside the click handler that finishes the game, so
-browser autoplay policies count it as user-initiated.
+- **...vertically only.** The panel also carries `wide:overflow-x-clip`:
+  `overflow-y: auto` silently makes the x-axis scrollable too, and with the
+  scrollbars hidden a stray horizontal trackpad swipe left the panel stuck
+  side-scrolled, clipping the pedals/CTA on the left. `clip` forbids all
+  horizontal scrolling. Keep every panel child narrower than the panel
+  (that's also why the wide accuracy card stacks its bars).
 
 ## Share flow
 
-No backend: the score is encoded in the URL
-(`?s=<total>&r=<r0.r1.r2.r3>`). `share()` tries `navigator.share`, falls
-back to clipboard + a "Link gekopieerd!" flash. `parseSharedScore()` renders
-the landing card for incoming links; it validates against
-`fixture.rounds.length` so malformed links fall through to the normal game.
-Anyone can forge a score URL — it's a social share, not a leaderboard; don't
-build trust on it.
+No backend: the whole run travels in the URL (`?r=<run token>`, typically
+50-80 characters). The token packs, per round, the score plus the pedal
+timeline quantized to 0.1s — one byte per pedal change (2 bits state, 6
+bits time delta), see the byte layout in
+[shareToken.ts](../src/lib/shareToken.ts). The receiving browser has the
+full fixture baked in, so the landing card recomputes the sharer's overall
+REM/LOS/GAS accuracy bars from the timeline (an earlier iteration also drew
+their racelines on a mini SVG circuit; playtesting cut it — the bars carry
+the message). The displayed scores come from the token itself, not from the
+recompute, so the number on the card always matches what the sharer saw
+(quantizing the timeline can shift a recomputed score by a point). Legacy
+scores-only links (`?d=`) still decode into a plain card without visuals.
+`share()` tries `navigator.share`, falls back to clipboard + a "Link
+gekopieerd!" flash. Both token forms carry a tamper check and validate
+against `fixture.rounds.length`, so malformed links fall through to the
+normal game. Anyone who reads shareToken.ts can still forge a run — it's a
+social share, not a leaderboard; don't build trust on it.
 
 ## Extension points, roughly in order of effort
 
@@ -439,14 +574,19 @@ build trust on it.
 
 For any change to the flow or scene: drive the real app, don't trust the
 build. The pattern that works (see the session scratchpad's
-`playthrough.mjs`): start `npm run dev`, script Playwright to click through
-all four rounds **reading press timings from the fixture JSON**
-(`event.t - round.tStart` + ~150ms), screenshot each phase, and look at
-the screenshots. Two traps: layered UI keeps hidden buttons in the DOM
-(`opacity-0` + `pointer-events-none`), so Playwright's `visible` check
-passes early — gate on _clickability_, not visibility; and a Space press
-after a round ends advances the flow, so mistimed presses silently skip
-phases.
+`playthrough.mjs`): start `npm run dev`, script Playwright to play all four
+rounds with **held keys** — derive Max's phase spans from the fixture's
+telemetry channels (`brakeActive` / `throttle < 95`), start each round with
+`keyboard.down('KeyG')`, then walk the spans with `keyboard.down`/`up` on
+KeyR/KeyG about 120ms late (inside the 0.2s scoring grace) — screenshot
+each phase, and look at the screenshots. A telemetry-mirroring run must
+score 100 on every round and a gas-only run around ~40; if either drifts,
+the scoring grace, the phase averaging or the transition recording broke. Two traps: layered UI
+keeps hidden buttons in the DOM (`opacity-0` + `pointer-events-none`), so
+Playwright's `visible` check passes early — gate on _clickability_, not
+visibility (and match the pedals by `aria-label`, their text is just
+"REM!"/"GAS!"); and Space advances the flow on `roundResult`, so drive the
+pedals with KeyG/KeyR only and release every key at `tEnd`.
 
 Hard-won additions to that pattern:
 

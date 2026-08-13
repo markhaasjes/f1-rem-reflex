@@ -10,10 +10,21 @@ const GRAVEL_FROM_M = ROAD_WIDTH_M / 2 + 3.5;
 const GRAVEL_TO_M = GRAVEL_FROM_M + 26;
 const GREEN_BAND_M = 110; // grass corridor around the track, F1 TV map style
 
+// The flat/coast/brake colors shared by every phase-colored line: Max's
+// dashed reference line, the player's line (CircuitScene) and the on-map
+// legend swatches (App).
+export const PHASE_COLOR: Record<'flat' | 'coast' | 'brake', string> = {
+  flat: '#12a37f',
+  coast: '#f2a11c',
+  brake: '#e61f15',
+};
+
 // Sampled from the aerial/broadcast photos in docs/corners: medium-gray
 // asphalt with a lighter worn line, paved beige-gray run-offs, khaki dune
 // sand with olive scrub, muted grass banks. Curbs are white + NOS red
-// (docs/colors.ts redNosRood) per design.
+// (docs/colors.ts redNosRood) per design. Water is the one place the scene
+// carries brand blue: the two allowed blues double as shallow (light) and
+// deep (dark) water.
 const PALETTE = {
   sand: '#d8cdb2',
   sandLight: '#e4dbc6',
@@ -28,9 +39,12 @@ const PALETTE = {
   paddock: '#aaa8a4',
   white: '#ffffff',
   curbRed: '#e61f15', // redNosRood
-  water: '#8fb8d4',
+  // Light blue, but let down onto the sand/grass underneath: at full strength
+  // the palette blue makes the lakes glow brighter than the car and the race
+  // line. The shoreline stroke is the dark blue, reading as deeper water.
+  water: 'rgba(60, 160, 255, 0.72)',
   bush: '#4c7d46',
-  waterEdge: '#7aa6c4',
+  waterEdge: '#294cbd',
   beach: '#efe4c3',
 };
 
@@ -99,6 +113,13 @@ function offsetPolyline(points: Point[], from: number, to: number, offsetM: numb
     prevBase = points[i];
   }
   return result;
+}
+
+/** A parallel copy of an open path, shifted `offsetM` to one side: the result
+ * comparison draws Max's reference line beside the player's instead of on top
+ * of it. Reuses offsetPolyline, so fold-backs on tight bends are pruned. */
+export function offsetPathPoints(points: Point[], offsetM: number): Point[] {
+  return offsetPolyline(points, 0, points.length - 1, offsetM, 1);
 }
 
 // Like offsetPolyline, but splits into separate runs wherever the bend is
@@ -700,15 +721,20 @@ export function drawRibbon(
   color: string,
   projection: ScreenProjection,
   widthM = 3.2,
+  /** Dash pattern in meters, so the dashes keep their road-relative size at
+   * every zoom. Dashed ribbons get butt caps: round caps grow each dash by
+   * half the line width on both ends, which closes the gaps. */
+  dashM?: [number, number],
 ) {
   if (points.length < 2) return;
   tracePath(ctx, points, projection);
-  ctx.lineCap = 'round';
+  ctx.lineCap = dashM ? 'butt' : 'round';
   ctx.lineJoin = 'round';
-  ctx.setLineDash([]);
+  ctx.setLineDash(dashM ? dashM.map((m) => m * projection.scale) : []);
   ctx.lineWidth = widthM * projection.scale;
   ctx.strokeStyle = color;
   ctx.stroke();
+  ctx.setLineDash([]);
 }
 
 // Corner-number badge in the NOS bochten-kaart style, fixed screen size.
@@ -762,40 +788,11 @@ export function drawMapLabel(
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
   ctx.lineWidth = 4;
-  ctx.strokeStyle = '#0b1440';
+  ctx.strokeStyle = '#1e1e1e';
   ctx.strokeText(label, screenX, screenY);
   ctx.fillStyle = PALETTE.white;
   ctx.fillText(label, screenX, screenY);
   ctx.restore();
-}
-
-export function drawPin(
-  ctx: CanvasRenderingContext2D,
-  screenX: number,
-  screenY: number,
-  color: string,
-  label: string,
-  labelBelow = false,
-) {
-  ctx.beginPath();
-  ctx.arc(screenX, screenY, 6, 0, Math.PI * 2);
-  ctx.fillStyle = color;
-  ctx.strokeStyle = PALETTE.white;
-  ctx.lineWidth = 2.5;
-  ctx.fill();
-  ctx.stroke();
-
-  // Max's pins label above the dot, the player's below, so a well-timed mark
-  // (player pin landing on Max's) doesn't stack the two labels illegibly.
-  const labelY = labelBelow ? screenY + 20 : screenY - 12;
-  ctx.font = "800 13px Effra, 'Helvetica Neue', Helvetica, Arial, sans-serif";
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'alphabetic';
-  ctx.lineWidth = 4;
-  ctx.strokeStyle = PALETTE.white;
-  ctx.strokeText(label, screenX, labelY);
-  ctx.fillStyle = color;
-  ctx.fillText(label, screenX, labelY);
 }
 
 export function drawScaleBar(ctx: CanvasRenderingContext2D, projection: ScreenProjection, canvasHeight: number) {

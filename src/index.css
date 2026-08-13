@@ -11,13 +11,18 @@
    and landscape tablets/phones; portrait keeps the stacked layout. */
 @custom-variant wide (@media (orientation: landscape) and (min-width: 48rem));
 
+/* The whole app runs on brand blues plus neutrals: `track-blue` is the page
+   surface (and the scrims, links and car livery drawn in it), `deep-blue`
+   draws the hatch lines on it, `light-blue` is for water and livery accents,
+   and #1e1e1e is the only black. The surface is dark, so page-level chrome is
+   white (7.3:1) - ink would be 2.3:1 on it. */
 @theme {
   --font-sans: 'Effra', 'Helvetica Neue', Helvetica, Arial, sans-serif;
 
   --color-track-blue: #294cbd;
-  --color-track-blue-dark: #101d63;
-  --color-badge-blue: #2f6fed;
-  --color-ink: #0b1440;
+  --color-deep-blue: #02118a;
+  --color-light-blue: #3ca0ff;
+  --color-ink: #1e1e1e;
 }
 
 body {
@@ -35,23 +40,29 @@ button:disabled {
 }
 
 /* NOS F1 graphics carbon: a fine diagonal hatch over the brand blue, same as
-   the broadcast/WK-stand visuals. Hatch lines in the darker brand blue
-   (#001189) per design. */
+   the broadcast/WK-stand visuals. The deep blue draws the lines at ~2:1
+   against the surface, so the texture reads without competing with content. */
 .bg-carbon {
   background-color: var(--color-track-blue);
   /* the solid rounded curve rising from the bottom paints over the hatch,
      exactly like the NOS F1 broadcast graphics */
   background-image:
     radial-gradient(95% 58% at 50% 124%, var(--color-track-blue) 0 99.6%, transparent 100%),
-    repeating-linear-gradient(115deg, #001189 0px, #001189 2px, transparent 2px, transparent 8px);
+    repeating-linear-gradient(
+      115deg,
+      var(--color-deep-blue) 0px,
+      var(--color-deep-blue) 2px,
+      transparent 2px,
+      transparent 8px
+    );
 }
 
 /* The same hatch woven into modal backdrops, on top of the dark blur. */
 .backdrop-carbon {
   background-image: repeating-linear-gradient(
     115deg,
-    rgba(0, 17, 137, 0.45) 0px,
-    rgba(0, 17, 137, 0.45) 2px,
+    rgba(2, 17, 138, 0.45) 0px,
+    rgba(2, 17, 138, 0.45) 2px,
     transparent 2px,
     transparent 8px
   );
@@ -68,6 +79,29 @@ button:disabled {
   display: none;
 }
 
+/* The "hold GAS to start" affordance on the armed gas pedal: an outline that
+   pulses outward like a sonar ping, and a callout that gently bobs. */
+@keyframes pedal-pulse {
+  0% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(1.1);
+  }
+}
+@keyframes callout-bob {
+  0%,
+  100% {
+    transform: translate(-50%, -100%);
+  }
+  50% {
+    transform: translate(-50%, calc(-100% - 6px));
+  }
+}
+
 /* NOS-style keyboard focus (like nos.nl): 2px solid outline with 2px offset,
    red on light surfaces, overridable per surface via --ring. Only shows for
    keyboard/assistive focus, never on click. */
@@ -78,9 +112,7 @@ button:disabled {
 .focus-ring-white {
   --ring: #fff;
 }
+/* ink and the old "dark" ring are the same #1e1e1e now, so there is one class */
 .focus-ring-ink {
-  --ring: #0b1440;
-}
-.focus-ring-dark {
   --ring: #1e1e1e;
 }

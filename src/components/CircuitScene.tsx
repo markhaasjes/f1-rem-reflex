@@ -1,18 +1,19 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useElementSize } from '../hooks/useElementSize';
 import { viewBoxFromCam, type CamBox } from '../hooks/useCameraFlight';
-import { fitProjection, prepareCanvas } from '../lib/canvas';
+import { fitProjection, prepareCanvas, type ScreenProjection } from '../lib/canvas';
 import { CAR_ART_LENGTH_UNITS, drawF1Car } from '../lib/canvasCar';
-import { headingAt, positionAt, primePathModel, sampleAt, smoothPathPoints } from '../lib/corner';
-import { buildPhaseSegments, type DrivingPhase } from '../lib/phases';
+import { headingAt, positionAt, primePathModel, sampleAt } from '../lib/corner';
+import { buildPhaseSegments } from '../lib/phases';
+import { buildInputSegments } from '../lib/playerInput';
 import {
+  PHASE_COLOR,
   drawCornerBadge,
   drawCornerCurbs,
   drawGravelTrap,
   drawGreenSurroundings,
   drawMapLabel,
   drawPaddock,
-  drawPin,
   drawRibbon,
   drawDirectionArrow,
   drawSandBackground,
@@ -22,9 +23,10 @@ import {
   drawStartFinish,
   drawTrackRibbon,
   nearestIndex,
+  offsetPathPoints,
   rotateOutline,
 } from '../lib/scene';
-import type { GamePhase, GameRound, PlayerMark, ZandvoortFixture } from '../types';
+import type { GamePhase, GameRound, InputTransition, PedalInput, ZandvoortFixture } from '../types';
 
 interface CircuitSceneProps {
   fixture: ZandvoortFixture;
@@ -33,8 +35,11 @@ interface CircuitSceneProps {
   round: GameRound;
   roundIndex: number;
   elapsedT: number;
-  marks: PlayerMark[];
-  /** Reveal Max's line, phase colors and brake/gas pins (round result). */
+  /** The player's recorded pedal timeline for the current round. */
+  transitions: InputTransition[];
+  /** The combined pedal state held right now (colors the live car glow). */
+  heldInput: PedalInput;
+  /** Reveal the Max-vs-player comparison ribbons (round result). */
   showReference: boolean;
 }
 
@@ -89,10 +94,19 @@ const LABEL_OFFSETS: Record<string, { dx: number; dy: number }> = {
   hansernst: { dx: 4, dy: 30 },
 };
 
-const PHASE_COLOR: Record<DrivingPhase, string> = {
-  flat: '#12a37f',
-  coast: '#f2a11c',
-  brake: '#e61f15',
+// Max's reference line runs one road-half beside the driven line, thinner and
+// dashed: the dash pattern is what separates his line from the player's solid
+// one at a glance, without needing labels on the map.
+const MAX_LINE_OFFSET_M = 4.6;
+const MAX_LINE_WIDTH_M = 2.2;
+const MAX_LINE_DASH_M: [number, number] = [5, 3.5];
+
+// The glow disc under the car while driving, colored by the held pedal.
+const GLOW_RADIUS_M = 9;
+const GLOW_MIN_RADIUS_PX = 16;
+const GLOW_COLOR: Record<'gas' | 'brake', string> = {
+  gas: 'rgba(18, 163, 127, 0.35)',
+  brake: 'rgba(230, 31, 21, 0.4)',
 };
 
 // The scene renders on its own requestAnimationFrame loop, reading the
@@ -123,29 +137,75 @@ export function CircuitScene(props: CircuitSceneProps) {
   // Corners the game visits get prominent badges; the rest render minor.
   const roundCornerNumbers = useMemo(() => new Set(fixture.rounds.flatMap((r) => r.cornerNumbers)), [fixture]);
 
-  // Pre-split the whole lap into phase segments once; per round we clip by t.
-  const roundSegments = useMemo(
+  // Max's reference line per round: his phase-colored line shifted one
+  // road-half aside, so it runs beside the player's line instead of under it.
+  // Offsetting is geometry work, so it happens once here, not per frame.
+  const maxReferenceSegments = useMemo(
     () =>
       fixture.rounds.map((round) =>
-        buildPhaseSegments(fixture.lap.samples, round.tStart, round.tEnd).filter(
-          (segment) => segment.points.length >= 2,
-        ),
+        buildPhaseSegments(fixture.lap.samples, round.tStart, round.tEnd)
+          .map((segment) => ({ phase: segment.phase, points: offsetPathPoints(segment.points, MAX_LINE_OFFSET_M) }))
+          .filter((segment) => segment.points.length >= 2),
       ),
     [fixture],
   );
 
+
+  // Redraws happen lazily: the rAF loop keeps running (cheap), but the scene
+  // - sand field, corridor, track, curbs, everything - is only rasterized
+  // when something visible changed. Painting unconditionally at 60fps kept
+  // the main thread >50% busy on completely idle screens (intro, ready,
+  // result), which users noticed as a hot browser. The snapshot covers every
+  // input the drawing reads; 'running' and 'flying' are time-animated (the
+  // clock / the badge pulse) and always paint. Fonts load async, so the
+  // loaded-flag is part of the snapshot - otherwise an early static frame
+  // would keep fallback-font labels until the next change.
+  const fontsLoadedRef = useRef(false);
+  useEffect(() => {
+    document.fonts?.ready.then(() => {
+      fontsLoadedRef.current = true;
+    });
+  }, []);
+  const lastSnapshotRef = useRef('');
+
   useEffect(() => {
     let raf = 0;
+
+    const drawMaxReference = (ctx: CanvasRenderingContext2D, projection: ScreenProjection, roundIndex: number) => {
+      for (const segment of maxReferenceSegments[roundIndex]) {
+        drawRibbon(ctx, segment.points, PHASE_COLOR[segment.phase], projection, MAX_LINE_WIDTH_M, MAX_LINE_DASH_M);
+      }
+    };
 
     const render = (now: number) => {
       raf = requestAnimationFrame(render);
       const { width: w, height: h } = sizeRef.current;
       const canvas = canvasRef.current;
       if (!canvas || w === 0 || h === 0) return;
+
+      const { camBox, phase, round, roundIndex, elapsedT, transitions, heldInput, showReference } = propsRef.current;
+      const timeAnimated = phase === 'running' || phase === 'flying';
+      const snapshot = [
+        camBox.cx,
+        camBox.cy,
+        camBox.w,
+        camBox.h,
+        w,
+        h,
+        devicePixelRatio,
+        phase,
+        roundIndex,
+        elapsedT,
+        transitions.length,
+        heldInput,
+        showReference,
+        fontsLoadedRef.current,
+      ].join('|');
+      if (!timeAnimated && snapshot === lastSnapshotRef.current) return;
+      lastSnapshotRef.current = snapshot;
+
       const ctx = prepareCanvas(canvas, w, h);
       if (!ctx) return;
-
-      const { camBox, phase, round, roundIndex, elapsedT, marks, showReference } = propsRef.current;
       const projection = fitProjection(viewBoxFromCam(camBox), w, h);
       const samples = fixture.lap.samples;
 
@@ -165,48 +225,30 @@ export function CircuitScene(props: CircuitSceneProps) {
       }
       drawStartFinish(ctx, fixture.startFinish.x, fixture.startFinish.y, fixture.startFinish.headingDeg, projection);
 
-      // --- practice coaching: pulsing markers where Max brakes and gets
-      // back on the gas, so first-time players see what to do without
-      // reading anything ---
+      // --- practice coaching: Max's dashed reference line runs beside the
+      // player's, so first-time players see what to match without reading
+      // anything (the zone colors say where to brake and where to get back
+      // on the gas - no point markers needed) ---
       if (round.practice && (phase === 'ready' || phase === 'running')) {
-        for (const event of round.events) {
-          const s = sampleAt(samples, event.t);
-          const [x, y] = projection.toScreen(s.x, s.y);
-          const isBrake = event.type === 'brake';
-          const color = isBrake ? '#e61f15' : '#0b7a43';
-          const pulse = (now % 1400) / 1400;
-          ctx.save();
-          ctx.globalAlpha = 1 - pulse;
-          ctx.beginPath();
-          ctx.arc(x, y, 8 + pulse * 16, 0, Math.PI * 2);
-          ctx.strokeStyle = color;
-          ctx.lineWidth = 3;
-          ctx.stroke();
-          ctx.restore();
-          drawPin(ctx, x, y, color, isBrake ? 'Rem hier!' : 'Gas hier!', !isBrake);
-        }
+        drawMaxReference(ctx, projection, roundIndex);
       }
 
-      // --- run/result overlays ---
+      // --- live trail: the driven line so far, colored by what the player's
+      // pedals said at each moment (green = gas, amber = los, red = remmen) ---
       if (phase === 'running' && elapsedT > round.tStart) {
-        drawRibbon(ctx, smoothPathPoints(samples, round.tStart, elapsedT), 'rgba(230, 31, 21, 0.85)', projection);
-      }
-
-      if (showReference) {
-        for (const segment of roundSegments[roundIndex]) {
+        for (const segment of buildInputSegments(samples, transitions, round.tStart, elapsedT)) {
           drawRibbon(ctx, segment.points, PHASE_COLOR[segment.phase], projection);
         }
-        // Pins are placed via the path model (not raw samples) so they sit on
-        // the drawn line, also inside the repaired Gerlach/Hugenholtz stretch.
-        for (const event of round.events) {
-          const p = positionAt(samples, event.t);
-          const [x, y] = projection.toScreen(p.x, p.y);
-          drawPin(ctx, x, y, '#0b7a43', event.type === 'brake' ? 'Max rem' : 'Max gas');
-        }
-        for (const mark of marks) {
-          const p = positionAt(samples, mark.t);
-          const [x, y] = projection.toScreen(p.x, p.y);
-          drawPin(ctx, x, y, '#1a2c8f', mark.type === 'brake' ? 'Jij rem' : 'Jij gas', true);
+      }
+
+      // --- result comparison: Max's dashed line beside the player's solid
+      // one (same pairing the practice round teaches with), so matching
+      // stretches read as two same-colored lines running together and a
+      // mismatch shows as two different colors side by side ---
+      if (showReference) {
+        drawMaxReference(ctx, projection, roundIndex);
+        for (const segment of buildInputSegments(samples, transitions, round.tStart, round.tEnd)) {
+          drawRibbon(ctx, segment.points, PHASE_COLOR[segment.phase], projection);
         }
       }
 
@@ -220,6 +262,15 @@ export function CircuitScene(props: CircuitSceneProps) {
       else if (phase === 'roundResult' || phase === 'finished') carT = round.tEnd;
       const carState = sampleAt(samples, carT);
       const carPos = positionAt(samples, carT);
+      // Immediate pedal feedback at the car itself: a colored glow under it
+      // while the player is on the gas or the brake (nothing while coasting).
+      if (phase === 'running' && heldInput !== 'coast') {
+        const [glowX, glowY] = projection.toScreen(carPos.x, carPos.y);
+        ctx.beginPath();
+        ctx.arc(glowX, glowY, Math.max(GLOW_RADIUS_M * projection.scale, GLOW_MIN_RADIUS_PX), 0, Math.PI * 2);
+        ctx.fillStyle = GLOW_COLOR[heldInput];
+        ctx.fill();
+      }
       const minScale = CAR_MIN_LENGTH_PX / (CAR_ART_LENGTH_UNITS * projection.scale);
       drawF1Car(ctx, {
         x: carPos.x,
@@ -238,10 +289,13 @@ export function CircuitScene(props: CircuitSceneProps) {
       // big screens. Fully visible at the ~1200m overview, gone below ~700m.
       const badgeAlpha = Math.max(0, Math.min(1, (camBox.w - 700) / 300));
       if (badgeAlpha > 0) {
-        // Every corner of the upcoming round pulses, so a double (Gerlach &
-        // Hugenholtz, Bocht 9 & 10) announces both its corners at once.
+        // Every corner of the upcoming round pulses during the flight toward
+        // it, so a double (Gerlach & Hugenholtz, Bocht 9 & 10) announces both
+        // its corners at once. Only while flying: a pulse on the (modal-
+        // covered) intro map would force the idle screen to repaint at 60fps,
+        // defeating the lazy-redraw snapshot above.
         const nextRound = fixture.rounds[roundIndex];
-        const pulseCornerNumbers = new Set(phase === 'intro' || phase === 'flying' ? nextRound.cornerNumbers : []);
+        const pulseCornerNumbers = new Set(phase === 'flying' ? nextRound.cornerNumbers : []);
         fixture.corners.forEach((corner) => {
           const [x, y] = projection.toScreen(corner.x, corner.y);
           const isPulse = pulseCornerNumbers.has(corner.number);
@@ -287,7 +341,7 @@ export function CircuitScene(props: CircuitSceneProps) {
 
     raf = requestAnimationFrame(render);
     return () => cancelAnimationFrame(raf);
-  }, [fixture, outline, cornerIndices, roundSegments, roundCornerNumbers]);
+  }, [fixture, outline, cornerIndices, maxReferenceSegments, roundCornerNumbers]);
 
   return (
     <div ref={containerRef} className="relative h-full w-full">

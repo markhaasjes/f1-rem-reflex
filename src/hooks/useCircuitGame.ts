@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { sampleAt } from '../lib/corner';
 import { scoreRound, type RoundResult } from '../lib/scoring';
-import type { GamePhase, PlayerMark, ZandvoortFixture } from '../types';
+import type { GamePhase, InputTransition, PedalInput, ZandvoortFixture } from '../types';
 
 // Game flow: intro (circuit overview) -> per round: flying (camera moves to
 // the corner) -> ready -> running -> roundResult -> ... -> finished.
 // The camera itself is owned by App (useCameraFlight); this hook owns round
-// progression, the run clock and the player's marks.
+// progression, the run clock and the player's pedal timeline.
+//
+// The pedals are held, not tapped: the player keeps GAS or REM pressed and
+// the hook records every change of the combined pedal state as a transition
+// on the lap clock. A round starts the moment the player first presses GAS
+// on the ready screen - the car pulls away with their foot already down.
 export function useCircuitGame(fixture: ZandvoortFixture) {
   const [phase, setPhase] = useState<GamePhase>('intro');
   const [roundIndex, setRoundIndex] = useState(0);
@@ -15,14 +19,17 @@ export function useCircuitGame(fixture: ZandvoortFixture) {
   // Global lap time (seconds into the telemetry window); runs from
   // round.tStart to round.tEnd while a round plays.
   const [elapsedT, setElapsedT] = useState(round.tStart);
-  const [marks, setMarks] = useState<PlayerMark[]>([]);
+  const [transitions, setTransitions] = useState<InputTransition[]>([]);
   const [results, setResults] = useState<RoundResult[]>([]);
+  // The combined pedal state right now, for the pedal art and live hints.
+  const [heldInput, setHeldInput] = useState<PedalInput>('coast');
 
   const rafRef = useRef<number | null>(null);
   const startTimeRef = useRef(0);
-  // Synchronous mirror of marks so fast double presses within one frame read
-  // the right count before React re-renders.
-  const marksRef = useRef<PlayerMark[]>([]);
+  // Synchronous mirrors: pedal changes must read the up-to-date timeline and
+  // held state immediately, not after the next React render.
+  const transitionsRef = useRef<InputTransition[]>([]);
+  const heldRef = useRef({ gas: false, brake: false });
 
   const stopLoop = useCallback(() => {
     if (rafRef.current !== null) {
@@ -41,7 +48,7 @@ export function useCircuitGame(fixture: ZandvoortFixture) {
       if (t >= round.tEnd) {
         setElapsedT(round.tEnd);
         stopLoop();
-        setResults((prev) => [...prev, scoreRound(round, marksRef.current)]);
+        setResults((prev) => [...prev, scoreRound(round, fixture.lap.samples, transitionsRef.current)]);
         setPhase('roundResult');
         return;
       }
@@ -51,75 +58,86 @@ export function useCircuitGame(fixture: ZandvoortFixture) {
 
     rafRef.current = requestAnimationFrame(tick);
     return stopLoop;
-  }, [phase, round, stopLoop]);
+  }, [phase, round, fixture.lap.samples, stopLoop]);
+
+  const resetPedals = useCallback(() => {
+    heldRef.current = { gas: false, brake: false };
+    setHeldInput('coast');
+  }, []);
 
   /** Camera flight toward `index` has started (from intro or a result). */
   const flyToRound = useCallback(
     (index: number) => {
       setRoundIndex(index);
-      marksRef.current = [];
-      setMarks([]);
+      transitionsRef.current = [];
+      setTransitions([]);
+      resetPedals();
       setElapsedT(fixture.rounds[index].tStart);
       setPhase('flying');
     },
-    [fixture.rounds],
+    [fixture.rounds, resetPedals],
   );
 
   /** Camera arrived: show the round's ready screen. */
   const arm = useCallback(() => setPhase('ready'), []);
 
-  const startRun = useCallback(() => {
-    marksRef.current = [];
-    setMarks([]);
-    setElapsedT(round.tStart);
-    setPhase('running');
-  }, [round.tStart]);
+  // One handler for every input source (pointer, touch, keyboard): a pedal
+  // went down or came up. Brake wins when both pedals are held - the 3-state
+  // input model needs one answer and braking over throttle is the honest one.
+  const setPedal = useCallback(
+    (pedal: 'gas' | 'brake', pressed: boolean) => {
+      if (heldRef.current[pedal] === pressed) return;
+      heldRef.current[pedal] = pressed;
+      let input: PedalInput = 'coast';
+      if (heldRef.current.brake) input = 'brake';
+      else if (heldRef.current.gas) input = 'gas';
+      setHeldInput(input);
 
-  // Two pedals: each press is typed by the pedal (REM/GAS), and only the
-  // pedal matching Max's next event registers - play-testing showed players
-  // don't read instructions, so the game enforces the brake/gas order and the
-  // UI disables the other pedal. Scoring pairs the k-th brake press with
-  // Max's k-th brake event (same for gas), which alternation guarantees.
-  const press = useCallback(
-    (type: PlayerMark['type']) => {
+      if (phase === 'ready' && pedal === 'gas' && pressed) {
+        // The first gas press IS the start: the run clock effect stamps
+        // startTimeRef when the phase flips, and the timeline opens with the
+        // player already on the pedal state they are holding right now.
+        transitionsRef.current = [{ t: round.tStart, input }];
+        setTransitions(transitionsRef.current);
+        setElapsedT(round.tStart);
+        setPhase('running');
+        return;
+      }
       if (phase !== 'running') return;
-      if (round.events[marksRef.current.length]?.type !== type) return;
+
       const t = Math.min(round.tStart + (performance.now() - startTimeRef.current) / 1000, round.tEnd);
-      const state = sampleAt(fixture.lap.samples, t);
-      const mark: PlayerMark = { type, t, distanceM: state.distanceM, speedKph: state.speedKph };
-      marksRef.current = [...marksRef.current, mark];
-      setMarks(marksRef.current);
+      const last = transitionsRef.current.at(-1);
+      if (last?.input === input) return;
+      transitionsRef.current = [...transitionsRef.current, { t, input }];
+      setTransitions(transitionsRef.current);
     },
-    [phase, round, fixture.lap.samples],
+    [phase, round],
   );
 
   const finish = useCallback(() => setPhase('finished'), []);
 
   const restart = useCallback(() => {
     stopLoop();
-    marksRef.current = [];
-    setMarks([]);
+    transitionsRef.current = [];
+    setTransitions([]);
+    resetPedals();
     setResults([]);
     setRoundIndex(0);
     setElapsedT(fixture.rounds[0].tStart);
     setPhase('intro');
-  }, [fixture.rounds, stopLoop]);
-
-  const nextEvent = round.events[marks.length] ?? null;
+  }, [fixture.rounds, stopLoop, resetPedals]);
 
   return {
     phase,
     roundIndex,
     round,
     elapsedT,
-    marks,
+    transitions,
     results,
-    /** The event type the next press will answer (null once all are used). */
-    nextEvent,
+    heldInput,
     flyToRound,
     arm,
-    startRun,
-    press,
+    setPedal,
     finish,
     restart,
   };

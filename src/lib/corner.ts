@@ -425,14 +425,3 @@ export function headingAt(samples: LapSample[], t: number): number {
   const b = pointAtArc(model, Math.min(s + ds, model.totalLen));
   return (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
 }
-
-// Smoothed polyline for a stretch of the lap, sampled from the same
-// jitter-filtered Catmull-Rom path model that drives the car - use this for
-// drawing driven lines/ribbons instead of raw sample points, which carry
-// visible 20 Hz GPS jitter through slow corners.
-export function smoothPathPoints(samples: LapSample[], t0: number, t1: number, stepS = 0.05): Point[] {
-  const points: Point[] = [];
-  for (let t = t0; t < t1; t += stepS) points.push(positionAt(samples, t));
-  points.push(positionAt(samples, t1));
-  return points;
-}

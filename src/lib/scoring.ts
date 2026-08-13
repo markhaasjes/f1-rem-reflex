@@ -1,149 +1,154 @@
-import type { GameRound, PlayerMark, TargetEvent } from '../types';
+import { classifyAt, STEP_S, type DrivingPhase } from './phases';
+import { inputAt, inputToPhase } from './playerInput';
+import type { GameRound, InputTransition, LapSample, PedalInput } from '../types';
 
 export type ResultTone = 'perfect' | 'good' | 'okay' | 'bad';
 
-export interface ResultDescription {
-  title: string;
-  detail: string;
-  tone: ResultTone;
+// Human reaction lag: a pedal state also counts as matched when it matches
+// Max's phase this far to either side of t, so every zone boundary forgives
+// a fraction of a second of being late (or anticipating) without rewarding a
+// wrong pedal held through a whole zone.
+const REACTION_GRACE_S = 0.2;
+
+// A phase must fill at least this much of the window to count toward the
+// score average - guards against a future fixture where a one-blip phase
+// would otherwise carry a third of a round's score.
+const MIN_PHASE_S = 0.5;
+
+/** One contiguous stretch of the round where Max holds the same phase, with
+ * how much of it the player's pedals agreed. */
+export interface ZoneResult {
+  phase: DrivingPhase;
+  tStart: number;
+  tEnd: number;
+  matchFraction: number;
+  /** What the player mostly did instead during the mismatched time. */
+  wrongInput: PedalInput | null;
 }
 
-// deltaM: player's brake distance minus Verstappen's. Positive = player
-// braked later (deeper into the corner), negative = earlier. null = the
-// player never braked at all.
-function describeBrakeAttempt(deltaM: number | null): ResultDescription {
-  if (deltaM === null) {
-    return {
-      title: 'Je hebt niet geremd!',
-      detail: 'Zo ga je rechtdoor het grind in.',
-      tone: 'bad',
-    };
-  }
-
-  const absDelta = Math.abs(deltaM);
-  const late = deltaM > 0;
-
-  if (absDelta <= 3) {
-    return { title: 'Perfect getimed!', detail: 'Zo remt een wereldkampioen.', tone: 'perfect' };
-  }
-  if (absDelta <= 10) {
-    return {
-      title: late ? 'Heel dichtbij, iets te laat.' : 'Heel dichtbij, iets te vroeg.',
-      detail: `Je zat maar ${absDelta.toFixed(1)} meter naast het rempunt van Max.`,
-      tone: 'good',
-    };
-  }
-  if (absDelta <= 25) {
-    return {
-      title: late ? 'Iets te laat geremd.' : 'Iets te voorzichtig.',
-      detail: late
-        ? 'Nog iets langer wachten met remmen was sneller geweest, toch?'
-        : 'Je durfde het niet helemaal aan.',
-      tone: 'okay',
-    };
-  }
-  return {
-    title: late ? 'Veel te laat!' : 'Veel te voorzichtig.',
-    detail: late ? 'Dat werd een uitstapje door het grind.' : `Max remde hier pas ${absDelta.toFixed(0)} meter later.`,
-    tone: 'bad',
-  };
-}
-
-// deltaM: player's throttle-on distance minus Verstappen's. Positive = player
-// got back on the gas later (further round the corner), negative = earlier.
-// null = the player never got on the gas.
-function describeGasAttempt(deltaM: number | null): ResultDescription {
-  if (deltaM === null) {
-    return { title: 'Geen gas gegeven!', detail: 'Je bleef te lang van het gas af.', tone: 'bad' };
-  }
-
-  const absDelta = Math.abs(deltaM);
-  const late = deltaM > 0;
-
-  if (absDelta <= 5) {
-    return { title: 'Perfect op het gas!', detail: 'Precies waar Max het gas intrapt.', tone: 'perfect' };
-  }
-  if (absDelta <= 14) {
-    return {
-      title: late ? 'Net te laat op het gas.' : 'Net te vroeg op het gas.',
-      detail: `Je zat ${absDelta.toFixed(1)} meter naast het gaspunt van Max.`,
-      tone: 'good',
-    };
-  }
-  if (absDelta <= 30) {
-    return {
-      title: late ? 'Te laat op het gas.' : 'Te vroeg op het gas.',
-      detail: late ? 'Eerder vol gas wint tijd op het rechte stuk.' : 'Zoveel gas en je glijdt wijd de bocht uit.',
-      tone: 'okay',
-    };
-  }
-  return {
-    title: late ? 'Veel te laat vol gas.' : 'Veel te vroeg vol gas.',
-    detail: late ? 'Zo laat Max je op het rechte stuk staan.' : 'Daar spin je zo de grindbak in.',
-    tone: 'bad',
-  };
-}
-
-const TONE_RANK: Record<ResultTone, number> = { perfect: 3, good: 2, okay: 1, bad: 0 };
-
-const OVERALL_TITLE: Record<ResultTone, string> = {
-  perfect: 'Wereldklasse!',
-  good: 'Sterke bocht!',
-  okay: 'Netjes gedaan.',
-  bad: 'Volgende keer beter.',
-};
-
-// Combines several event verdicts into one headline, taking the weakest so
-// the player sees the honest overall grade.
-export function combineResults(descriptions: ResultDescription[]): { title: string; tone: ResultTone } {
-  const tone = descriptions.reduce<ResultTone>(
-    (worst, d) => (TONE_RANK[d.tone] < TONE_RANK[worst] ? d.tone : worst),
-    'perfect',
-  );
-  return { title: OVERALL_TITLE[tone], tone };
-}
-
-// --- Numeric scoring across the whole game ---
-
-/** 100 points within 2m of Max, linearly down to 0 at 50m. Missed event = 0. */
-function scoreEvent(deltaM: number | null): number {
-  if (deltaM === null) return 0;
-  const absDelta = Math.abs(deltaM);
-  if (absDelta <= 2) return 100;
-  return Math.max(0, Math.round(100 - ((absDelta - 2) * 100) / 48));
-}
-
-export interface EventResult {
-  event: TargetEvent;
-  mark: PlayerMark | null;
-  deltaM: number | null;
-  score: number;
-  description: ResultDescription;
+interface PhaseAccuracy {
+  matchedS: number;
+  totalS: number;
 }
 
 export interface RoundResult {
   round: GameRound;
-  eventResults: EventResult[];
+  /** The pedal timeline this result was scored from (feeds the share link). */
+  transitions: InputTransition[];
+  zones: ZoneResult[];
+  /** Match time per phase of Max's driving (totalS 0 = phase absent). */
+  phaseAccuracy: Record<DrivingPhase, PhaseAccuracy>;
+  /** 0-100: the average of the per-phase match percentages. */
   score: number;
 }
 
-// Marks pair to Max's events per pedal, in order: the k-th brake press
-// answers Max's k-th brake event, the k-th gas press his k-th gas event.
-// Unanswered events score 0.
-export function scoreRound(round: GameRound, marks: PlayerMark[]): RoundResult {
-  const byType: Record<PlayerMark['type'], PlayerMark[]> = {
-    brake: marks.filter((m) => m.type === 'brake'),
-    gas: marks.filter((m) => m.type === 'gas'),
+/** A phase's match share as the whole percentage the result card shows. */
+export function phasePercent(accuracy: PhaseAccuracy): number {
+  return accuracy.totalS === 0 ? 0 : Math.round((accuracy.matchedS / accuracy.totalS) * 100);
+}
+
+// Walks the round window on the same grid the ribbons render at and compares
+// the player's pedal timeline against Max's telemetry moment by moment.
+//
+// The score is the equal-weight average of the three per-phase match
+// percentages (the REM/LOS/GAS bars on the result card), NOT the matched
+// share of time: Max is flat out for 40-55% of every window, so time-weighted
+// matching handed ~50 points to anyone who simply held the gas down and let
+// the long easy stretches drown out the short braking zones where the actual
+// skill sits. Equal phase weight puts a 2s braking zone on par with a 4s
+// flat-out run (one-pedal strategies now land around 40 - the reaction grace
+// at zone edges lifts them above the naive 33), and averaging the *rounded*
+// percentages keeps the score verifiable from the card the player sees - the
+// same property totalScore keeps for the final card.
+export function scoreRound(round: GameRound, samples: LapSample[], transitions: InputTransition[]): RoundResult {
+  const zones: ZoneResult[] = [];
+  const phaseAccuracy: Record<DrivingPhase, PhaseAccuracy> = {
+    flat: { matchedS: 0, totalS: 0 },
+    coast: { matchedS: 0, totalS: 0 },
+    brake: { matchedS: 0, totalS: 0 },
   };
-  const used: Record<PlayerMark['type'], number> = { brake: 0, gas: 0 };
-  const eventResults = round.events.map((event) => {
-    const mark = byType[event.type][used[event.type]++] ?? null;
-    const deltaM = mark ? mark.distanceM - event.distanceM : null;
-    const describe = event.type === 'brake' ? describeBrakeAttempt : describeGasAttempt;
-    return { event, mark, deltaM, score: scoreEvent(deltaM), description: describe(deltaM) };
-  });
-  const score = Math.round(eventResults.reduce((sum, r) => sum + r.score, 0) / eventResults.length);
-  return { round, eventResults, score };
+
+  let zone: { phase: DrivingPhase; tStart: number; tEnd: number; matchedS: number; totalS: number } | null = null;
+  let zoneWrong: Record<PedalInput, number> | null = null;
+
+  const closeZone = () => {
+    if (!zone || !zoneWrong) return;
+    const wrongEntries = (Object.entries(zoneWrong) as [PedalInput, number][]).filter(([, s]) => s > 0);
+    wrongEntries.sort((a, b) => b[1] - a[1]);
+    zones.push({
+      phase: zone.phase,
+      tStart: zone.tStart,
+      tEnd: zone.tEnd,
+      matchFraction: zone.totalS === 0 ? 1 : zone.matchedS / zone.totalS,
+      wrongInput: wrongEntries[0]?.[0] ?? null,
+    });
+  };
+
+  for (let t = round.tStart; t <= round.tEnd; t += STEP_S) {
+    const maxPhase = classifyAt(samples, t);
+    const playerInput = inputAt(transitions, t);
+    const playerPhase = inputToPhase(playerInput);
+    const matched =
+      playerPhase === maxPhase ||
+      playerPhase === classifyAt(samples, t - REACTION_GRACE_S) ||
+      playerPhase === classifyAt(samples, t + REACTION_GRACE_S);
+
+    if (!zone || zone.phase !== maxPhase) {
+      closeZone();
+      zone = { phase: maxPhase, tStart: t, tEnd: t, matchedS: 0, totalS: 0 };
+      zoneWrong = { gas: 0, brake: 0, coast: 0 };
+    }
+    zone.tEnd = t;
+    zone.totalS += STEP_S;
+    phaseAccuracy[maxPhase].totalS += STEP_S;
+    if (matched) {
+      zone.matchedS += STEP_S;
+      phaseAccuracy[maxPhase].matchedS += STEP_S;
+    } else if (zoneWrong) {
+      zoneWrong[playerInput] += STEP_S;
+    }
+  }
+  closeZone();
+
+  const countedPhases = Object.values(phaseAccuracy).filter((accuracy) => accuracy.totalS >= MIN_PHASE_S);
+  const score =
+    countedPhases.length === 0
+      ? 0
+      : Math.round(countedPhases.reduce((sum, accuracy) => sum + phasePercent(accuracy), 0) / countedPhases.length);
+  return { round, transitions, zones, phaseAccuracy, score };
+}
+
+/** The whole run's match time per phase, summed over the scoring rounds -
+ * the same rounds the total reflects (practice excluded). Feeds the overall
+ * REM/LOS/GAS bars on the shared-score landing. */
+export function aggregatePhaseAccuracy(results: RoundResult[]): Record<DrivingPhase, PhaseAccuracy> {
+  const aggregate: Record<DrivingPhase, PhaseAccuracy> = {
+    flat: { matchedS: 0, totalS: 0 },
+    coast: { matchedS: 0, totalS: 0 },
+    brake: { matchedS: 0, totalS: 0 },
+  };
+  for (const result of results) {
+    if (result.round.practice) continue;
+    for (const phase of Object.keys(aggregate) as DrivingPhase[]) {
+      aggregate[phase].matchedS += result.phaseAccuracy[phase].matchedS;
+      aggregate[phase].totalS += result.phaseAccuracy[phase].totalS;
+    }
+  }
+  return aggregate;
+}
+
+const VERDICT_FALLBACK: [number, ResultTone, string] = [0, 'bad', 'Volgende keer beter.'];
+const VERDICTS: [number, ResultTone, string][] = [
+  [90, 'perfect', 'Wereldklasse!'],
+  [72, 'good', 'Sterke bocht!'],
+  [45, 'okay', 'Netjes gedaan.'],
+  VERDICT_FALLBACK,
+];
+
+/** The round verdict banner: one headline for the matched share of the round. */
+export function verdictForScore(score: number): { title: string; tone: ResultTone } {
+  const [, tone, title] = VERDICTS.find(([threshold]) => score >= threshold) ?? VERDICT_FALLBACK;
+  return { title, tone };
 }
 
 /** Overall 0-100: the average of the scoring rounds' (rounded) scores,
@@ -164,9 +169,7 @@ export function totalScoreFromRoundScores(rounds: GameRound[], roundScores: numb
 
 /** Overall 0-100: the average of the scoring rounds' (rounded) scores;
  * practice rounds are shown on the card but do not count. Averaging at the
- * round level keeps the total verifiable from the score card - the earlier
- * event-weighted average (double corners counting twice as heavy) produced
- * totals that looked like calculation mistakes next to the listed rounds. */
+ * round level keeps the total verifiable from the score card. */
 export function totalScore(results: RoundResult[]): number {
   return totalScoreFromRoundScores(
     results.map((r) => r.round),

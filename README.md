@@ -3,9 +3,14 @@
 Proof of concept for a browser reflex game built on real Formula 1 telemetry
 from [OpenF1](https://openf1.org). You fly over Circuit Zandvoort like the
 F1 TV race map, zoom into four corners of Max Verstappen's real pole lap,
-and hit the **REM!** and **GAS!** pedals at the moments you think he braked
-and got back on the throttle. Every brake/gas moment is scored by how close you are
-to his real point (in meters); the final score is shareable via a link.
+and drive them with held pedals: keep **GAS!** pressed where Max is flat
+out, release everything where he coasts, and hold **REM!** through his
+braking zones. Your pedal timeline is compared against his real telemetry
+moment by moment; per pedal state you get a matched percentage and the
+corner score is the average of those three (so the short braking zone
+counts as much as the long flat-out stretch). The final score is shareable
+via a link, and the score card explains the whole calculation, including
+an AI-assistance and data-provenance disclaimer.
 
 This is a POC for a nos.nl feature around the Dutch Grand Prix, not
 production code.
@@ -14,13 +19,21 @@ production code.
 
 1. **Overview**: the full circuit, oriented like Google Maps, drawn in the
    F1 TV map style (green surroundings, dark asphalt, corner badges).
-2. **Tarzanbocht** — practice corner (does not count): one brake, one gas.
-3. **Gerlach & Hugenholtz** — a double: brake, gas, brake, gas.
+2. **Tarzanbocht** — practice corner (does not count): Max's brake, coast
+   and full-throttle zones run alongside you as a dashed colored line, so
+   you can see the telemetry you have to match.
+3. **Gerlach & Hugenholtz** — a double: two braking zones, two returns to
+   throttle.
 4. **Bocht 9 & 10** — the slow double after Mastersbocht.
 5. **Hans Ernstbocht** — the chicane, one deep braking zone.
-6. **Eindscore** — 0–100 across the three scoring corners, revealed with
-   Max's real team radio (positive clip for a good score), plus a share link
-   that renders the same score card for whoever opens it.
+6. **Eindscore** — 0–100 across the three scoring corners, plus a share link
+   that carries your whole run (~80 characters): whoever opens it sees your
+   overall REM/LOS/GAS accuracy bars rebuilt from your actual pedal work.
+
+Each corner starts the moment you first hold the gas pedal on the ready
+screen; while driving, the trail behind the car is colored by your own
+input, and the result view runs Max's dashed zone line beside your solid
+one, plus a REM/LOS/GAS accuracy card and an on-map legend.
 
 Between rounds the camera zooms back to the overview and flies to the next
 corner — one continuous map, no separate per-corner artwork.
@@ -62,7 +75,6 @@ updating the `DRIVER` lap reference in the script and re-running it.
 
 ```
 scripts/build-game-fixture.mjs   data pipeline: OpenF1 + official geometry -> the fixture
-scripts/fetch-team-radio.mjs     downloads Max's team-radio mp3s for the score screen
 scripts/analyze-race-line.mjs    diagnoses straight/faceted race-line corners (GPS data gaps)
 scripts/lib/geojson.mjs          shared geometry helpers (fitting, resampling, smoothing)
 src/data/zandvoort2025.json      the one fixture: circuit, full lap, rounds + target events
@@ -72,14 +84,15 @@ src/lib/geometry.ts              the ViewBox type shared by canvas.ts and the ca
 src/lib/scene.ts                 illustrated scene: sand, green corridor, paddock, track, curbs, gravel, badges
 src/lib/canvasCar.ts             draws the top-down car SVG (public/images/auto-boven.svg) on the canvas
 src/lib/corner.ts                sampling/interpolation + GPS-stall-proof car motion
-src/lib/phases.ts                flat/coast/brake segmentation of the driven line
-src/lib/scoring.ts               per-event scores (0-100) + Dutch verdicts
+src/lib/phases.ts                flat/coast/brake segmentation (Max's telemetry or any phase source)
+src/lib/playerInput.ts           the player's pedal timeline: state lookup + colored segments
+src/lib/scoring.ts               zone-match scoring (0-100 share matched) + Dutch verdicts
 src/lib/storage.ts               localStorage persistence for the last run + best run
-src/lib/tips.ts                  turns a round's worst event into a Dutch coaching tip
+src/lib/tips.ts                  turns a round's worst zone into a Dutch coaching tip
 src/hooks/useCircuitGame.ts      game state machine (intro/flying/ready/running/result/finished)
 src/hooks/useCameraFlight.ts     animated camera box (log-space zoom, step queues)
 src/hooks/useElementSize.ts      ResizeObserver hook
-src/components/CircuitScene.tsx  the one canvas scene, own rAF loop, every zoom level
+src/components/CircuitScene.tsx  the one canvas scene, own rAF loop (lazy repaint), every zoom level
 src/components/HeroCar.tsx       side-view car for the intro (public/images/auto-zij.svg)
 src/components/NOSLogo.tsx       NOS wordmark used in the app chrome
 src/components/Brand.tsx         shared pill/badge chrome
@@ -113,6 +126,18 @@ for how the pieces fit together; the rules below are about how to change them.
   rounds (or drive them with Playwright); for race-line/geometry work, follow
   the verification criteria in the
   [Hugenholtz playbook](docs/DEVELOPMENT.md#repairing-a-race-line-with-gps-data-gaps-the-hugenholtz-playbook).
+- **A short brand palette, no ad-hoc colors.** `#294cbd` is the page surface,
+  `#02118a` the hatch lines on it, `#3ca0ff` water and livery accents; black is
+  only `#1e1e1e`; red stays NOS red. The surface is dark, so page-level chrome
+  is white, and every translucent variant has a measured contrast floor - see
+  [Brand palette](docs/DEVELOPMENT.md#brand-palette) before changing either. The full rule, including the deliberate
+  exceptions (the Dutch flag's official colors, the photo-sampled scenery
+  greys, the brake/coast/throttle signal colors), lives in
+  [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#brand-palette).
+- **Pills, badges and buttons hug their label.** They are sized by their
+  content (`BTN_BASE` carries `w-fit`), never stretched to the container, so
+  the rounded end starts right after the text. Progress bars, cards and the
+  pedals are the exceptions: those are meant to fill their width.
 - **User-facing copy is Dutch; code, comments, docs and commit messages are
   English.** Keep new UI strings consistent with the existing verdict/copy
   tone in [scoring.ts](src/lib/scoring.ts) and [App.tsx](src/App.tsx). Never
@@ -162,8 +187,9 @@ for how the pieces fit together; the rules below are about how to change them.
 ## Known limitations (POC scope)
 
 - One driver, four fixed corner windows, by design.
-- No leaderboard/persistence; the share link encodes the score in the URL
-  and is trivially forgeable (social share, not a competition).
+- No leaderboard/persistence; the share link encodes the whole run in the
+  URL and is forgeable by anyone who reads the token code (social share,
+  not a competition).
 - Scenery (dunes, green corridor, paddock block, gravel shapes) is
   illustrative, not surveyed; the track line itself is official geometry and
   the driven line is real telemetry.
