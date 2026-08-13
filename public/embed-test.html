@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="nl" dir="ltr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Testpagina: nooit indexeren, en niet meesturen als referrer-doel in
+         zoekresultaten. Weghalen voor een echte livegang. -->
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Testpagina embed | NOS Rem Reflex</title>
+    <style>
+      :root {
+        --ink: #1e1e1e;
+        --rood: #e61f15;
+        --grijs: #f3f3f0;
+        --lijn: #ddd;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        color: var(--ink);
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        line-height: 1.5;
+      }
+      .test-balk {
+        background: #ffc828;
+        color: var(--ink);
+        font-weight: 800;
+        font-size: 14px;
+        padding: 10px 16px;
+        text-align: center;
+      }
+      header.nos {
+        border-bottom: 1px solid var(--lijn);
+        padding: 12px 16px;
+      }
+      .merk {
+        font-weight: 800;
+        letter-spacing: 0.5px;
+      }
+      .merk span {
+        color: var(--rood);
+      }
+      main {
+        max-width: 640px;
+        margin: 0 auto;
+        padding: 24px 16px 64px;
+      }
+      .kruimel {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--rood);
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+      }
+      h1 {
+        font-size: clamp(28px, 6vw, 40px);
+        line-height: 1.15;
+        margin: 8px 0 12px;
+      }
+      .ankeiler {
+        font-size: 18px;
+        font-weight: 700;
+        margin: 0 0 16px;
+      }
+      .meta {
+        font-size: 14px;
+        color: #666;
+        border-bottom: 1px solid var(--lijn);
+        padding-bottom: 16px;
+        margin-bottom: 24px;
+      }
+      figure {
+        margin: 0 0 24px;
+      }
+      figure img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      figcaption {
+        font-size: 14px;
+        color: #666;
+        padding-top: 6px;
+      }
+      h2 {
+        font-size: 22px;
+        margin: 32px 0 8px;
+      }
+      p {
+        margin: 0 0 16px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 16px;
+        margin: 0 0 24px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 8px 4px;
+        border-bottom: 1px solid var(--lijn);
+      }
+      .plaatshouder {
+        background: var(--grijs);
+        border-left: 4px solid #ffc828;
+        padding: 12px 16px;
+        font-size: 14px;
+        margin: 0 0 24px;
+      }
+      /* De embed: de poster in het iframe is 4:3, dus laat de hoogte met de
+         breedte meelopen in plaats van een vaste pixelhoogte te zetten. */
+      .embed {
+        aspect-ratio: 4 / 3;
+        margin: 0 0 8px;
+      }
+      .embed iframe {
+        width: 100%;
+        height: 100%;
+        border: 0;
+        display: block;
+      }
+      .embed-hint {
+        font-size: 14px;
+        color: #666;
+        margin: 0 0 32px;
+      }
+      a {
+        color: #294cbd;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="test-balk">TESTPAGINA — geen redactionele publicatie, alleen om de iframe-embed te proberen</div>
+
+    <header class="nos">
+      <div class="merk">N<span>O</span>S</div>
+    </header>
+
+    <main>
+      <p class="kruimel">Formule 1</p>
+      <h1>Voor het laatst Formule 1 in Zandvoort: rem jij net zo laat als Verstappen?</h1>
+      <p class="ankeiler">
+        Over een week rijdt de Formule 1 voor de laatste keer door de duinen van Zandvoort. Test in ons spel of jij het
+        rempunt van Max Verstappen durft te benaderen.
+      </p>
+      <p class="meta">NOS Sport · 13 augustus 2026, 09.00</p>
+
+      <figure>
+        <img
+          src="/images/nos-rem-reflex-spel-max-verstappen-zandvoort-formule-1.webp"
+          width="1600"
+          height="1200"
+          alt="Max Verstappen in Red Bull-pak naast het spel NOS Rem Reflex op een telefoon, met de kaart van Circuit Zandvoort."
+        />
+        <figcaption>De promotie-afbeelding van het spel. In een echt artikel staat hier een sfeerfoto met credit.</figcaption>
+      </figure>
+
+      <p>
+        Van vrijdag 21 tot en met zondag 23 augustus is Circuit Zandvoort voor het laatst het decor van de Dutch Grand
+        Prix. Het contract met de Formule 1 loopt na deze editie af en wordt niet verlengd, waarmee er een einde komt aan
+        de reeks die in 2021 begon.
+      </p>
+      <p>
+        Het slotweekend is meteen een primeur: Zandvoort is voor het eerst gastheer van een sprintweekend. Dat betekent
+        twee keer punten, en één vrije training minder om de auto goed te zetten.
+      </p>
+
+      <h2>Het programma</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Dag</th>
+            <th>Sessie</th>
+            <th>Tijd</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Vrijdag 21 augustus</td>
+            <td>Sprintkwalificatie</td>
+            <td>16.30</td>
+          </tr>
+          <tr>
+            <td>Zaterdag 22 augustus</td>
+            <td>Sprintrace</td>
+            <td>12.00</td>
+          </tr>
+          <tr>
+            <td>Zaterdag 22 augustus</td>
+            <td>Kwalificatie</td>
+            <td>16.00</td>
+          </tr>
+          <tr>
+            <td>Zondag 23 augustus</td>
+            <td>Grand Prix</td>
+            <td>15.00</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="plaatshouder">
+        Redactie: check de tijden tegen het definitieve tijdschema en vul de trainingen aan.
+      </p>
+
+      <h2>Waarom het stopt</h2>
+      <p>
+        De Dutch Grand Prix verlengde het contract tot en met 2026 en kondigde daarbij aan dat dit de laatste editie in
+        Zandvoort wordt. Daarmee verdwijnt de race na zes edities weer van de kalender.
+      </p>
+      <p class="plaatshouder">
+        Redactie: hier een quote van de organisatie of van Verstappen over het afscheid. In dit testartikel staan bewust
+        geen verzonnen quotes.
+      </p>
+
+      <h2>Rem jij net zo laat als Max?</h2>
+      <p>
+        Wie het circuit kent van de tv, weet hoe laat Verstappen durft te remmen voor de Tarzanbocht. Maar hoe laat is
+        dat precies? In het spel NOS Rem Reflex rijd je zijn echte kwalificatieronde van 2025 na: ronde 17 uit de
+        kwalificatie van de Dutch Grand Prix, opgehaald uit de officiële telemetrie.
+      </p>
+      <p>
+        Je houdt het gas ingedrukt zolang Verstappen vol gas geeft, laat los waar hij uitrolt en trapt op de rem waar hij
+        remt. Na elke bocht zie je jouw lijn naast die van Max op de baan, met per pedaal het percentage dat je gelijk
+        zat. Wie alleen gas geeft en nooit remt, komt niet ver: je moet alle drie de pedaalstanden raken.
+      </p>
+      <p>
+        Eerst is er een oefenbocht, de Tarzanbocht, die niet meetelt. Daarna volgen drie bochten voor de punten en is je
+        eindscore te delen via een link.
+      </p>
+
+      <!-- De embed zelf. src is relatief, zodat deze testpagina zowel lokaal
+           (npm run dev) als na een deploy naar hetzelfde spel wijst. -->
+      <div class="embed">
+        <iframe src="/" title="NOS Rem Reflex: rem jij net zo laat als Max Verstappen?" loading="lazy"></iframe>
+      </div>
+      <p class="embed-hint">
+        In het iframe staat een poster: klikken opent het spel op zijn eigen pagina, want het spel heeft het hele scherm
+        nodig. Los te spelen via <a href="/">f1-rem-reflex.vercel.app</a>.
+      </p>
+    </main>
+  </body>
+</html>

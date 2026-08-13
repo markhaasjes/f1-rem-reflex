@@ -575,6 +575,22 @@ CMS that wraps embeds in its own frame cannot end up loading the game into
 that wrapper; and the href is rebuilt from `origin + pathname`, so a stale
 `?r=` share token in the frame's src can never ride along into the article.
 
+### Testing the embed
+
+[public/embed-test.html](../public/embed-test.html) is an nos.nl-shaped article
+with the real iframe in it, so the embed can be tried in a content column
+instead of a bare frame - locally at `/embed-test.html` and, after a deploy, on
+a phone. It carries a yellow TESTPAGINA banner and `robots: noindex, nofollow`
+because it deliberately looks like an article; delete it before any real
+launch. Its copy (and the checked facts behind it) live in
+[docs/embed-test-article.md](embed-test-article.md), quotes and the lead photo
+left as marked placeholders rather than invented.
+
+The one thing worth re-testing there after any change to EmbedPoster: click the
+poster inside the frame and confirm the **top-level** URL becomes the game, not
+the frame's. That is the whole point of `target="_top"`, and a frame that
+navigates itself instead looks fine in a screenshot while being broken.
+
 ## Share flow
 
 No backend: the whole run travels in the URL (`?r=<run token>`, typically
