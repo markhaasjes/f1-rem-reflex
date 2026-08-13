@@ -6,9 +6,9 @@ F1 TV race map, zoom into four corners of Max Verstappen's real pole lap,
 and drive them with held pedals: keep **GAS!** pressed where Max is flat
 out, release everything where he coasts, and hold **REM!** through his
 braking zones. Your pedal timeline is compared against his real telemetry
-moment by moment; per pedal state you get a matched percentage and the
-corner score is the average of those three (so the short braking zone
-counts as much as the long flat-out stretch). The final score is shareable
+moment by moment; per pedal state you get a matched percentage and the three
+are multiplied into the corner score, so you have to answer all three: one
+pedal you never use drags the corner down however good the rest is. The final score is shareable
 via a link, and the score card explains the whole calculation, including
 an AI-assistance and data-provenance disclaimer.
 

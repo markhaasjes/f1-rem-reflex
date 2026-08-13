@@ -375,22 +375,25 @@ step the player's pedal state (from the transition timeline) is compared
 against Max's phase (`classifyAt`: brakeActive → brake, throttle < 95 →
 coast, else flat).
 
-- **Numeric**: the round score is the equal-weight average of the three
+- **Numeric**: the round score is the **geometric** mean of the three
   per-phase match percentages (the REM/LOS/GAS bars on the result card),
-  rounded per phase before averaging so the card exactly verifies the score.
-  It is deliberately NOT the matched share of time: Max is flat out for
-  40-55% of every window, so time-weighted matching handed ~50 points to
-  anyone who just held the gas down — the long easy stretches drowned out
-  the short braking zones where the skill sits. With equal phase weight a
-  one-pedal strategy lands around 40 (the boundary grace lifts it above the
-  naive 33) and a telemetry-mirroring playthrough with 120ms lag still
-  scores 100. A step counts as matched when the
-  player's state matches Max's phase directly or 0.2s to either side
-  (`REACTION_GRACE_S`), forgiving human reaction lag at zone boundaries
-  without rewarding a wrong pedal held through a whole zone; phases shorter
-  than `MIN_PHASE_S` in a window are left out of the average. `totalScore`
-  averages the **scoring rounds' rounded scores** (equal round weight,
-  practice excluded), so the total stays verifiable from the card too.
+  rounded per phase first so a 0% bar really does zero the round. Both
+  simpler formulas pay out ~50 for not playing, and both were shipped and
+  rejected: the matched share of _time_ gave ~51 for holding the gas down
+  (Max is flat out 40-55% of every window), and the _arithmetic_ mean gave
+  ~48 for touching nothing after the start, because coasting is the absence
+  of input and collects a free 100% on that phase. Multiplying instead of
+  averaging means every phase has to be answered - one pedal you never use
+  drags the whole round down however good the other two are. Calibration
+  (scripted, see the verification workflow): mirroring Max's telemetry with
+  120ms lag **100**, doing nothing **29**, holding gas only **14**. The
+  trade-off is that the player can no longer verify the score by averaging
+  the bars, so the explainer modal states the rule in words instead of
+  arithmetic. A step counts as matched when the player's state matches Max's
+  phase directly or 0.2s to either side (`REACTION_GRACE_S`), forgiving
+  reaction lag at zone boundaries; phases shorter than `MIN_PHASE_S` in a
+  window are left out. `totalScore` still averages the scoring rounds'
+  rounded scores (equal round weight, practice excluded).
 - **Zones**: the same walk is grouped into contiguous same-phase zones
   (`ZoneResult`: match fraction + the dominant wrong input) and into
   per-phase totals (`phaseAccuracy`), which feed the REM/LOS/GAS accuracy
@@ -487,6 +490,20 @@ Rules that keep it that way:
   result). The round-result cards therefore overlay the **stage** on portrait
   (`wide:hidden` absolute layer at its bottom edge) instead of living in the
   deck; the deck copy of the cards is `hidden` + `wide:flex`.
+- **No text below 16px.** Every UI string sits at `text-base` or larger,
+  including the map legend, the badges and the keyboard hint; canvas labels
+  (map names 16-17px, scale bar 16px, corner numerals 12-18px with the circle
+  radii grown to match) follow the same floor. It is a hard floor, not a
+  preference, so copy gets shortened rather than shrunk: at 16px the legend
+  uses `rem/los/gas` and `Max/jij` on phones and the full words from `sm:` up,
+  the start pill drops "om te starten" below `sm:`, the round label drops the
+  corner name below 360px, and the "Houd ingedrukt!" callout is `sm:`-only
+  (on phones it collided with the hint line, and the deck pill right above
+  the pedals already says the same thing).
+- **The practice round marks the stage, not just the deck.** A yellow
+  `OEFENBOCHT · telt niet mee` badge sits at the stage's top-left for the
+  whole practice round: the deck label alone was missed because the player is
+  looking at the circuit.
 - **Controls are sized by their label.** `BTN_BASE` carries
   `mx-auto block w-fit max-w-full`, so every button hugs its text (the pill's
   rounded end starts right after the label) and still cannot outgrow a narrow
@@ -587,8 +604,12 @@ telemetry channels (`brakeActive` / `throttle < 95`), start each round with
 `keyboard.down('KeyG')`, then walk the spans with `keyboard.down`/`up` on
 KeyR/KeyG about 120ms late (inside the 0.2s scoring grace) — screenshot
 each phase, and look at the screenshots. A telemetry-mirroring run must
-score 100 on every round and a gas-only run around ~40; if either drifts,
-the scoring grace, the phase averaging or the transition recording broke. Two traps: layered UI
+score 100 on every round; the two lazy strategies are part of the suite,
+because they are what the scoring rules exist to punish: `STRATEGY=fullgas`
+(hold gas, never brake) must land near 14 and `STRATEGY=nothing` (release
+everything after the mandatory start press) near 29. If any of the three
+drifts, the reaction grace, the geometric mean or the transition recording
+broke. Two traps: layered UI
 keeps hidden buttons in the DOM (`opacity-0` + `pointer-events-none`), so
 Playwright's `visible` check passes early — gate on _clickability_, not
 visibility (and match the pedals by `aria-label`, their text is just

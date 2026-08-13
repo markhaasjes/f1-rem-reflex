@@ -50,16 +50,22 @@ export function phasePercent(accuracy: PhaseAccuracy): number {
 // Walks the round window on the same grid the ribbons render at and compares
 // the player's pedal timeline against Max's telemetry moment by moment.
 //
-// The score is the equal-weight average of the three per-phase match
-// percentages (the REM/LOS/GAS bars on the result card), NOT the matched
-// share of time: Max is flat out for 40-55% of every window, so time-weighted
-// matching handed ~50 points to anyone who simply held the gas down and let
-// the long easy stretches drown out the short braking zones where the actual
-// skill sits. Equal phase weight puts a 2s braking zone on par with a 4s
-// flat-out run (one-pedal strategies now land around 40 - the reaction grace
-// at zone edges lifts them above the naive 33), and averaging the *rounded*
-// percentages keeps the score verifiable from the card the player sees - the
-// same property totalScore keeps for the final card.
+// The score is the **geometric** mean of the three per-phase match percentages
+// (the REM/LOS/GAS bars on the result card). Both simpler formulas hand out
+// ~50 points for not playing:
+//
+//   - matched share of *time*: Max is flat out 40-55% of every window, so
+//     holding the gas down and ignoring the corner scored ~51;
+//   - arithmetic mean of the three phases: coasting is the *absence* of input,
+//     so a player who touches nothing after the start collects a free 100% on
+//     that phase and lands at ~48 (11 + 100 + 34) / 3.
+//
+// Multiplying instead of averaging means every phase has to be answered: one
+// pedal you never use drags the whole round down, no matter how good the other
+// two are (do-nothing ~33, gas-only ~25), while a genuinely good run barely
+// notices the difference (85/75/80 -> 80, 95/90/95 -> 93). The trade-off is
+// that the player can no longer verify the score by averaging the bars in
+// their head, so the explainer modal describes the rule in words instead.
 export function scoreRound(round: GameRound, samples: LapSample[], transitions: InputTransition[]): RoundResult {
   const zones: ZoneResult[] = [];
   const phaseAccuracy: Record<DrivingPhase, PhaseAccuracy> = {
@@ -110,11 +116,11 @@ export function scoreRound(round: GameRound, samples: LapSample[], transitions: 
   }
   closeZone();
 
+  // Uses the same rounded percentages the bars show, so a 0% bar really does
+  // zero the round - that is the point of the rule, not an edge case.
   const countedPhases = Object.values(phaseAccuracy).filter((accuracy) => accuracy.totalS >= MIN_PHASE_S);
-  const score =
-    countedPhases.length === 0
-      ? 0
-      : Math.round(countedPhases.reduce((sum, accuracy) => sum + phasePercent(accuracy), 0) / countedPhases.length);
+  const product = countedPhases.reduce((factor, accuracy) => factor * (phasePercent(accuracy) / 100), 1);
+  const score = countedPhases.length === 0 ? 0 : Math.round(100 * product ** (1 / countedPhases.length));
   return { round, transitions, zones, phaseAccuracy, score };
 }
 
