@@ -795,11 +795,12 @@ export function drawMapLabel(
   ctx.restore();
 }
 
+// Bottom-left, the same corner the HTML legend and speed badge occupy - the
+// caller draws it only while those are hidden (see CircuitScene's
+// `showScaleBar`). Sharing the corner by moving it right is not an option: on
+// a landscape phone the stage is ~356px wide and the legend alone is 259px.
 export function drawScaleBar(ctx: CanvasRenderingContext2D, projection: ScreenProjection, canvasHeight: number) {
-  // Pick a round meter length that lands between 40 and 100 px on screen. The
-  // upper bound is 100, not 110: the bar starts at x=16 and the map legend is
-  // anchored bottom-right, and on a 320px-wide phone a 110px bar would end
-  // exactly where the legend begins.
+  // Pick a round meter length that lands between 40 and 100 px on screen.
   const candidates = [25, 50, 100, 200, 500, 1000];
   const lengthM = candidates.find((m) => m * projection.scale >= 40 && m * projection.scale <= 100) ?? 50;
   const lengthPx = lengthM * projection.scale;

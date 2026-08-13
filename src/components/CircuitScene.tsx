@@ -41,6 +41,9 @@ interface CircuitSceneProps {
   heldInput: PedalInput;
   /** Reveal the Max-vs-player comparison ribbons (round result). */
   showReference: boolean;
+  /** Draw the scale bar. False while the HTML legend/speed badge own that
+   * corner, so the two can never overlap on a narrow stage. */
+  showScaleBar: boolean;
 }
 
 // The corner a round's name label anchors to: for combined rounds (e.g.
@@ -150,7 +153,6 @@ export function CircuitScene(props: CircuitSceneProps) {
     [fixture],
   );
 
-
   // Redraws happen lazily: the rAF loop keeps running (cheap), but the scene
   // - sand field, corridor, track, curbs, everything - is only rasterized
   // when something visible changed. Painting unconditionally at 60fps kept
@@ -183,7 +185,8 @@ export function CircuitScene(props: CircuitSceneProps) {
       const canvas = canvasRef.current;
       if (!canvas || w === 0 || h === 0) return;
 
-      const { camBox, phase, round, roundIndex, elapsedT, transitions, heldInput, showReference } = propsRef.current;
+      const { camBox, phase, round, roundIndex, elapsedT, transitions, heldInput, showReference, showScaleBar } =
+        propsRef.current;
       const timeAnimated = phase === 'running' || phase === 'flying';
       const snapshot = [
         camBox.cx,
@@ -199,6 +202,7 @@ export function CircuitScene(props: CircuitSceneProps) {
         transitions.length,
         heldInput,
         showReference,
+        showScaleBar,
         fontsLoadedRef.current,
       ].join('|');
       if (!timeAnimated && snapshot === lastSnapshotRef.current) return;
@@ -336,7 +340,7 @@ export function CircuitScene(props: CircuitSceneProps) {
         badgeAlpha,
       );
 
-      drawScaleBar(ctx, projection, h);
+      if (showScaleBar) drawScaleBar(ctx, projection, h);
     };
 
     raf = requestAnimationFrame(render);

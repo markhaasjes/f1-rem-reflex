@@ -194,7 +194,6 @@ sand + dunes (world space) -> green corridor + striped infield -> paddock
   -> [running] input-colored trail so far -> [result] Max's dashed line +
   the player's solid line -> pedal glow under the car
   -> car -> corner badges + labels (fade out as you zoom in) -> scale bar
-  (bottom-left; the HTML legend and speed badge stack in the bottom-right)
 
 Max's telemetry is a **dashed** phase-colored line one road-half beside the
 driven line (`MAX_LINE_OFFSET_M`/`WIDTH_M`/`DASH_M` in CircuitScene, offset
@@ -283,6 +282,14 @@ in screen space, covering any zoom-out past the decorated field.
   photos. Corner badges split into prominent (playable corners) and `minor`
   (everything else); round-label screen offsets live in `LABEL_OFFSETS` so
   they clear each other on narrow portrait canvases.
+- **One stage corner, three tenants**: the HTML legend hugs the stage's
+  bottom-left with the live speed badge stacked directly above it (positioned
+  against the wrapper's top edge, so it can fade without leaving a gap and the
+  stack holds whether the legend has one row or two), and the canvas scale bar
+  draws in that same corner - so App passes `showScaleBar={!legendVisible}`
+  and the bar simply yields while the legend is up. Moving the bar to the
+  right instead does not work: on a landscape phone the stage is ~356px wide
+  and the legend alone is 259px.
 - **Visual QA per corner**: `?corner=N` starts the camera zoomed on corner N
   with the intro chrome hidden — used by the Playwright corner-snapshot sweep
   when comparing against the official F1 TV map.
