@@ -821,10 +821,12 @@ function App() {
               showReference={phase === 'roundResult' || phase === 'finished'}
             />
 
-            {/* live speed */}
+            {/* live speed: top-left on phones (the bottom-right corner is
+                too crowded there, between the legend and the scale bar),
+                bottom-right from sm: up where there is room */}
             <div
               aria-hidden={liveSpeed === null}
-              className={`absolute bottom-3 right-3 rounded-full bg-white/95 px-4 py-1.5 font-extrabold tabular-nums text-ink shadow transition-opacity duration-300 sm:text-lg ${liveSpeed === null ? 'opacity-0' : 'opacity-100'}`}
+              className={`absolute left-3 top-3 rounded-full bg-white/95 px-4 py-1.5 font-extrabold tabular-nums text-ink shadow transition-opacity duration-300 sm:bottom-3 sm:left-auto sm:right-3 sm:top-auto sm:text-lg ${liveSpeed === null ? 'opacity-0' : 'opacity-100'}`}
             >
               {liveSpeed ?? 0} km/u
             </div>
@@ -832,13 +834,15 @@ function App() {
             {/* map legend, shown whenever colored lines are on the map: the
                 three phase colors, plus - when Max's reference line is on
                 screen - which line is whose. It lives in the bottom-RIGHT
-                corner, clear of the canvas scale bar on the left, stacked
-                above the live speed badge that shares that corner (hence the
-                bottom offset). Sized down hard on phones, where the full-size
-                card covered a third of the corner. */}
+                corner, clear of the canvas scale bar on the left. From sm: up
+                it also has to clear the speed badge that shares that corner,
+                hence the bigger bottom offset there; on phones the badge sits
+                top-left, so the legend hugs the corner. Sized down hard on
+                phones, where the full-size card covered a third of the
+                corner. */}
             <div
               aria-hidden={!legendVisible}
-              className={`pointer-events-none absolute bottom-14 right-2 flex flex-col items-end gap-0.5 rounded-lg bg-white/95 px-2 py-1 shadow transition-opacity duration-300 sm:bottom-16 sm:right-3 sm:gap-1.5 sm:rounded-2xl sm:px-4 sm:py-2.5 ${legendVisible ? 'opacity-100' : 'opacity-0'}`}
+              className={`pointer-events-none absolute bottom-2 right-2 flex flex-col items-end gap-0.5 rounded-lg bg-white/95 px-2 py-1 shadow transition-opacity duration-300 sm:bottom-16 sm:right-3 sm:gap-1.5 sm:rounded-2xl sm:px-4 sm:py-2.5 ${legendVisible ? 'opacity-100' : 'opacity-0'}`}
             >
               <div className="flex items-center gap-1.5 sm:gap-3">
                 {PHASE_ROWS.map((row) => (

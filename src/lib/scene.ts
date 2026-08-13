@@ -796,9 +796,12 @@ export function drawMapLabel(
 }
 
 export function drawScaleBar(ctx: CanvasRenderingContext2D, projection: ScreenProjection, canvasHeight: number) {
-  // pick a round meter length that lands between 40 and 110 px on screen
+  // Pick a round meter length that lands between 40 and 100 px on screen. The
+  // upper bound is 100, not 110: the bar starts at x=16 and the map legend is
+  // anchored bottom-right, and on a 320px-wide phone a 110px bar would end
+  // exactly where the legend begins.
   const candidates = [25, 50, 100, 200, 500, 1000];
-  const lengthM = candidates.find((m) => m * projection.scale >= 40 && m * projection.scale <= 110) ?? 50;
+  const lengthM = candidates.find((m) => m * projection.scale >= 40 && m * projection.scale <= 100) ?? 50;
   const lengthPx = lengthM * projection.scale;
   if (lengthPx < 20 || lengthPx > 200) return;
   const x = 16;
