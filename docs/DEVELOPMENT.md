@@ -194,6 +194,7 @@ sand + dunes (world space) -> green corridor + striped infield -> paddock
   -> [running] input-colored trail so far -> [result] Max's dashed line +
   the player's solid line -> pedal glow under the car
   -> car -> corner badges + labels (fade out as you zoom in) -> scale bar
+  (bottom-left; the HTML legend and speed badge stack in the bottom-right)
 
 Max's telemetry is a **dashed** phase-colored line one road-half beside the
 driven line (`MAX_LINE_OFFSET_M`/`WIDTH_M`/`DASH_M` in CircuitScene, offset

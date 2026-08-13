@@ -829,14 +829,16 @@ function App() {
               {liveSpeed ?? 0} km/u
             </div>
 
-            {/* map legend, shown whenever colored lines are on the map (above
-                the scale bar in the bottom-left corner): the three phase
-                colors, plus - when Max's reference line is on screen - which
-                line is whose. Sized down hard on phones, where the full-size
+            {/* map legend, shown whenever colored lines are on the map: the
+                three phase colors, plus - when Max's reference line is on
+                screen - which line is whose. It lives in the bottom-RIGHT
+                corner, clear of the canvas scale bar on the left, stacked
+                above the live speed badge that shares that corner (hence the
+                bottom offset). Sized down hard on phones, where the full-size
                 card covered a third of the corner. */}
             <div
               aria-hidden={!legendVisible}
-              className={`pointer-events-none absolute bottom-7 left-2 flex flex-col gap-0.5 rounded-lg bg-white/95 px-2 py-1 shadow transition-opacity duration-300 sm:bottom-10 sm:left-3 sm:gap-1.5 sm:rounded-2xl sm:px-4 sm:py-2.5 ${legendVisible ? 'opacity-100' : 'opacity-0'}`}
+              className={`pointer-events-none absolute bottom-14 right-2 flex flex-col items-end gap-0.5 rounded-lg bg-white/95 px-2 py-1 shadow transition-opacity duration-300 sm:bottom-16 sm:right-3 sm:gap-1.5 sm:rounded-2xl sm:px-4 sm:py-2.5 ${legendVisible ? 'opacity-100' : 'opacity-0'}`}
             >
               <div className="flex items-center gap-1.5 sm:gap-3">
                 {PHASE_ROWS.map((row) => (
