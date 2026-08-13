@@ -450,14 +450,19 @@ Rules that keep it that way:
   hatch is translucent light blue, the water is `rgba(60,160,255,0.72)` so the
   lakes stop out-glowing the car, and the pedal artwork's greys were
   re-neutralized so `#1e1e1e` is the darkest tone in it.
-- **The page surface is light, so page-level chrome is ink, never white.**
-  White on `light-blue` is 2.7:1; ink is 6.1:1. Opacity eats that fast on a
-  bright surface (`ink/80` measures 4.4:1, `ink/75` 4.0:1 - both under AA for
-  the small bold sizes in the deck), so the deck copy runs at full ink and
-  gets its hierarchy from size and weight instead. Text that sits on a
-  colored surface still states its own color: white on NOS red (4.6:1), white
-  on `track-blue` (7.4:1), ink on white cards (16.7:1). Only the hatch lines
-  are allowed below AA (2.7:1) because they are texture, not text.
+- **The page surface is dark, so page-level chrome is white, never ink.**
+  White on `track-blue` is 7.3:1; ink would be 2.3:1. Translucency is fine
+  here but has a floor: `white/85` is 5.8:1 and `white/75` 4.9:1 (both pass),
+  while the `white/40` the keyboard hint used to carry was 2.5:1, and a
+  `white/15` pill with `white/90` text (the old practice label) only 4.4:1 -
+  that label is now an `ink/25` pill with white text at 9.3:1, still reading
+  as secondary. Text on other surfaces states its own color: white on NOS red
+  (4.6:1), ink on white cards (16.7:1), `track-blue` links on white (7.3:1).
+  Only the hatch lines are allowed below AA (2.0:1) because they are texture,
+  not text. **The surface has flipped once already** (light blue base with
+  sport-blue lines), so if it flips again, re-check every `text-white*` and
+  `text-ink*` on the page against the numbers above - contrast is the whole
+  reason those two sets exist.
 - **Scrims are blue, not black.** A `#1e1e1e` wash over the brand blue reads
   as slate grey; the modal backdrops use `bg-track-blue/80..85` instead.
 - **Deliberate exceptions**, all outside the brand system: the Dutch flag

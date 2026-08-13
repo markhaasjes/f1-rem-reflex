@@ -330,15 +330,15 @@ function Pedal({
       aria-keyshortcuts={isBrake ? 'r arrowleft' : 'g arrowright'}
       aria-label={isBrake ? 'Rempedaal, houd ingedrukt (toets R)' : 'Gaspedaal, houd ingedrukt (toets G)'}
       aria-pressed={held}
-      className={`group relative flex-1 select-none touch-manipulation rounded-2xl pb-1 pt-2 transition-all duration-150 focus-ring focus-ring-ink hover:-translate-y-0.5 ${
-        highlight && !held ? 'ring-4 ring-ink/70' : ''
+      className={`group relative flex-1 select-none touch-manipulation rounded-2xl pb-1 pt-2 transition-all duration-150 focus-ring focus-ring-white hover:-translate-y-0.5 ${
+        highlight && !held ? 'ring-4 ring-white/80' : ''
       } ${held ? `ring-4 ${isBrake ? 'ring-[#e61f15]' : 'ring-[#10b981]'}` : ''}`}
     >
       {highlight && !held && (
         <>
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 rounded-2xl ring-4 ring-ink/70 [animation:pedal-pulse_1.6s_ease-out_infinite]"
+            className="pointer-events-none absolute inset-0 rounded-2xl ring-4 ring-white/80 [animation:pedal-pulse_1.6s_ease-out_infinite]"
           />
           <span
             aria-hidden="true"
@@ -797,11 +797,11 @@ function App() {
           <NOSLogo className="w-12 h-auto text-white fill-current" />
         </div>
       </div>
-      <div className="bg-carbon flex h-svh flex-col items-center gap-3 overflow-hidden px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-ink sm:gap-4 sm:px-8 sm:pt-5 wide:px-10 wide:pt-20">
+      <div className="bg-carbon flex h-svh flex-col items-center gap-3 overflow-hidden px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-white sm:gap-4 sm:px-8 sm:pt-5 wide:px-10 wide:pt-20">
         <Pill className="gap-3 text-sm wide:hidden sm:text-base">{fixture.meta.circuit}</Pill>
 
         <div
-          className={`rounded-full px-4 py-1 text-xs font-extrabold tracking-wide transition-opacity wide:hidden sm:text-sm ${roundLabel ? 'opacity-100' : 'opacity-0'} ${round?.practice ? 'bg-white text-ink' : 'bg-[#e61f15] text-white'}`}
+          className={`rounded-full px-4 py-1 text-xs font-extrabold tracking-wide transition-opacity wide:hidden sm:text-sm ${roundLabel ? 'opacity-100' : 'opacity-0'} ${round?.practice ? 'bg-ink/25 text-white' : 'bg-[#e61f15] text-white'}`}
         >
           {roundLabel || '·'}
         </div>
@@ -907,7 +907,7 @@ function App() {
               aria-live="polite"
               className="grid h-20 place-items-center py-1 text-center sm:h-24 wide:h-auto wide:flex-1"
             >
-              <p {...layer(phase === 'flying', 'text-sm font-extrabold text-ink sm:text-lg')}>
+              <p {...layer(phase === 'flying', 'text-sm font-extrabold text-white/85 sm:text-lg')}>
                 Onderweg naar de {round.label}...
               </p>
               <div {...layer(phase === 'ready', 'flex flex-col items-center gap-3')}>
@@ -919,12 +919,12 @@ function App() {
                   <span className="text-sm font-extrabold text-ink sm:text-base">ingedrukt om te starten</span>
                 </div>
                 {lastRoundAdvice ? (
-                  <p className="text-xs font-bold text-ink sm:text-base">
+                  <p className="text-xs font-bold text-white sm:text-base">
                     <TipBadge />
                     Vorige keer: {lastRoundAdvice}
                   </p>
                 ) : (
-                  <p className="text-xs font-bold text-ink sm:text-base">
+                  <p className="text-xs font-bold text-white/85 sm:text-base">
                     {round.practice && 'Rijd de streepjeslijn van Max na!'}
                     {!round.practice &&
                       (round.events.length / 2 === 1
@@ -980,10 +980,10 @@ function App() {
             </div>
 
             {/* keyboard hint (pointer-fine devices only) */}
-            <p className="hidden text-center text-xs font-bold text-ink/85 sm:block">
-              Toetsenbord: houd <kbd className="rounded bg-ink/10 px-1.5 py-0.5">R</kbd> = rem ·{' '}
-              <kbd className="rounded bg-ink/10 px-1.5 py-0.5">G</kbd> = gas ·{' '}
-              <kbd className="rounded bg-ink/10 px-1.5 py-0.5">spatie</kbd> = verder
+            <p className="hidden text-center text-xs font-bold text-white/75 sm:block">
+              Toetsenbord: houd <kbd className="rounded bg-white/10 px-1.5 py-0.5">R</kbd> = rem ·{' '}
+              <kbd className="rounded bg-white/10 px-1.5 py-0.5">G</kbd> = gas ·{' '}
+              <kbd className="rounded bg-white/10 px-1.5 py-0.5">spatie</kbd> = verder
             </p>
           </div>
         </main>

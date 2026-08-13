@@ -11,21 +11,23 @@
    and landscape tablets/phones; portrait keeps the stacked layout. */
 @custom-variant wide (@media (orientation: landscape) and (min-width: 48rem));
 
-/* The whole app runs on three brand colors plus neutrals: light blue as the
-   page surface, NOS sport blue for the lines/scrims/links drawn on it, and
-   #1e1e1e as the only black (text, dark buttons, shadows, illustration
-   outlines). White text does NOT survive on the light-blue surface (~2.8:1),
-   so chrome sitting directly on the page uses ink. */
+/* The whole app runs on brand blues plus neutrals: `track-blue` is the page
+   surface (and the scrims, links and car livery drawn in it), `deep-blue`
+   draws the hatch lines on it, `light-blue` is for water and livery accents,
+   and #1e1e1e is the only black. The surface is dark, so page-level chrome is
+   white (7.3:1) - ink would be 2.3:1 on it. */
 @theme {
   --font-sans: 'Effra', 'Helvetica Neue', Helvetica, Arial, sans-serif;
 
-  --color-track-blue: #284bbe;
+  --color-track-blue: #294cbd;
+  --color-deep-blue: #02118a;
   --color-light-blue: #3ca0ff;
   --color-ink: #1e1e1e;
 }
 
 body {
   margin: 0;
+  color-scheme: dark;
 }
 
 /* Interactive elements always advertise themselves (Tailwind v4 resets
@@ -37,20 +39,19 @@ button:disabled {
   cursor: not-allowed;
 }
 
-/* NOS F1 graphics carbon: a fine diagonal hatch, same as the broadcast/
-   WK-stand visuals. Light blue is the surface and the sport blue draws the
-   lines. The surface is light (~2.8:1 against white), so chrome sitting
-   directly on it uses ink, never white - see the layout notes. */
+/* NOS F1 graphics carbon: a fine diagonal hatch over the brand blue, same as
+   the broadcast/WK-stand visuals. The deep blue draws the lines at ~2:1
+   against the surface, so the texture reads without competing with content. */
 .bg-carbon {
-  background-color: var(--color-light-blue);
+  background-color: var(--color-track-blue);
   /* the solid rounded curve rising from the bottom paints over the hatch,
      exactly like the NOS F1 broadcast graphics */
   background-image:
-    radial-gradient(95% 58% at 50% 124%, var(--color-light-blue) 0 99.6%, transparent 100%),
+    radial-gradient(95% 58% at 50% 124%, var(--color-track-blue) 0 99.6%, transparent 100%),
     repeating-linear-gradient(
       115deg,
-      var(--color-track-blue) 0px,
-      var(--color-track-blue) 2px,
+      var(--color-deep-blue) 0px,
+      var(--color-deep-blue) 2px,
       transparent 2px,
       transparent 8px
     );
@@ -60,8 +61,8 @@ button:disabled {
 .backdrop-carbon {
   background-image: repeating-linear-gradient(
     115deg,
-    rgba(60, 160, 255, 0.16) 0px,
-    rgba(60, 160, 255, 0.16) 2px,
+    rgba(2, 17, 138, 0.45) 0px,
+    rgba(2, 17, 138, 0.45) 2px,
     transparent 2px,
     transparent 8px
   );

@@ -44,7 +44,7 @@ const PALETTE = {
   // line. The shoreline stroke is the dark blue, reading as deeper water.
   water: 'rgba(60, 160, 255, 0.72)',
   bush: '#4c7d46',
-  waterEdge: '#284bbe',
+  waterEdge: '#294cbd',
   beach: '#efe4c3',
 };
 
