@@ -555,8 +555,9 @@ Rules that keep it that way:
 
 `main.tsx` decides what to mount by frame context: standalone it renders the
 game, inside an iframe it renders
-[EmbedPoster.tsx](../src/components/EmbedPoster.tsx) - the share art as one
-big link that breaks out to the standalone page. A hold-to-drive game needs
+[EmbedPoster.tsx](../src/components/EmbedPoster.tsx) - the designed promo art
+(NOS brand, phone mock, "bekijk" CTA, Max in Red Bull kit) as one big link
+that breaks out to the standalone page. A hold-to-drive game needs
 the whole viewport (pedals, corner map, camera) which a content column cannot
 give it, and a run started in a frame fights the article's scrolling.
 
@@ -626,7 +627,12 @@ social share, not a leaderboard; don't build trust on it.
   the root `<svg>` (canvas `drawImage` of an SVG without them is unreliable
   across browsers), recolor by fill only, and verify by screenshotting the
   rendered app, not the raw file.
-- `public/images/share.png` is the og:image **and** the iframe poster, so it
+- **Served art is a derivative; masters live in `docs/art/`.** The poster
+  master is 6000x4500 (5.6MB), far too heavy to ship: `public/images` carries
+  a 1600px wide, quality-78 WebP of it (~170KB, still crisp at 2x in an
+  article column) and `docs/art` keeps the master for re-exports. Anything
+  dropped straight into `public/` is deployed as-is, so check its weight.
+- `public/images/share.png` is the og:image, so it
   has to match what the game currently looks like - it went stale once
   already (old dark-navy surface, "poleronde" copy) and shipped that way into
   social previews. Regenerate it by screenshotting the intro rather than
