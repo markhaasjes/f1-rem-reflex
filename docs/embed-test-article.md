@@ -13,19 +13,19 @@ sfeerfoto zijn hier bewust niet verzonnen.
 
 ## Metadata
 
-| Veld                 | Waarde                                                                                                                                                              |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Titel**            | Voor het laatst Formule 1 in Zandvoort: rem jij net zo laat als Verstappen?                                                                                         |
-| **Ankeiler**         | Over een week rijdt de Formule 1 voor de laatste keer door de duinen van Zandvoort. Test in ons spel of jij het rempunt van Max Verstappen durft te benaderen.      |
-| **Slug**             | `laatste-formule-1-zandvoort-rem-reflex-spel`                                                                                                                       |
-| **Rubriek**          | Sport › Formule 1                                                                                                                                                   |
-| **Auteur**           | NOS Sport                                                                                                                                                           |
-| **Publicatiedatum**  | 13 augustus 2026                                                                                                                                                    |
-| **Hoofdafbeelding**  | `/images/nos-rem-reflex-spel-max-verstappen-zandvoort-formule-1.webp` (1600×1200)                                                                                   |
-| **Alt-tekst**        | Max Verstappen in Red Bull-pak naast het spel NOS Rem Reflex op een telefoon, met de kaart van Circuit Zandvoort.                                                   |
-| **Meta-description** | De Formule 1 verlaat Zandvoort na 2026. Rijd in het NOS-spel Rem Reflex de echte kwalificatieronde van Max Verstappen na en zie hoe dicht je bij zijn rempunt komt. |
-| **Keywords**         | formule 1, dutch grand prix, zandvoort, max verstappen, laatste grand prix nederland, circuit zandvoort, f1 spel, rem reflex, kwalificatie, sprintrace              |
-| **Tags (NOS)**       | Formule 1 · Max Verstappen · Dutch Grand Prix · Zandvoort                                                                                                           |
+| Veld                 | Waarde                                                                                                                                                                        |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Titel**            | Voor het laatst Formule 1 in Zandvoort: rem jij net zo laat als Verstappen?                                                                                                   |
+| **Ankeiler**         | Over een week rijdt de Formule 1 voor de laatste keer door de duinen van Zandvoort. Test in ons spel of jij het rempunt van Max Verstappen durft te benaderen.                |
+| **Slug**             | `laatste-formule-1-zandvoort-rem-reflex-spel`                                                                                                                                 |
+| **Rubriek**          | Sport › Formule 1                                                                                                                                                             |
+| **Auteur**           | NOS Sport                                                                                                                                                                     |
+| **Publicatiedatum**  | 13 augustus 2026                                                                                                                                                              |
+| **Hoofdafbeelding**  | `/images/waar-max-verstappen-remt-circuit-zandvoort-formule-1.webp` (1600×900, 16:9) — gegenereerd met `scripts/build-article-image.mjs`                                      |
+| **Alt-tekst**        | Kaart van Circuit Zandvoort met de kwalificatieronde van Max Verstappen in kleur: rood waar hij remt, oranje waar hij uitrolt en groen waar hij vol gas geeft.                |
+| **Meta-description** | De Formule 1 verlaat Zandvoort na 2026. Rijd in het NOS-spel Rem Reflex de echte kwalificatieronde van Max Verstappen na en zie hoe dicht je bij zijn rempunt komt.           |
+| **Keywords**         | formule 1, dutch grand prix, zandvoort, max verstappen, laatste grand prix nederland, circuit zandvoort, rempunten, telemetrie, f1 spel, rem reflex, kwalificatie, sprintrace |
+| **Tags (NOS)**       | Formule 1 · Max Verstappen · Dutch Grand Prix · Zandvoort                                                                                                                     |
 
 ---
 
@@ -35,10 +35,13 @@ sfeerfoto zijn hier bewust niet verzonnen.
 Zandvoort. Test in ons spel of jij het rempunt van Max Verstappen durft te
 benaderen.**
 
-![Max Verstappen in Red Bull-pak naast het spel NOS Rem Reflex op een telefoon, met de kaart van Circuit Zandvoort.](/images/nos-rem-reflex-spel-max-verstappen-zandvoort-formule-1.webp)
+![Kaart van Circuit Zandvoort met de kwalificatieronde van Max Verstappen in kleur: rood waar hij remt, oranje waar hij uitrolt en groen waar hij vol gas geeft.](/images/waar-max-verstappen-remt-circuit-zandvoort-formule-1.webp)
 
-_[[ Redactie: vervang deze afbeelding door een sfeerfoto van het circuit met
-fotocredit. De afbeelding hierboven is de promotie-afbeelding van het spel. ]]_
+_Waar Max Verstappen remt op Zandvoort, volgens de telemetrie van zijn snelste kwalificatieronde in 2025. Beeld: NOS · Data: OpenF1_
+
+_[[ Redactie: dit is een eigen datagrafiek, gemaakt uit de telemetrie in het
+spel, dus vrij van rechten. Een sfeerfoto van het circuit kan er nog bij of
+in de plaats van, met fotocredit. ]]_
 
 Van vrijdag 21 tot en met zondag 23 augustus is Circuit Zandvoort voor het
 laatst het decor van de Dutch Grand Prix. Het contract met de Formule 1 loopt
@@ -89,9 +92,9 @@ bochten voor de punten. Je eindscore is te delen via een link.
 <!-- EMBED: NOS Rem Reflex.
      De embed toont in een iframe een poster die doorlinkt naar het spel op de
      eigen pagina, omdat het spel het hele scherm nodig heeft (pedalen, kaart,
-     camera). De poster is 4:3, dus laat de hoogte met de breedte meelopen. -->
+     camera). De poster is 16:9, dus laat de hoogte met de breedte meelopen. -->
 
-<div style="aspect-ratio: 4 / 3">
+<div style="aspect-ratio: 16 / 9">
   <iframe
     src="https://f1-rem-reflex.vercel.app/"
     title="NOS Rem Reflex: rem jij net zo laat als Max Verstappen?"

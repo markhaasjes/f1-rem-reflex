@@ -79,6 +79,7 @@ updating the `DRIVER` lap reference in the script and re-running it.
 ```
 scripts/build-game-fixture.mjs   data pipeline: OpenF1 + official geometry -> the fixture
 scripts/analyze-race-line.mjs    diagnoses straight/faceted race-line corners (GPS data gaps)
+scripts/build-article-image.mjs  renders the article lead image (Max's braking zones) from the fixture
 scripts/lib/geojson.mjs          shared geometry helpers (fitting, resampling, smoothing)
 src/data/zandvoort2025.json      the one fixture: circuit, full lap, rounds + target events
 src/types.ts                     the fixture/game shape shared by every module

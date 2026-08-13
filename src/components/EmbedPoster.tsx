@@ -9,15 +9,16 @@
 // would otherwise load the game into that wrapper instead of the article page.
 // The href drops any query string so a stale share token can never ride along.
 //
-// The poster is the designed promo art (NOS brand, phone mock, "bekijk" CTA,
-// Max in Red Bull kit), resized to 1600px wide from the 6000px master kept in
-// docs/art - crisp on a 2x display in an article column at ~170KB, where the
-// master would have been 5.6MB. Width/height are declared so the frame does
-// not reflow the article while the image loads. The same file is the og:image
-// (index.html), so the embed and every social preview show one artwork.
+// The poster is the designed promo art (phone mock, "bekijk" CTA, Max in Red
+// Bull kit), resized to 1600x900 from the 8000px master kept in docs/art -
+// crisp on a 2x display in an article column at ~160KB, where the master would
+// have been 6.3MB. Width/height are declared so the frame does not reflow the
+// article while the image loads. The same file is the og:image (index.html),
+// so the embed and every social preview show one artwork; 16:9 is deliberate,
+// since a social card crops to ~1.91:1 and a 4:3 version lost its top strip.
 const POSTER_SRC = '/images/nos-rem-reflex-spel-max-verstappen-zandvoort-formule-1.webp';
 const POSTER_WIDTH = 1600;
-const POSTER_HEIGHT = 1200;
+const POSTER_HEIGHT = 900;
 
 export function EmbedPoster() {
   return (

@@ -643,6 +643,16 @@ social share, not a leaderboard; don't build trust on it.
   the root `<svg>` (canvas `drawImage` of an SVG without them is unreliable
   across browsers), recolor by fill only, and verify by screenshotting the
   rendered app, not the raw file.
+- **The article's lead image is generated, not sourced.**
+  `node scripts/build-article-image.mjs` renders
+  `waar-max-verstappen-remt-circuit-zandvoort-formule-1.webp` (1600x900) from
+  the fixture: the circuit, Max's lap coloured by phase, the legend and the
+  wordmark, in the app's own palette. So it is rights-free, it always matches
+  the game, and a palette change is one command away from a correct image.
+  Needs Playwright (`npm i -D playwright`), which the app itself does not
+  depend on. **Type in it is sized for the worst case**: an article lead
+  shrinks ~4x on a 390px phone, so nothing under ~40px survives - that is why
+  the credit and date lines moved out of the artwork and into the figcaption.
 - **One artwork for the poster and the social preview.**
   `public/images/nos-rem-reflex-spel-max-verstappen-zandvoort-formule-1.webp`
   is both the iframe poster (EmbedPoster) and the `og:image`/`twitter:image`
@@ -650,20 +660,24 @@ social share, not a leaderboard; don't build trust on it.
   same thing. The filename is deliberately descriptive rather than functional
   ("share" was in it once and is worth nothing in image search): brand,
   product, what it is, who is in it, where, which sport.
-- **Served art is a derivative; masters live in `docs/art/`.** The poster
-  master is 6000x4500 (5.6MB), far too heavy to ship: `public/images` carries
-  a 1600px wide, quality-78 WebP of it (~170KB, still crisp at 2x in an
-  article column) and `docs/art` keeps the master for re-exports. Anything
-  dropped straight into `public/` is deployed as-is, so check its weight.
-- **Two known trade-offs of a 4:3 og:image**, both accepted rather than
-  overlooked: link previews on X and Facebook crop to ~1.91:1, which keeps
-  Max, the phone and the "bekijk" pill but loses the NOS logo strip at the
-  top (the fix, if the logo matters there, is a second 1200x630 derivative
-  cropped from the top); and the file is WebP, which every current scraper
-  reads, though LinkedIn has historically been the last to support it - if a
-  preview ever comes up blank there, a JPEG copy of the same art is the
-  answer. Keep `og:image:width`/`height` in step with the file: they say
-  1600x1200 now.
+- **Served art is a derivative; masters live in `docs/art/`.** The promo
+  masters are 6000x4500 and 8000x4500 (5.6-6.3MB), far too heavy to ship:
+  `public/images` carries a 1600px wide WebP (~160KB, still crisp at 2x in an
+  article column) and `docs/art` keeps both masters, ratio in the filename.
+  Anything dropped straight into `public/` is deployed as-is, so check its
+  weight before committing.
+- **The promo art is 16:9 for a reason.** A 4:3 version shipped first and
+  lost its top strip - NOS logo included - to the ~1.91:1 crop that X and
+  Facebook apply to link previews. 16:9 survives that crop, and it is a
+  calmer shape for an embed in a content column too. The served file keeps
+  the same name across that swap, so anything already crawled or shared still
+  resolves. Keep `og:image:width`/`height` in step with the file (1600x900
+  now), and the embed wrapper's `aspect-ratio` too - both
+  [public/embed-test.html](../public/embed-test.html) and the markdown
+  article set `16 / 9`.
+- **WebP as og:image** is read by every current scraper, though LinkedIn was
+  the last to get there; if a preview ever comes up blank on one platform, a
+  JPEG copy of the same art is the answer.
 - The earlier `share.png` (a screenshot of the intro card) is gone. If a
   screenshot is ever wanted again, take it at viewport 1400x875 with
   `deviceScaleFactor: 1200/1400` and quantize with
