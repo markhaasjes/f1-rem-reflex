@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pill } from './components/Brand';
-import { CircuitScene } from './components/CircuitScene';
+import { CircuitExplorer, LineModeToggle } from './components/CircuitExplorer';
+import { CircuitScene, type ResultLine } from './components/CircuitScene';
+import { MapLegend, activeLineLabel } from './components/MapLegend';
 import { HeroCar } from './components/HeroCar';
 import { NOSLogo } from './components/NOSLogo';
 import fixtureJson from './data/zandvoort2025.json';
@@ -8,7 +10,6 @@ import { boxFromBounds, useCameraFlight, type CamBox } from './hooks/useCameraFl
 import { useCircuitGame } from './hooks/useCircuitGame';
 import { positionAt, sampleAt } from './lib/corner';
 import type { DrivingPhase } from './lib/phases';
-import { PHASE_COLOR } from './lib/scene';
 import {
   aggregatePhaseAccuracy,
   phasePercent,
@@ -21,7 +22,7 @@ import {
 import { decodeRunToken, decodeShareToken, encodeRunToken } from './lib/shareToken';
 import { loadScores, saveRun, type SavedRun, type SavedScores } from './lib/storage';
 import { adviceForRound, adviceForRun } from './lib/tips';
-import type { GamePhase, GameRound, InputTransition, ZandvoortFixture } from './types';
+import type { GamePhase, GameRound, InputTransition, LineMode, ZandvoortFixture } from './types';
 
 const fixture = fixtureJson as unknown as ZandvoortFixture;
 
@@ -46,6 +47,10 @@ function useWideViewport(): boolean {
   }, []);
   return isWide;
 }
+
+// Stable identity so the scene's lazy repaint is not woken by a new empty
+// array on every render.
+const EMPTY_RESULT_LINES: ResultLine[] = [];
 
 const OVERVIEW_PAD_M = 90;
 const OVERVIEW_SEA_PAD_M = 190;
@@ -344,7 +349,7 @@ function Pedal({
           />
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute -top-2 left-1/2 hidden whitespace-nowrap rounded-full bg-white px-3 py-1 text-base font-extrabold text-[#1e1e1e] shadow-lg [animation:callout-bob_1.6s_ease-in-out_infinite] sm:block"
+            className="pointer-events-none absolute -top-2 left-1/2 hidden whitespace-nowrap rounded-full bg-white px-3 py-1 text-base font-extrabold text-[#1e1e1e] shadow-lg [animation:callout-bob_1.6s_ease-in-out_infinite] wide:block short:wide:hidden"
           >
             Houd ingedrukt!
             <span className="absolute left-1/2 top-full -mt-1 h-2 w-2 -translate-x-1/2 rotate-45 bg-white" />
@@ -393,7 +398,7 @@ function DutchFlag({ className }: { className?: string }) {
 // sub-pill). Lives in the control panel on wide screens.
 function EventCard({ roundLabel }: { roundLabel: string }) {
   return (
-    <div className="hidden flex-col items-center gap-3 wide:flex">
+    <div className="hidden flex-col items-center gap-3 wide:flex short:wide:hidden">
       <DutchFlag className="h-14 w-14 drop-shadow-[0_4px_10px_rgba(30,30,30,0.35)]" />
       <div className="rounded-full bg-white px-7 py-2 text-xl font-extrabold text-[#1e1e1e] shadow-lg xl:text-2xl">
         Circuit Zandvoort
@@ -549,6 +554,11 @@ function App() {
   const [runContext, setRunContext] = useState<{ previousLast: SavedRun | null; isNewBest: boolean } | null>(null);
   const [showShared, setShowShared] = useState(shared !== null);
   const [showScoreInfo, setShowScoreInfo] = useState(false);
+  const [exploreOpen, setExploreOpen] = useState(false);
+  // Which line the result views draw. Starts on the player's own line: after
+  // driving a corner, "what did I do" is the first question, and Max's line is
+  // one tap away.
+  const [lineMode, setLineMode] = useState<LineMode>('player');
   const [copied, setCopied] = useState(false);
   const hideIntroChrome = showShared || debugCornerBox !== null;
 
@@ -589,6 +599,7 @@ function App() {
   const restart = useCallback(() => {
     setShowShared(false);
     setShowScoreInfo(false);
+    setExploreOpen(false);
     setRunContext(null);
     history.replaceState(null, '', location.pathname);
     game.restart();
@@ -664,7 +675,7 @@ function App() {
     const pedalsLive = phase === 'ready' || phase === 'running';
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (showShared) return;
+      if (showShared || exploreOpen) return;
       if (showScoreInfo) {
         if (event.code === 'Escape') setShowScoreInfo(false);
         return;
@@ -682,6 +693,7 @@ function App() {
       else if (phase === 'roundResult') (isLastRound ? showFinal : nextRound)();
     };
     const onKeyUp = (event: KeyboardEvent) => {
+      if (exploreOpen) return;
       const pedal = pedalForCode(event.code);
       if (pedal) game.setPedal(pedal, false);
     };
@@ -691,7 +703,7 @@ function App() {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
     };
-  }, [phase, showShared, showScoreInfo, game, startGame, nextRound, showFinal, isLastRound]);
+  }, [phase, showShared, showScoreInfo, exploreOpen, game, startGame, nextRound, showFinal, isLastRound]);
 
   // Move keyboard focus along with the flow, so Tab/Enter always lands on the
   // primary action and screen-reader users follow the game without hunting.
@@ -733,6 +745,12 @@ function App() {
     return () => clearTimeout(id);
   }, [phase, showShared]);
 
+  // Everything driven so far, so the map accumulates corner by corner instead
+  // of only ever showing the round just finished.
+  const resultLines = useMemo<ResultLine[]>(
+    () => results.map((r) => ({ round: r.round, transitions: r.transitions, score: r.score })),
+    [results],
+  );
   const total = totalScore(results);
   // What went wrong at this corner last time, shown while the round is armed.
   const lastRoundAdvice = savedScores.last?.advice?.[round.id] ?? null;
@@ -772,6 +790,9 @@ function App() {
   // (dashed = Max, solid = you) only makes sense while both lines can appear.
   const referenceVisible = (round.practice && (phase === 'ready' || phase === 'running')) || showRoundResult;
   const legendVisible = referenceVisible || phase === 'running';
+  // The line toggle and the full-screen button only make sense once a round has
+  // been scored; they stay up on the final card too.
+  const showResultControls = (showRoundResult || phase === 'finished') && resultLines.length > 0;
   const verdict = showRoundResult ? verdictForScore(lastResult.score) : null;
 
   let roundLabel = '';
@@ -808,19 +829,27 @@ function App() {
           <NOSLogo className="w-12 h-auto fill-current text-white max-[359px]:w-9" />
         </button>
       </div>
-      <div className="bg-carbon flex h-svh flex-col items-center gap-3 overflow-hidden px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-white sm:gap-4 sm:px-8 sm:pt-5 wide:px-10 wide:pt-20">
-        <Pill className="gap-3 text-base max-[359px]:hidden wide:hidden">{fixture.meta.circuit}</Pill>
+      <div
+        inert={exploreOpen || undefined}
+        className="bg-carbon flex h-svh flex-col items-center gap-3 overflow-hidden px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-white sm:gap-4 sm:px-8 sm:pt-5 wide:px-10 wide:pt-20"
+      >
+        {/* Padded clear of the NOS badge on phones: these pills are centred in
+            the column, and at ~360px wide a centred pill reaches under the
+            badge. The padding only shifts the pills, not the stage below. */}
+        <div className="flex w-full flex-col items-center gap-3 pl-[76px] pr-1 sm:gap-4 sm:pl-0 sm:pr-0 wide:hidden">
+          <Pill className="gap-3 text-base">{fixture.meta.circuit}</Pill>
 
-        <div
-          className={`rounded-full px-4 py-1 text-sm font-extrabold tracking-wide transition-opacity sm:text-base wide:hidden ${roundLabel ? 'opacity-100' : 'opacity-0'} ${round?.practice ? 'bg-ink/25 text-white' : 'bg-[#e61f15] text-white'}`}
-        >
-          <span className="min-[360px]:hidden">{roundLabelShort || '·'}</span>
-          <span className="hidden min-[360px]:inline">{roundLabel || '·'}</span>
+          <div
+            className={`rounded-full px-4 py-1 text-sm font-extrabold tracking-wide transition-opacity sm:text-base ${roundLabel ? 'opacity-100' : 'opacity-0'} ${round?.practice ? 'bg-ink/25 text-white' : 'bg-[#e61f15] text-white'}`}
+          >
+            <span className="min-[360px]:hidden">{roundLabelShort || '·'}</span>
+            <span className="hidden min-[360px]:inline">{roundLabel || '·'}</span>
+          </div>
         </div>
 
         <main className="flex min-h-0 w-full max-w-md flex-1 flex-col gap-3 sm:max-w-2xl lg:max-w-4xl wide:grid wide:w-full wide:max-w-none wide:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)] wide:items-stretch wide:gap-6">
           {/* Stage */}
-          <div className="relative min-h-[13rem] w-full flex-1 overflow-hidden rounded-3xl wide:h-full wide:min-h-[22rem]">
+          <div className="relative min-h-[13rem] w-full flex-1 overflow-hidden rounded-3xl wide:h-full wide:min-h-[min(22rem,60svh)]">
             <CircuitScene
               fixture={fixture}
               camBox={camera.box}
@@ -830,9 +859,31 @@ function App() {
               elapsedT={elapsedT}
               transitions={transitions}
               heldInput={heldInput}
-              showReference={phase === 'roundResult' || phase === 'finished'}
+              resultLines={phase === 'roundResult' || phase === 'finished' ? resultLines : EMPTY_RESULT_LINES}
+              lineMode={lineMode}
+              showScoreBadges={false}
               showScaleBar={!legendVisible}
             />
+
+            {/* Result controls, bottom-left of the stage: which line is drawn
+                and the way into the full-screen map. Bottom-left because the
+                verdict banner owns the top, the legend the bottom-right, and
+                the canvas hides its scale bar while the legend is up. Only up
+                once there is a result to look at. */}
+            <div
+              inert={!showResultControls || undefined}
+              className={`absolute bottom-3 left-3 flex items-center gap-2 transition-opacity duration-300 short:wide:bottom-24 ${showResultControls ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+            >
+              <LineModeToggle mode={lineMode} onChange={setLineMode} />
+              <button
+                type="button"
+                onClick={() => setExploreOpen(true)}
+                aria-label="Bekijk de baan op volledig scherm"
+                className="grid h-10 w-10 place-items-center rounded-full bg-white/95 text-base font-extrabold text-ink shadow-lg transition-colors hover:bg-white focus-ring focus-ring-ink sm:h-12 sm:w-12"
+              >
+                <span aria-hidden="true">⤢</span>
+              </button>
+            </div>
 
             {/* Practice marker: the deck label says "Oefenbocht" too, but the
                 player is looking at the circuit, so the stage carries its own
@@ -864,55 +915,13 @@ function App() {
                 {liveSpeed ?? 0} km/u
               </div>
 
-              {/* the three phase colors, plus - when Max's reference line is
-                  on screen - which line is whose. Sized down hard on phones,
-                  where the full-size card covered a third of the corner. */}
               <div
                 aria-hidden={!legendVisible}
-                className={`flex flex-col items-end gap-0.5 rounded-lg bg-white/95 px-2 py-1 shadow transition-opacity duration-300 sm:gap-1.5 sm:rounded-2xl sm:px-4 sm:py-2.5 ${legendVisible ? 'opacity-100' : 'opacity-0'}`}
+                className={`transition-opacity duration-300 ${legendVisible ? 'opacity-100' : 'opacity-0'}`}
               >
-                <div className="flex items-center gap-1.5 sm:gap-3">
-                  {PHASE_ROWS.map((row) => (
-                    <span key={row.phase} className="flex items-center gap-1">
-                      {/* dots use the exact line colors from the map, not the UI accents */}
-                      <span
-                        className="h-1.5 w-1.5 rounded-full sm:h-3.5 sm:w-3.5"
-                        style={{ backgroundColor: PHASE_COLOR[row.phase] }}
-                      />
-                      <span className="text-sm font-extrabold leading-tight text-ink sm:text-base">
-                        <span className="sm:hidden">{row.label.toLowerCase()}</span>
-                        <span className="hidden sm:inline">{row.sublabel}</span>
-                      </span>
-                    </span>
-                  ))}
-                </div>
-                {referenceVisible && (
-                  <div className="flex items-center gap-1.5 border-t border-ink/10 pt-0.5 sm:gap-3 sm:pt-1.5">
-                    <span className="flex items-center gap-1">
-                      {/* dashes, matching how Max's reference line is drawn */}
-                      <span
-                        className="h-1 w-4 sm:h-1.5 sm:w-8"
-                        style={{
-                          backgroundImage: `repeating-linear-gradient(90deg, ${PHASE_COLOR.flat} 0 6px, transparent 6px 10px)`,
-                        }}
-                      />
-                      <span className="text-sm font-extrabold leading-tight text-ink sm:text-base">
-                        <span className="sm:hidden">Max</span>
-                        <span className="hidden sm:inline">lijn van Max</span>
-                      </span>
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <span
-                        className="h-1 w-4 rounded-full sm:h-1.5 sm:w-8"
-                        style={{ backgroundColor: PHASE_COLOR.flat }}
-                      />
-                      <span className="text-sm font-extrabold leading-tight text-ink sm:text-base">
-                        <span className="sm:hidden">jij</span>
-                        <span className="hidden sm:inline">jouw lijn</span>
-                      </span>
-                    </span>
-                  </div>
-                )}
+                <MapLegend
+                  activeLine={activeLineLabel(showResultControls, lineMode, round.practice && phase !== 'roundResult')}
+                />
               </div>
             </div>
 
@@ -1017,7 +1026,7 @@ function App() {
             </div>
 
             {/* keyboard hint (pointer-fine devices only) */}
-            <p className="hidden text-center text-base font-bold text-white/75 sm:block">
+            <p className="hidden text-center text-base font-bold text-white/75 sm:block short:hidden">
               Houd <kbd className="rounded bg-white/10 px-1.5 py-0.5">R</kbd> = rem ·{' '}
               <kbd className="rounded bg-white/10 px-1.5 py-0.5">G</kbd> = gas ·{' '}
               <kbd className="rounded bg-white/10 px-1.5 py-0.5">spatie</kbd> = verder
@@ -1163,6 +1172,9 @@ function App() {
                 Nog een keer
               </button>
             </div>
+            <button type="button" onClick={() => setExploreOpen(true)} className={`${BTN_LIGHT} mt-2 w-full px-6 py-3`}>
+              Bekijk je lijnen op de kaart
+            </button>
             <button
               ref={scoreInfoOpenRef}
               type="button"
@@ -1278,6 +1290,22 @@ function App() {
           </div>
         </div>
       </div>
+
+      {/* Full-screen results map. A sibling of the game container rather than a
+          child, so that container can be inert while this is open; the NOS
+          badge sits above both at z-[60] and stays clickable. */}
+      {exploreOpen && (
+        <CircuitExplorer
+          fixture={fixture}
+          resultLines={resultLines}
+          lineMode={lineMode}
+          onLineModeChange={setLineMode}
+          initialBox={phase === 'finished' ? overviewBox : roundBoxes[roundIndex]}
+          overviewBox={overviewBox}
+          onClose={() => setExploreOpen(false)}
+          title="Jouw lijnen op Circuit Zandvoort"
+        />
+      )}
     </>
   );
 }

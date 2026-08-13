@@ -115,13 +115,6 @@ function offsetPolyline(points: Point[], from: number, to: number, offsetM: numb
   return result;
 }
 
-/** A parallel copy of an open path, shifted `offsetM` to one side: the result
- * comparison draws Max's reference line beside the player's instead of on top
- * of it. Reuses offsetPolyline, so fold-backs on tight bends are pruned. */
-export function offsetPathPoints(points: Point[], offsetM: number): Point[] {
-  return offsetPolyline(points, 0, points.length - 1, offsetM, 1);
-}
-
 // Like offsetPolyline, but splits into separate runs wherever the bend is
 // tighter than the offset reaches (offsetting past the local center of
 // curvature would put the line across the track - hairpin inside curbs).
@@ -799,6 +792,39 @@ export function drawMapLabel(
 // caller draws it only while those are hidden (see CircuitScene's
 // `showScaleBar`). Sharing the corner by moving it right is not an option: on
 // a landscape phone the stage is ~356px wide and the legend alone is 259px.
+// A driven round's score, parked next to its corner on the explorer's map: the
+// practice round is greyed because it does not count toward the total.
+export function drawScoreBadge(
+  ctx: CanvasRenderingContext2D,
+  screenX: number,
+  screenY: number,
+  score: number,
+  practice: boolean,
+  side: 'above' | 'below' = 'above',
+) {
+  const label = practice ? `${score} · oefen` : `${score}`;
+  ctx.save();
+  ctx.font = "800 16px Effra, 'Helvetica Neue', Helvetica, Arial, sans-serif";
+  const width = ctx.measureText(label).width + 22;
+  const height = 30;
+  // Clear of the corner-number badge either way; the caller picks the side the
+  // corner's name label is not using.
+  const x = screenX - width / 2;
+  const y = side === 'above' ? screenY - height - 22 : screenY + 24;
+  ctx.beginPath();
+  ctx.roundRect(x, y, width, height, height / 2);
+  ctx.fillStyle = practice ? 'rgba(30, 30, 30, 0.75)' : PALETTE.white;
+  ctx.strokeStyle = practice ? PALETTE.white : '#1e1e1e';
+  ctx.lineWidth = 2;
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = practice ? PALETTE.white : '#1e1e1e';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, screenX, y + height / 2 + 1);
+  ctx.restore();
+}
+
 export function drawScaleBar(ctx: CanvasRenderingContext2D, projection: ScreenProjection, canvasHeight: number) {
   // Pick a round meter length that lands between 40 and 100 px on screen.
   const candidates = [25, 50, 100, 200, 500, 1000];

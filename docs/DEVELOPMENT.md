@@ -195,23 +195,23 @@ sand + dunes (world space) -> green corridor + striped infield -> paddock
   the player's solid line -> pedal glow under the car
   -> car -> corner badges + labels (fade out as you zoom in) -> scale bar
 
-Max's telemetry is a **dashed** phase-colored line one road-half beside the
-driven line (`MAX_LINE_OFFSET_M`/`WIDTH_M`/`DASH_M` in CircuitScene, offset
-via `offsetPathPoints`), the player's own line is solid on the driven line.
-The dash pattern - not width, position or opacity - is what tells the two
-apart, so both can stay thin and full-strength: matching stretches read as
-two same-colored lines running together, a mismatch as two colors side by
-side. `drawRibbon`'s `dashM` is in **meters** so dashes keep their
-road-relative size at every zoom, and dashed ribbons switch to butt caps
-(round caps grow each dash by half the line width at both ends and close
-the gaps). Two earlier attempts are worth not repeating: a 6m
-semi-transparent corridor on his racing line vanished under the player's
-line, and tinting the whole asphalt band in his zone colors drowned the
-map's own colors. Offsetting is geometry work, so the offset segments are
-built once per fixture in a memo, never per frame. There are deliberately
-no point markers (no "rem hier" pins, no Max/Jij dots on the road): the
-zone colors say where braking starts and where the throttle opens, and the
-on-map legend covers the colors plus the dashed-vs-solid distinction.
+Max's line and the player's line share **one position and one style**: both
+are phase-coloured, full width, drawn exactly where the car went, and only one
+is on screen at a time (`lineMode`). Flipping between them with the toggle
+compares better than reading two parallel ribbons, and it keeps each line on
+the racing line instead of offset beside it. Two earlier versions are worth not
+repeating: a semi-transparent corridor on Max's line vanished under the
+player's, and an offset dashed line for Max meant neither line sat where the
+car actually drove. Because the two are now indistinguishable by style, saying
+which is up is not decoration but the whole mechanism - hence the toggle plus
+the legend's bottom row (`activeLineLabel`).
+
+**Results accumulate.** `resultLines` carries every round driven so far, so
+zooming out shows the whole run corner by corner rather than only the round
+just finished; the explorer additionally labels each one with its score on the
+track (`drawScoreBadge`), placed on the opposite side of the corner from its
+name label, which `LABEL_OFFSETS` puts above for some corners and below for
+others.
 ```
 
 The sand decoration (dune patches, scrub, grass speckles) is a fixed field in
@@ -521,6 +521,23 @@ Rules that keep it that way:
   that could wrap mid-phrase gets `whitespace-nowrap` plus room to sit on one
   line — see the "nieuw record!" badge, which stacks its stat tiles below
   360px rather than breaking in half.
+- **`short:` is for landscape phones.** A 844x390 phone matches `wide` (it is
+  landscape and wide enough) but has only ~390px of height, so the side panel's
+  rows compress until they collide. `@custom-variant short (max-height: 460px)`
+  in index.css marks what yields there: the decorative event card, the keyboard
+  hint, the "Houd ingedrukt!" callout, and the result cluster's offset. The
+  stage's floor is viewport-aware for the same reason
+  (`wide:min-h-[min(22rem,60svh)]`) - a flat `22rem` floor pushed the legend and
+  the pedals off a 390px-tall screen entirely.
+- **Overlaps are measured, not eyeballed.** The sweep in the session scratchpad
+  (`overlapsweep.mjs`) walks every element that renders its own text or is a
+  control, drops what is invisible, inert, or behind an open modal, and reports
+  pairs whose boxes intersect without one containing the other, plus anything
+  outside the viewport that is not inside a scrollable container. Run it across
+  iPhone SE / Galaxy S20 / iPhone 14 / 14 Pro Max / landscape phone / iPad mini
+  / iPad Pro / laptop / desktop, in every phase including the explorer. It
+  found 31 real collisions the screenshots had not made obvious; the target is
+  zero.
 - **The NOS badge is the way home.** It is a real `<button>` that calls
   `restart()`, so it works from anywhere: mid-run, from the score card, and
   from a shared-score landing (where it also strips the `?r=` token). On hover
@@ -550,6 +567,38 @@ Rules that keep it that way:
   side-scrolled, clipping the pedals/CTA on the left. `clip` forbids all
   horizontal scrolling. Keep every panel child narrower than the panel
   (that's also why the wide accuracy card stacks its bars).
+
+## The results map (full-screen explorer)
+
+[CircuitExplorer.tsx](../src/components/CircuitExplorer.tsx) is the results
+view at full size: a full-viewport overlay showing every corner driven so far
+on one track, free to pan and zoom. It opens from the button on the stage
+(bottom-left, next to the line toggle) after any round and from the final score
+card, and closes with the × or Escape.
+
+- **Not the Fullscreen API.** iOS Safari does not give an element true
+  fullscreen on iPhone, so this is a plain full-viewport overlay - identical
+  behaviour everywhere, and the NOS badge (`z-[60]`) still sits above it, as
+  asked.
+- **Four ways in, one camera.** The overlay owns a `CamBox` and drives a second
+  `CircuitScene` with it: drag or one-finger pan, wheel or pinch to zoom,
+  arrows/`+`/`-`/`0` on the keyboard, and the on-screen buttons. Zoom is
+  **anchored to the pointer** (`zoomAt` re-projects the point under the cursor
+  before and after and corrects the centre) because centre-anchored zoom drifts
+  away from whatever the user is looking at. `clampBox` keeps the centre inside
+  the circuit bounds and the box between `MIN_BOX_M` and `MAX_BOX_M`, so the map
+  cannot be lost in empty sand.
+- **Pointers are tracked in a Map by id**, so one finger pans and two pinch out
+  of the same handler, with the mouse falling through the single-pointer path.
+  `setPointerCapture` is wrapped in try/catch: it throws for a pointer that is
+  not active, and a failed capture must not abort the drag.
+- **The wheel listener is attached by hand** with `{ passive: false }`; React's
+  `onWheel` is passive, so `preventDefault` there does not stop the page
+  scrolling.
+- **The game goes `inert` behind it.** The overlay is a sibling of the game
+  container, not a child, precisely so that container can carry `inert` - the
+  same rule the crossfade layers follow. The game's own key handler also bails
+  out while it is open, since `ArrowLeft` is the brake pedal.
 
 ## Embedded in an article (iframe)
 

@@ -11,6 +11,10 @@
    and landscape tablets/phones; portrait keeps the stacked layout. */
 @custom-variant wide (@media (orientation: landscape) and (min-width: 48rem));
 
+/* A landscape phone is `wide` but only ~390px tall, so its rows compress until
+   they collide. `short:` marks the chrome that yields its space there. */
+@custom-variant short (@media (max-height: 460px));
+
 /* The whole app runs on brand blues plus neutrals: `track-blue` is the page
    surface (and the scrims, links and car livery drawn in it), `deep-blue`
    draws the hatch lines on it, `light-blue` is for water and livery accents,

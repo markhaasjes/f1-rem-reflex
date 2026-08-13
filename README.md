@@ -97,6 +97,8 @@ src/hooks/useCircuitGame.ts      game state machine (intro/flying/ready/running/
 src/hooks/useCameraFlight.ts     animated camera box (log-space zoom, step queues)
 src/hooks/useElementSize.ts      ResizeObserver hook
 src/components/CircuitScene.tsx  the one canvas scene, own rAF loop (lazy repaint), every zoom level
+src/components/CircuitExplorer.tsx  the results map full screen: pan/zoom by gesture, mouse, keyboard, buttons
+src/components/MapLegend.tsx     the colour key, shared by the stage and the explorer
 src/components/EmbedPoster.tsx   what an iframe gets instead of the game: poster linking out to the page
 docs/art/                        image masters (public/images holds the resized, served derivatives)
 docs/embed-test-article.md       Dutch test article (copy + metadata) for trying the iframe embed
