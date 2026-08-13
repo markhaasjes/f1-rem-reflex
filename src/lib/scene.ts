@@ -749,10 +749,10 @@ export function drawCornerBadge(
 ) {
   const { highlight = false, minor = false, alpha = 1, compact = false } = opts;
   if (alpha <= 0.01) return;
-  const scale = compact ? 0.8 : 1;
-  let r = 11;
-  if (highlight) r = 14;
-  else if (minor) r = 7;
+  const scale = compact ? 0.85 : 1;
+  let r = 13;
+  if (highlight) r = 16;
+  else if (minor) r = 9;
   r *= scale;
   ctx.save();
   ctx.globalAlpha = minor ? alpha * 0.55 : alpha;
@@ -761,9 +761,9 @@ export function drawCornerBadge(
   // Solid black circle with a white number, no ring - per design.
   ctx.fillStyle = '#1e1e1e';
   ctx.fill();
-  let fontPx = 12;
-  if (highlight) fontPx = 15;
-  else if (minor) fontPx = 9;
+  let fontPx = 16;
+  if (highlight) fontPx = 18;
+  else if (minor) fontPx = 12;
   ctx.font = `800 ${Math.round(fontPx * scale)}px Effra, 'Helvetica Neue', Helvetica, Arial, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -817,8 +817,8 @@ export function drawScaleBar(ctx: CanvasRenderingContext2D, projection: ScreenPr
   ctx.moveTo(x + lengthPx, y - 4);
   ctx.lineTo(x + lengthPx, y + 4);
   ctx.stroke();
-  ctx.font = "700 11px Effra, 'Helvetica Neue', Helvetica, Arial, sans-serif";
+  ctx.font = "700 16px Effra, 'Helvetica Neue', Helvetica, Arial, sans-serif";
   ctx.textAlign = 'center';
   ctx.fillStyle = '#5b5648';
-  ctx.fillText(`${lengthM} m`, x + lengthPx / 2, y - 7);
+  ctx.fillText(`${lengthM} m`, x + lengthPx / 2, y - 9);
 }

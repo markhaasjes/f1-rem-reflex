@@ -327,7 +327,7 @@ export function CircuitScene(props: CircuitSceneProps) {
           if (!corner) return;
           const [x, y] = projection.toScreen(corner.x, corner.y);
           const offset = LABEL_OFFSETS[r.id] ?? { dx: 0, dy: 28 };
-          drawMapLabel(ctx, x + offset.dx, y + offset.dy, r.label, badgeAlpha, compact ? 11 : 13);
+          drawMapLabel(ctx, x + offset.dx, y + offset.dy, r.label, badgeAlpha, compact ? 14 : 17);
         });
       }
 

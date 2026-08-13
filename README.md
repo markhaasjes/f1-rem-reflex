@@ -6,9 +6,9 @@ F1 TV race map, zoom into four corners of Max Verstappen's real pole lap,
 and drive them with held pedals: keep **GAS!** pressed where Max is flat
 out, release everything where he coasts, and hold **REM!** through his
 braking zones. Your pedal timeline is compared against his real telemetry
-moment by moment; per pedal state you get a matched percentage and the
-corner score is the average of those three (so the short braking zone
-counts as much as the long flat-out stretch). The final score is shareable
+moment by moment; per pedal state you get a matched percentage and the three
+are multiplied into the corner score, so you have to answer all three: one
+pedal you never use drags the corner down however good the rest is. The final score is shareable
 via a link, and the score card explains the whole calculation, including
 an AI-assistance and data-provenance disclaimer.
 
@@ -44,6 +44,9 @@ corner — one continuous map, no separate per-corner artwork.
 - Tailwind CSS v4 (`@tailwindcss/vite`), Effra with Helvetica fallback
 - One Canvas 2D scene for every zoom level (devicePixelRatio capped at 2),
   inline SVG for the hero car
+- Playable on its own page only: embedded in an iframe the app renders a
+  poster that links out (see
+  [Embedded in an article](docs/DEVELOPMENT.md#embedded-in-an-article-iframe))
 - No backend and no runtime network calls: one baked fixture
   (`src/data/zandvoort2025.json`, ~385 KB raw) carries the circuit geometry,
   the full pole lap at 20 Hz and the four rounds.
@@ -93,6 +96,8 @@ src/hooks/useCircuitGame.ts      game state machine (intro/flying/ready/running/
 src/hooks/useCameraFlight.ts     animated camera box (log-space zoom, step queues)
 src/hooks/useElementSize.ts      ResizeObserver hook
 src/components/CircuitScene.tsx  the one canvas scene, own rAF loop (lazy repaint), every zoom level
+src/components/EmbedPoster.tsx   what an iframe gets instead of the game: poster linking out to the page
+docs/art/                        image masters (the served copies in public/images are derivatives)
 src/components/HeroCar.tsx       side-view car for the intro (public/images/auto-zij.svg)
 src/components/NOSLogo.tsx       NOS wordmark used in the app chrome
 src/components/Brand.tsx         shared pill/badge chrome
@@ -134,6 +139,10 @@ for how the pieces fit together; the rules below are about how to change them.
   exceptions (the Dutch flag's official colors, the photo-sampled scenery
   greys, the brake/coast/throttle signal colors), lives in
   [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#brand-palette).
+- **Type floor: 14px on phones, 16px from `sm:` up.** Dense chrome takes the
+  14px step; primary copy stays 16px everywhere. See
+  [the layout notes](docs/DEVELOPMENT.md#layout-invariants-portrait--landscape)
+  before shrinking anything.
 - **Pills, badges and buttons hug their label.** They are sized by their
   content (`BTN_BASE` carries `w-fit`), never stretched to the container, so
   the rounded end starts right after the text. Progress bars, cards and the

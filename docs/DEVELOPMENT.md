@@ -375,22 +375,25 @@ step the player's pedal state (from the transition timeline) is compared
 against Max's phase (`classifyAt`: brakeActive → brake, throttle < 95 →
 coast, else flat).
 
-- **Numeric**: the round score is the equal-weight average of the three
+- **Numeric**: the round score is the **geometric** mean of the three
   per-phase match percentages (the REM/LOS/GAS bars on the result card),
-  rounded per phase before averaging so the card exactly verifies the score.
-  It is deliberately NOT the matched share of time: Max is flat out for
-  40-55% of every window, so time-weighted matching handed ~50 points to
-  anyone who just held the gas down — the long easy stretches drowned out
-  the short braking zones where the skill sits. With equal phase weight a
-  one-pedal strategy lands around 40 (the boundary grace lifts it above the
-  naive 33) and a telemetry-mirroring playthrough with 120ms lag still
-  scores 100. A step counts as matched when the
-  player's state matches Max's phase directly or 0.2s to either side
-  (`REACTION_GRACE_S`), forgiving human reaction lag at zone boundaries
-  without rewarding a wrong pedal held through a whole zone; phases shorter
-  than `MIN_PHASE_S` in a window are left out of the average. `totalScore`
-  averages the **scoring rounds' rounded scores** (equal round weight,
-  practice excluded), so the total stays verifiable from the card too.
+  rounded per phase first so a 0% bar really does zero the round. Both
+  simpler formulas pay out ~50 for not playing, and both were shipped and
+  rejected: the matched share of _time_ gave ~51 for holding the gas down
+  (Max is flat out 40-55% of every window), and the _arithmetic_ mean gave
+  ~48 for touching nothing after the start, because coasting is the absence
+  of input and collects a free 100% on that phase. Multiplying instead of
+  averaging means every phase has to be answered - one pedal you never use
+  drags the whole round down however good the other two are. Calibration
+  (scripted, see the verification workflow): mirroring Max's telemetry with
+  120ms lag **100**, doing nothing **29**, holding gas only **14**. The
+  trade-off is that the player can no longer verify the score by averaging
+  the bars, so the explainer modal states the rule in words instead of
+  arithmetic. A step counts as matched when the player's state matches Max's
+  phase directly or 0.2s to either side (`REACTION_GRACE_S`), forgiving
+  reaction lag at zone boundaries; phases shorter than `MIN_PHASE_S` in a
+  window are left out. `totalScore` still averages the scoring rounds'
+  rounded scores (equal round weight, practice excluded).
 - **Zones**: the same walk is grouped into contiguous same-phase zones
   (`ZoneResult`: match fraction + the dominant wrong input) and into
   per-phase totals (`phaseAccuracy`), which feed the REM/LOS/GAS accuracy
@@ -487,6 +490,27 @@ Rules that keep it that way:
   result). The round-result cards therefore overlay the **stage** on portrait
   (`wide:hidden` absolute layer at its bottom edge) instead of living in the
   deck; the deck copy of the cards is `hidden` + `wide:flex`.
+- **Type floor: 14px on phones, 16px from `sm:` up.** Nothing renders below
+  that anywhere, canvas labels included (map names 14px on a compact canvas
+  and 17px otherwise, scale bar 16px). Dense or secondary chrome takes the
+  14px step (`text-sm sm:text-base`): the legend, the round label, the stage
+  practice badge, the accuracy bars' eyebrow/sublabels, the score card's round
+  list and stat tiles, keycaps and section eyebrows. Primary copy keeps 16px
+  everywhere: the deck hints, the intro paragraph, the explainer bullets and
+  the score sentence. The floor is a floor, so where 16px genuinely did not
+  fit the copy shortened rather than shrank, and some of that survives at
+  14px because it also reads better: the legend uses `rem/los/gas` and
+  `Max/jij` on phones (full words from `sm:`), the round label drops the
+  corner name below 360px where it slid under the NOS badge (smaller there
+  too), and the "Houd ingedrukt!" callout stays `sm:`-only because on phones
+  it collided with the hint line and the pill above the pedals says the same
+  thing. Corner-number badges are map pins rather than text and stay sized to
+  their circles. Measured, not eyeballed: a probe walks every text node and
+  reports the smallest rendered size (14px at 320/390, 16px at 1280).
+- **The practice round marks the stage, not just the deck.** A yellow
+  `OEFENBOCHT · telt niet mee` badge sits at the stage's top-left for the
+  whole practice round: the deck label alone was missed because the player is
+  looking at the circuit.
 - **Controls are sized by their label.** `BTN_BASE` carries
   `mx-auto block w-fit max-w-full`, so every button hugs its text (the pill's
   rounded end starts right after the label) and still cannot outgrow a narrow
@@ -497,6 +521,12 @@ Rules that keep it that way:
   that could wrap mid-phrase gets `whitespace-nowrap` plus room to sit on one
   line — see the "nieuw record!" badge, which stacks its stat tiles below
   360px rather than breaking in half.
+- **The NOS badge is the way home.** It is a real `<button>` that calls
+  `restart()`, so it works from anywhere: mid-run, from the score card, and
+  from a shared-score landing (where it also strips the `?r=` token). On hover
+  the tab pulls further out of the top edge and warms up, so it reads as
+  pressable. It is deliberately still clickable while a modal is open, which
+  is what makes it a home button rather than decoration.
 - **The NOS badge outranks the modals.** It sits at `z-[60]`, above every
   dialog layer (`z-40`, score explainer `z-50`), so a backdrop never dims or
   blurs the brand, plus `pointer-events-none` so it can't swallow a click.
@@ -520,6 +550,30 @@ Rules that keep it that way:
   side-scrolled, clipping the pedals/CTA on the left. `clip` forbids all
   horizontal scrolling. Keep every panel child narrower than the panel
   (that's also why the wide accuracy card stacks its bars).
+
+## Embedded in an article (iframe)
+
+`main.tsx` decides what to mount by frame context: standalone it renders the
+game, inside an iframe it renders
+[EmbedPoster.tsx](../src/components/EmbedPoster.tsx) - the designed promo art
+(NOS brand, phone mock, "bekijk" CTA, Max in Red Bull kit) as one big link
+that breaks out to the standalone page. A hold-to-drive game needs
+the whole viewport (pedals, corner map, camera) which a content column cannot
+give it, and a run started in a frame fights the article's scrolling.
+
+This is the pattern NOS already uses for its other games, where the embed is a
+_separate_ static document (a thumbnail linking out, plus a redirect for
+anyone opening that document directly). Here one app covers both cases, which
+keeps a single URL and a single build. The trade-off: an embedding article
+downloads the app bundle to render a poster. If that ever matters, the fix is
+a dynamic `import('./App')` behind the check, so the frame case only pulls the
+poster chunk - deliberately not done yet, because it would put an extra
+round trip in front of every real player.
+
+Two details worth keeping: the link targets **`_top`**, not `_parent`, so a
+CMS that wraps embeds in its own frame cannot end up loading the game into
+that wrapper; and the href is rebuilt from `origin + pathname`, so a stale
+`?r=` share token in the frame's src can never ride along into the article.
 
 ## Share flow
 
@@ -573,9 +627,21 @@ social share, not a leaderboard; don't build trust on it.
   the root `<svg>` (canvas `drawImage` of an SVG without them is unreliable
   across browsers), recolor by fill only, and verify by screenshotting the
   rendered app, not the raw file.
-- `public/images/share.png` is flat art: `magick -strip -colors 64 PNG8:`
-  gives ~80% size reduction with no visible loss; compare candidates before
-  going lower (32 colors banded on the car shading).
+- **Served art is a derivative; masters live in `docs/art/`.** The poster
+  master is 6000x4500 (5.6MB), far too heavy to ship: `public/images` carries
+  a 1600px wide, quality-78 WebP of it (~170KB, still crisp at 2x in an
+  article column) and `docs/art` keeps the master for re-exports. Anything
+  dropped straight into `public/` is deployed as-is, so check its weight.
+- `public/images/share.png` is the og:image, so it
+  has to match what the game currently looks like - it went stale once
+  already (old dark-navy surface, "poleronde" copy) and shipped that way into
+  social previews. Regenerate it by screenshotting the intro rather than
+  editing art: viewport 1400x875 with `deviceScaleFactor: 1200/1400`, which
+  lands exactly on the 1200x750 the meta tags declare while leaving room for
+  the whole card (a straight 1200x750 viewport clips the CTA now that the copy
+  is longer). Then `magick -strip -colors 64 PNG8:` for ~85% off (517KB ->
+  85KB) with no visible loss; compare candidates before going lower (32 colors
+  banded on the car shading).
 
 ## Verification workflow
 
@@ -587,8 +653,12 @@ telemetry channels (`brakeActive` / `throttle < 95`), start each round with
 `keyboard.down('KeyG')`, then walk the spans with `keyboard.down`/`up` on
 KeyR/KeyG about 120ms late (inside the 0.2s scoring grace) — screenshot
 each phase, and look at the screenshots. A telemetry-mirroring run must
-score 100 on every round and a gas-only run around ~40; if either drifts,
-the scoring grace, the phase averaging or the transition recording broke. Two traps: layered UI
+score 100 on every round; the two lazy strategies are part of the suite,
+because they are what the scoring rules exist to punish: `STRATEGY=fullgas`
+(hold gas, never brake) must land near 14 and `STRATEGY=nothing` (release
+everything after the mandatory start press) near 29. If any of the three
+drifts, the reaction grace, the geometric mean or the transition recording
+broke. Two traps: layered UI
 keeps hidden buttons in the DOM (`opacity-0` + `pointer-events-none`), so
 Playwright's `visible` check passes early — gate on _clickability_, not
 visibility (and match the pedals by `aria-label`, their text is just
