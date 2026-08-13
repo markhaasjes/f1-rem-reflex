@@ -271,7 +271,8 @@ in screen space, covering any zoom-out past the decorated field.
 - **Palette + curb realism come from photos**: `PALETTE` in scene.ts is
   sampled from the aerial/broadcast screenshots in `docs/corners` (medium-gray
   asphalt, paved beige-gray run-offs, khaki dunes with olive scrub, muted
-  grass); curbs are white + `redNosRood` from `docs/colors.ts`, with
+  grass); the sea and the lakes are the brand blues (see
+  [Brand palette](#brand-palette)); curbs are white + `redNosRood` from `docs/colors.ts`, with
   per-corner extents in `CURB_TUNING` (CircuitScene) positioned against those
   photos. Corner badges split into prominent (playable corners) and `minor`
   (everything else); round-label screen offsets live in `LABEL_OFFSETS` so
@@ -424,6 +425,36 @@ feedback. A held pedal tilts (the same perspective transform the old
 `:active` state used) and shows a ring in its accent color; pointer capture
 plus `onLostPointerCapture` guarantees a press can never stick.
 
+## Brand palette
+
+The whole app runs on three brand colors plus neutrals, declared as Tailwind
+theme tokens in [index.css](../src/index.css):
+
+| Token             | Value     | Used for                                               |
+| ----------------- | --------- | ------------------------------------------------------ |
+| `track-blue`      | `#284bbe` | the page surface, modal scrims, links, the car livery   |
+| `light-blue`      | `#3ca0ff` | the carbon hatch, water, livery accents (decoration)     |
+| `ink`             | `#1e1e1e` | all text, dark buttons, shadows, illustration outlines   |
+| (NOS red, inline) | `#e61f15` | CTAs, curbs, the brake signal color                     |
+
+Rules that keep it that way:
+
+- **No third blue and no second black.** `ink` used to be a navy (`#0b1440`)
+  and the hatch a darker blue (`#001189`); both are gone. A darker or lighter
+  shade is expressed with **alpha over these colors**, never a new hex — the
+  hatch is translucent light blue, the water is `rgba(60,160,255,0.72)` so the
+  lakes stop out-glowing the car, and the pedal artwork's greys were
+  re-neutralized so `#1e1e1e` is the darkest tone in it.
+- **Light blue never carries text on a light surface** (~2.8:1 contrast).
+  `track-blue` on white is ~7.3:1, so links use that.
+- **Scrims are blue, not black.** A `#1e1e1e` wash over the brand blue reads
+  as slate grey; the modal backdrops use `bg-track-blue/80..85` instead.
+- **Deliberate exceptions**, all outside the brand system: the Dutch flag
+  keeps its official `#ae1c28`/`#21468b` (recoloring a national flag would be
+  wrong), the scenery greys/sands/greens stay photo-sampled (see the
+  Rendering section), and brake/coast/throttle keep their signal colors
+  (`PHASE_COLOR`: red, amber, green) because they encode data, not brand.
+
 ## Layout invariants (portrait / landscape)
 
 - **Portrait deck never resizes.** The info row and the action row under the
@@ -432,6 +463,16 @@ plus `onLostPointerCapture` guarantees a press can never stick.
   result). The round-result cards therefore overlay the **stage** on portrait
   (`wide:hidden` absolute layer at its bottom edge) instead of living in the
   deck; the deck copy of the cards is `hidden` + `wide:flex`.
+- **Controls are sized by their label.** `BTN_BASE` carries
+  `mx-auto block w-fit max-w-full`, so every button hugs its text (the pill's
+  rounded end starts right after the label) and still cannot outgrow a narrow
+  phone. The verdict banner does the same with `w-fit` inside `inset-x-3`.
+  Deliberately still full width: the accuracy **bars** (they are meters, the
+  fill length is the data), the modal cards, and the two pedals (a hugged
+  pedal would shrink the touch target that the whole game runs on). A pill
+  that could wrap mid-phrase gets `whitespace-nowrap` plus room to sit on one
+  line — see the "nieuw record!" badge, which stacks its stat tiles below
+  360px rather than breaking in half.
 - **The NOS badge outranks the modals.** It sits at `z-[60]`, above every
   dialog layer (`z-40`, score explainer `z-50`), so a backdrop never dims or
   blurs the brand, plus `pointer-events-none` so it can't swallow a click.
