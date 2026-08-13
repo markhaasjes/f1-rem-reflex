@@ -11,10 +11,11 @@
    and landscape tablets/phones; portrait keeps the stacked layout. */
 @custom-variant wide (@media (orientation: landscape) and (min-width: 48rem));
 
-/* The whole app runs on three brand colors plus neutrals: NOS sport blue as
-   the surface, a light blue for accents/decoration, and #1e1e1e as the only
-   black (text, scrims, dark buttons, illustration outlines). Light blue is
-   ~2.8:1 on white, so it is decoration only, never text on a light surface. */
+/* The whole app runs on three brand colors plus neutrals: light blue as the
+   page surface, NOS sport blue for the lines/scrims/links drawn on it, and
+   #1e1e1e as the only black (text, dark buttons, shadows, illustration
+   outlines). White text does NOT survive on the light-blue surface (~2.8:1),
+   so chrome sitting directly on the page uses ink. */
 @theme {
   --font-sans: 'Effra', 'Helvetica Neue', Helvetica, Arial, sans-serif;
 
@@ -25,7 +26,6 @@
 
 body {
   margin: 0;
-  color-scheme: dark;
 }
 
 /* Interactive elements always advertise themselves (Tailwind v4 resets
@@ -37,20 +37,20 @@ button:disabled {
   cursor: not-allowed;
 }
 
-/* NOS F1 graphics carbon: a fine diagonal hatch over the brand blue, same as
-   the broadcast/WK-stand visuals. The hatch used to be a third, darker blue;
-   with the palette down to two blues it draws in translucent light blue, so
-   the texture reads as a sheen on the sport blue instead of a new color. */
+/* NOS F1 graphics carbon: a fine diagonal hatch, same as the broadcast/
+   WK-stand visuals. Light blue is the surface and the sport blue draws the
+   lines. The surface is light (~2.8:1 against white), so chrome sitting
+   directly on it uses ink, never white - see the layout notes. */
 .bg-carbon {
-  background-color: var(--color-track-blue);
+  background-color: var(--color-light-blue);
   /* the solid rounded curve rising from the bottom paints over the hatch,
      exactly like the NOS F1 broadcast graphics */
   background-image:
-    radial-gradient(95% 58% at 50% 124%, var(--color-track-blue) 0 99.6%, transparent 100%),
+    radial-gradient(95% 58% at 50% 124%, var(--color-light-blue) 0 99.6%, transparent 100%),
     repeating-linear-gradient(
       115deg,
-      rgba(60, 160, 255, 0.28) 0px,
-      rgba(60, 160, 255, 0.28) 2px,
+      var(--color-track-blue) 0px,
+      var(--color-track-blue) 2px,
       transparent 2px,
       transparent 8px
     );

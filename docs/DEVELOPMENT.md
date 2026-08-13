@@ -42,7 +42,9 @@ flying               "Onderweg naar de <bocht>..." — no interactive controls
   v
 ready                car waits at the window start; both pedals are live and
   |                  the gas pedal is ringed: "Houd GAS ingedrukt om te
-  |                  starten" — the first gas press IS the start
+  |                  starten" — the first gas press IS the start. On phones
+  |                  the camera holds the corner overview, then dives onto
+  |                  the car, so driving starts zoomed in (see Rendering)
   | setPedal('gas', true)
   v
 running              rAF clock plays lap.samples from round.tStart to tEnd in
@@ -75,7 +77,7 @@ Things worth knowing before changing the flow:
 - **Held pedals, one 3-state input.** REM! and GAS! are held, not tapped
   (pointer capture keeps a press alive when the finger drifts off; keyboard
   is keydown/keyup with auto-repeat ignored). The combined state is a single
-  `PedalInput` — brake wins when both pedals are down — and only *changes*
+  `PedalInput` — brake wins when both pedals are down — and only _changes_
   of that state are recorded (`InputTransition[]` on the lap clock), so a
   round's timeline stays a handful of entries.
 - **A round starts on the first gas press.** There is no start button: on
@@ -230,15 +232,18 @@ in screen space, covering any zoom-out past the decorated field.
   turns it into meter→pixel mapping per frame. Flights are step queues
   (`fly([{box, ms}, {ms: pause}, {box, ms}])`), giving the
   corner → overview → next corner two-stage move the user sees.
-- **Chase cam on phones**: while `running` on non-`wide` viewports the
-  camera rides with the car (box ≈ 0.55× the corner box, centered via an
-  `elapsedT` ref), and flies back to the corner box at `roundResult` so the
-  whole driven line is visible. It deliberately does NOT engage on the gas
-  press — that snap-zoom disoriented players. Instead: the corner overview
-  holds for the first 2s of the run, one eased 1.5s dive flies to where the
-  car will be when the dive ends, and only then `follow(getTarget)` (7% of
-  the remaining distance per frame) takes over from a box it is already
-  close to. The effect must depend on the hook's **stable callbacks**, not
+- **Chase cam on phones**: on non-`wide` viewports the zoom happens
+  **before** the player drives. On `ready` the camera holds the corner
+  overview for `CHASE_HOLD_MS` (2.5s, long enough to read the corner) and
+  then eases down onto the parked car over `CHASE_DIVE_MS` (1.6s), so
+  `running` starts already zoomed in and `follow(getTarget)` (7% of the
+  remaining distance per frame) takes over with nothing to travel. Starting
+  early is allowed: a gas press mid-storyboard flips the phase, and
+  `chaseZoomedRef` tells `running` whether it still has ground to cover — if
+  so it flies the rest in `CHASE_SNAP_MS` (0.65s) before following. Two
+  earlier versions were worse: engaging the follow on the gas press (a
+  snap-zoom that disoriented players) and running the hold+dive _during_ the
+  first seconds of the lap (the player drove the opening blind). The effect must depend on the hook's **stable callbacks**, not
   the returned camera object — that object changes identity every animated
   frame, which would restart the flight per render and it would never land.
 - **The outline is rotated at load** (`rotateOutline`) so index 0 sits at
@@ -430,12 +435,12 @@ plus `onLostPointerCapture` guarantees a press can never stick.
 The whole app runs on three brand colors plus neutrals, declared as Tailwind
 theme tokens in [index.css](../src/index.css):
 
-| Token             | Value     | Used for                                               |
-| ----------------- | --------- | ------------------------------------------------------ |
-| `track-blue`      | `#284bbe` | the page surface, modal scrims, links, the car livery   |
-| `light-blue`      | `#3ca0ff` | the carbon hatch, water, livery accents (decoration)     |
-| `ink`             | `#1e1e1e` | all text, dark buttons, shadows, illustration outlines   |
-| (NOS red, inline) | `#e61f15` | CTAs, curbs, the brake signal color                     |
+| Token             | Value     | Used for                                                   |
+| ----------------- | --------- | ---------------------------------------------------------- |
+| `light-blue`      | `#3ca0ff` | the page surface, water                                    |
+| `track-blue`      | `#284bbe` | the hatch lines on it, modal scrims, links, the car livery |
+| `ink`             | `#1e1e1e` | all text, dark buttons, shadows, illustration outlines     |
+| (NOS red, inline) | `#e61f15` | CTAs, curbs, the brake signal color                        |
 
 Rules that keep it that way:
 
@@ -445,8 +450,14 @@ Rules that keep it that way:
   hatch is translucent light blue, the water is `rgba(60,160,255,0.72)` so the
   lakes stop out-glowing the car, and the pedal artwork's greys were
   re-neutralized so `#1e1e1e` is the darkest tone in it.
-- **Light blue never carries text on a light surface** (~2.8:1 contrast).
-  `track-blue` on white is ~7.3:1, so links use that.
+- **The page surface is light, so page-level chrome is ink, never white.**
+  White on `light-blue` is 2.7:1; ink is 6.1:1. Opacity eats that fast on a
+  bright surface (`ink/80` measures 4.4:1, `ink/75` 4.0:1 - both under AA for
+  the small bold sizes in the deck), so the deck copy runs at full ink and
+  gets its hierarchy from size and weight instead. Text that sits on a
+  colored surface still states its own color: white on NOS red (4.6:1), white
+  on `track-blue` (7.4:1), ink on white cards (16.7:1). Only the hatch lines
+  are allowed below AA (2.7:1) because they are texture, not text.
 - **Scrims are blue, not black.** A `#1e1e1e` wash over the brand blue reads
   as slate grey; the modal backdrops use `bg-track-blue/80..85` instead.
 - **Deliberate exceptions**, all outside the brand system: the Dutch flag

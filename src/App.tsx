@@ -330,19 +330,19 @@ function Pedal({
       aria-keyshortcuts={isBrake ? 'r arrowleft' : 'g arrowright'}
       aria-label={isBrake ? 'Rempedaal, houd ingedrukt (toets R)' : 'Gaspedaal, houd ingedrukt (toets G)'}
       aria-pressed={held}
-      className={`group relative flex-1 select-none touch-manipulation rounded-2xl pb-1 pt-2 transition-all duration-150 focus-ring focus-ring-white hover:-translate-y-0.5 ${
-        highlight && !held ? 'ring-4 ring-white/80' : ''
+      className={`group relative flex-1 select-none touch-manipulation rounded-2xl pb-1 pt-2 transition-all duration-150 focus-ring focus-ring-ink hover:-translate-y-0.5 ${
+        highlight && !held ? 'ring-4 ring-ink/70' : ''
       } ${held ? `ring-4 ${isBrake ? 'ring-[#e61f15]' : 'ring-[#10b981]'}` : ''}`}
     >
       {highlight && !held && (
         <>
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 rounded-2xl ring-4 ring-white/80 [animation:pedal-pulse_1.6s_ease-out_infinite]"
+            className="pointer-events-none absolute inset-0 rounded-2xl ring-4 ring-ink/70 [animation:pedal-pulse_1.6s_ease-out_infinite]"
           />
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute -top-2 left-1/2 whitespace-nowrap rounded-full bg-white px-3 py-1 text-xs font-extrabold text-[#1e1e1e] shadow-lg [animation:callout-bob_1.6s_ease-in-out_infinite] sm:text-sm"
+            className="pointer-events-none absolute -top-1 left-1/2 whitespace-nowrap rounded-full bg-white px-2 py-0.5 text-[10px] font-extrabold text-[#1e1e1e] shadow-lg [animation:callout-bob_1.6s_ease-in-out_infinite] sm:-top-2 sm:px-3 sm:py-1 sm:text-sm"
           >
             Houd ingedrukt!
             <span className="absolute left-1/2 top-full -mt-1 h-2 w-2 -translate-x-1/2 rotate-45 bg-white" />
@@ -536,7 +536,9 @@ function App() {
   // match what the sharer saw).
   const sharedAccuracy = useMemo(() => {
     if (!shared?.runs) return null;
-    return aggregatePhaseAccuracy(shared.runs.map((run) => scoreRound(run.round, fixture.lap.samples, run.transitions)));
+    return aggregatePhaseAccuracy(
+      shared.runs.map((run) => scoreRound(run.round, fixture.lap.samples, run.transitions)),
+    );
   }, [shared]);
   // The player's history, persisted in localStorage (this game's "cookie"):
   // the last attempt and the best run. runContext freezes what the history
@@ -596,38 +598,51 @@ function App() {
   // it flies back out so the whole driven line is visible again. Wide layouts
   // keep the static corner framing.
   //
-  // The chase cam does NOT engage on the gas press: that snap-zoom read as
-  // disorienting in play-testing. Instead the corner overview holds for the
-  // first seconds of the run, then one eased dive brings the camera to where
-  // the car will be by the end of the dive, and only then the frame-by-frame
-  // follow takes over (from a box it is already close to, so no jump).
-  const CHASE_HOLD_MS = 2000;
-  const CHASE_DIVE_MS = 1500;
+  // The zoom happens BEFORE the player drives, on the ready screen: the corner
+  // overview holds for a few seconds so they can read the corner, then one
+  // eased dive settles on the parked car, and the run starts already zoomed in
+  // (the frame-by-frame follow then takes over from a box it is already on, so
+  // there is no jump). Starting early is allowed: a gas press mid-hold flips
+  // the phase to `running`, which flies the remaining distance to the car in
+  // CHASE_SNAP_MS instead of waiting out the storyboard.
+  const CHASE_HOLD_MS = 2500;
+  const CHASE_DIVE_MS = 1600;
+  const CHASE_SNAP_MS = 650;
   const isWide = useWideViewport();
   const elapsedTRef = useRef(elapsedT);
   elapsedTRef.current = elapsedT;
+  // Whether the ready-screen dive already landed on the car, so `running`
+  // knows if it still has ground to cover before following.
+  const chaseZoomedRef = useRef(false);
   // Depends on the hook's stable callbacks, NOT the camera object: that object
   // is rebuilt every frame while the camera moves, which would restart the
   // zoom-out flight on every render and it would never land.
   const { follow: cameraFollow, fly: cameraFly, jumpTo: cameraJumpTo } = camera;
   useEffect(() => {
-    if (phase === 'running' && !isWide) {
-      const round = fixture.rounds[roundIndex];
-      const base = roundBoxes[roundIndex];
-      const size = { w: Math.max(base.w * 0.55, 230), h: Math.max(base.h * 0.55, 230) };
-      const diveT = Math.min(round.tStart + (CHASE_HOLD_MS + CHASE_DIVE_MS) / 1000, round.tEnd);
-      const divePoint = positionAt(fixture.lap.samples, diveT);
-      cameraFly([{ ms: CHASE_HOLD_MS }, { box: { cx: divePoint.x, cy: divePoint.y, ...size }, ms: CHASE_DIVE_MS }], () =>
-        cameraFollow(() => {
-          const p = positionAt(fixture.lap.samples, elapsedTRef.current);
-          return { cx: p.x, cy: p.y, ...size };
-        }),
-      );
-    } else if (phase === 'running' && isWide) {
-      // rotated to landscape mid-run: drop the chase cam
-      cameraJumpTo(roundBoxes[roundIndex]);
-    } else if (phase === 'roundResult' && !isWide) {
-      cameraFly([{ box: roundBoxes[roundIndex], ms: 900 }]);
+    if (isWide) {
+      // landscape keeps the static corner framing, no chase cam at all
+      if (phase === 'running') cameraJumpTo(roundBoxes[roundIndex]);
+      return;
+    }
+    const round = fixture.rounds[roundIndex];
+    const base = roundBoxes[roundIndex];
+    const size = { w: Math.max(base.w * 0.55, 230), h: Math.max(base.h * 0.55, 230) };
+    const carBoxAt = (t: number): CamBox => {
+      const p = positionAt(fixture.lap.samples, t);
+      return { cx: p.x, cy: p.y, ...size };
+    };
+
+    if (phase === 'ready') {
+      chaseZoomedRef.current = false;
+      cameraFly([{ ms: CHASE_HOLD_MS }, { box: carBoxAt(round.tStart), ms: CHASE_DIVE_MS }], () => {
+        chaseZoomedRef.current = true;
+      });
+    } else if (phase === 'running') {
+      const followCar = () => cameraFollow(() => carBoxAt(elapsedTRef.current));
+      if (chaseZoomedRef.current) followCar();
+      else cameraFly([{ box: carBoxAt(round.tStart), ms: CHASE_SNAP_MS }], followCar);
+    } else if (phase === 'roundResult') {
+      cameraFly([{ box: base, ms: 900 }]);
     }
   }, [phase, isWide, cameraFollow, cameraFly, cameraJumpTo, roundBoxes, roundIndex]);
 
@@ -762,9 +777,7 @@ function App() {
     roundLabel = round.practice ? `Oefenbocht · ${round.label}` : `Bocht ${scoringRoundNumber} van 3 · ${round.label}`;
   }
 
-  const runningHint = round.practice
-    ? 'Volg de streepjeslijn van Max: rood = remmen, oranje = los, groen = vol gas!'
-    : 'Rem, rol uit en geef gas precies zoals Max!';
+  const runningHint = round.practice ? 'Volg de streepjeslijn van Max!' : 'Rem, rol uit en geef gas precies zoals Max!';
 
   // Crossfading layers stay mounted for the animation, so hidden ones must be
   // `inert`: otherwise invisible buttons stay in the Tab order and invisible
@@ -784,11 +797,11 @@ function App() {
           <NOSLogo className="w-12 h-auto text-white fill-current" />
         </div>
       </div>
-      <div className="bg-carbon flex h-svh flex-col items-center gap-3 overflow-hidden px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-white sm:gap-4 sm:px-8 sm:pt-5 wide:px-10 wide:pt-20">
+      <div className="bg-carbon flex h-svh flex-col items-center gap-3 overflow-hidden px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-ink sm:gap-4 sm:px-8 sm:pt-5 wide:px-10 wide:pt-20">
         <Pill className="gap-3 text-sm wide:hidden sm:text-base">{fixture.meta.circuit}</Pill>
 
         <div
-          className={`rounded-full px-4 py-1 text-xs font-extrabold tracking-wide transition-opacity wide:hidden sm:text-sm ${roundLabel ? 'opacity-100' : 'opacity-0'} ${round?.practice ? 'bg-white/15 text-white/90' : 'bg-[#e61f15] text-white'}`}
+          className={`rounded-full px-4 py-1 text-xs font-extrabold tracking-wide transition-opacity wide:hidden sm:text-sm ${roundLabel ? 'opacity-100' : 'opacity-0'} ${round?.practice ? 'bg-white text-ink' : 'bg-[#e61f15] text-white'}`}
         >
           {roundLabel || '·'}
         </div>
@@ -818,39 +831,49 @@ function App() {
 
             {/* map legend, shown whenever colored lines are on the map (above
                 the scale bar in the bottom-left corner): the three phase
-                colors, plus - when Max's corridor is on screen - what the
-                wide transparent band and the thin solid line each mean */}
+                colors, plus - when Max's reference line is on screen - which
+                line is whose. Sized down hard on phones, where the full-size
+                card covered a third of the corner. */}
             <div
               aria-hidden={!legendVisible}
-              className={`pointer-events-none absolute bottom-10 left-3 flex flex-col gap-1.5 rounded-2xl bg-white/95 px-4 py-2.5 shadow transition-opacity duration-300 ${legendVisible ? 'opacity-100' : 'opacity-0'}`}
+              className={`pointer-events-none absolute bottom-7 left-2 flex flex-col gap-0.5 rounded-lg bg-white/95 px-2 py-1 shadow transition-opacity duration-300 sm:bottom-10 sm:left-3 sm:gap-1.5 sm:rounded-2xl sm:px-4 sm:py-2.5 ${legendVisible ? 'opacity-100' : 'opacity-0'}`}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5 sm:gap-3">
                 {PHASE_ROWS.map((row) => (
-                  <span key={row.phase} className="flex items-center gap-1.5">
+                  <span key={row.phase} className="flex items-center gap-1">
                     {/* dots use the exact line colors from the map, not the UI accents */}
                     <span
-                      className="h-3 w-3 rounded-full sm:h-3.5 sm:w-3.5"
+                      className="h-1.5 w-1.5 rounded-full sm:h-3.5 sm:w-3.5"
                       style={{ backgroundColor: PHASE_COLOR[row.phase] }}
                     />
-                    <span className="text-xs font-extrabold text-ink sm:text-sm">{row.sublabel}</span>
+                    <span className="text-[9px] font-extrabold leading-tight text-ink sm:text-sm">{row.sublabel}</span>
                   </span>
                 ))}
               </div>
               {referenceVisible && (
-                <div className="flex items-center gap-3 border-t border-ink/10 pt-1.5">
-                  <span className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 border-t border-ink/10 pt-0.5 sm:gap-3 sm:pt-1.5">
+                  <span className="flex items-center gap-1">
                     {/* dashes, matching how Max's reference line is drawn */}
                     <span
-                      className="h-1.5 w-8"
+                      className="h-1 w-4 sm:h-1.5 sm:w-8"
                       style={{
                         backgroundImage: `repeating-linear-gradient(90deg, ${PHASE_COLOR.flat} 0 6px, transparent 6px 10px)`,
                       }}
                     />
-                    <span className="text-xs font-extrabold text-ink sm:text-sm">lijn van Max</span>
+                    <span className="text-[9px] font-extrabold leading-tight text-ink sm:text-sm">
+                      <span className="sm:hidden">Max</span>
+                      <span className="hidden sm:inline">lijn van Max</span>
+                    </span>
                   </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="h-1.5 w-8 rounded-full" style={{ backgroundColor: PHASE_COLOR.flat }} />
-                    <span className="text-xs font-extrabold text-ink sm:text-sm">jouw lijn</span>
+                  <span className="flex items-center gap-1">
+                    <span
+                      className="h-1 w-4 rounded-full sm:h-1.5 sm:w-8"
+                      style={{ backgroundColor: PHASE_COLOR.flat }}
+                    />
+                    <span className="text-[9px] font-extrabold leading-tight text-ink sm:text-sm">
+                      <span className="sm:hidden">jij</span>
+                      <span className="hidden sm:inline">jouw lijn</span>
+                    </span>
                   </span>
                 </div>
               )}
@@ -861,7 +884,7 @@ function App() {
               inert={!verdict || undefined}
               className={`absolute inset-x-3 top-3 mx-auto w-fit max-w-md rounded-2xl px-5 py-3 text-center shadow-lg transition-all duration-500 ${verdict ? 'opacity-100 translate-y-0' : 'pointer-events-none opacity-0 -translate-y-2'} ${TONE_STYLES[verdict?.tone ?? 'okay']}`}
             >
-              <h2 className="text-lg font-extrabold sm:text-xl">{verdict?.title}</h2>
+              <h2 className="text-lg font-extrabold text-white sm:text-xl">{verdict?.title}</h2>
               {lastResult && (
                 <p className="text-sm text-white/90">
                   {round.practice ? 'Oefenbocht' : round.label}:{' '}
@@ -870,7 +893,6 @@ function App() {
                 </p>
               )}
             </div>
-
           </div>
 
           {/* info row */}
@@ -885,7 +907,7 @@ function App() {
               aria-live="polite"
               className="grid h-20 place-items-center py-1 text-center sm:h-24 wide:h-auto wide:flex-1"
             >
-              <p {...layer(phase === 'flying', 'text-sm font-extrabold text-white/85 sm:text-lg')}>
+              <p {...layer(phase === 'flying', 'text-sm font-extrabold text-ink sm:text-lg')}>
                 Onderweg naar de {round.label}...
               </p>
               <div {...layer(phase === 'ready', 'flex flex-col items-center gap-3')}>
@@ -897,18 +919,17 @@ function App() {
                   <span className="text-sm font-extrabold text-ink sm:text-base">ingedrukt om te starten</span>
                 </div>
                 {lastRoundAdvice ? (
-                  <p className="text-xs font-bold text-white sm:text-base">
+                  <p className="text-xs font-bold text-ink sm:text-base">
                     <TipBadge />
                     Vorige keer: {lastRoundAdvice}
                   </p>
                 ) : (
-                  <p className="text-xs font-bold text-white/85 sm:text-base">
-                    {round.practice &&
-                      'Rijd de streepjeslijn van Max na: groen = vol gas, oranje = los, rood = remmen!'}
+                  <p className="text-xs font-bold text-ink sm:text-base">
+                    {round.practice && 'Rijd de streepjeslijn van Max na!'}
                     {!round.practice &&
                       (round.events.length / 2 === 1
-                        ? 'Rem, rol uit en geef weer gas precies waar Max dat doet!'
-                        : 'Een dubbele: twee remzones, en twee keer terug op het gas!')}
+                        ? 'Rem, rol uit en geef gas zoals Max!'
+                        : 'Een dubbele: twee remzones en twee keer gas!')}
                   </p>
                 )}
               </div>
@@ -959,10 +980,10 @@ function App() {
             </div>
 
             {/* keyboard hint (pointer-fine devices only) */}
-            <p className="hidden text-center text-xs font-bold text-white/40 sm:block">
-              Toetsenbord: houd <kbd className="rounded bg-white/10 px-1.5 py-0.5">R</kbd> = rem ·{' '}
-              <kbd className="rounded bg-white/10 px-1.5 py-0.5">G</kbd> = gas ·{' '}
-              <kbd className="rounded bg-white/10 px-1.5 py-0.5">spatie</kbd> = verder
+            <p className="hidden text-center text-xs font-bold text-ink/85 sm:block">
+              Toetsenbord: houd <kbd className="rounded bg-ink/10 px-1.5 py-0.5">R</kbd> = rem ·{' '}
+              <kbd className="rounded bg-ink/10 px-1.5 py-0.5">G</kbd> = gas ·{' '}
+              <kbd className="rounded bg-ink/10 px-1.5 py-0.5">spatie</kbd> = verder
             </p>
           </div>
         </main>
@@ -1130,7 +1151,10 @@ function App() {
                 Tijdens de bocht vergelijken we jouw pedalen 20 keer per seconde met de echte telemetrie van Max: remt
                 hij, rolt hij uit of geeft hij vol gas.
               </li>
-              <li>Reactietijd krijg je cadeau: zit je bij een overgang maximaal 0,2 seconde naast Max, dan telt dat gewoon als goed.</li>
+              <li>
+                Reactietijd krijg je cadeau: zit je bij een overgang maximaal 0,2 seconde naast Max, dan telt dat gewoon
+                als goed.
+              </li>
               <li>
                 Per pedaalstand krijg je zo een percentage, de drie balken op je bochtkaart. Je bochtscore is het
                 gemiddelde van die drie, zo weegt de korte remzone net zo zwaar als het lange stuk vol gas.
@@ -1140,9 +1164,9 @@ function App() {
             <div className="mt-5 border-t border-ink/10 pt-4">
               <h3 className="text-xs font-extrabold uppercase tracking-wide text-[#1e1e1e]/50">Over dit spel</h3>
               <p className="mt-2 text-xs font-bold leading-snug text-[#1e1e1e]/70">
-                Dit spel is gemaakt met hulp van AI (Claude). De rijdata is de echte poleronde van Max Verstappen:
-                ronde {fixture.meta.lapNumber} uit de kwalificatie van de {fixture.meta.meetingName} {fixture.meta.year}
-                , opgehaald via{' '}
+                Dit spel is gemaakt met hulp van AI (Claude). De rijdata is de echte poleronde van Max Verstappen: ronde{' '}
+                {fixture.meta.lapNumber} uit de kwalificatie van de {fixture.meta.meetingName} {fixture.meta.year},
+                opgehaald via{' '}
                 <a
                   href={fixture.meta.source}
                   target="_blank"

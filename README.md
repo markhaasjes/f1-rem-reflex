@@ -126,10 +126,11 @@ for how the pieces fit together; the rules below are about how to change them.
   rounds (or drive them with Playwright); for race-line/geometry work, follow
   the verification criteria in the
   [Hugenholtz playbook](docs/DEVELOPMENT.md#repairing-a-race-line-with-gps-data-gaps-the-hugenholtz-playbook).
-- **Three brand colors, no fourth.** Blue is only `#284bbe` (NOS
-  _blueSportBlauw_) or `#3ca0ff`; black is only `#1e1e1e`; red stays NOS red.
-  Light blue is ~2.8:1 on white, so it is decoration (hatch, water, accents)
-  and never text on a light surface. The full rule, including the deliberate
+- **Three brand colors, no fourth.** Blue is only `#3ca0ff` (the light page
+  surface) or `#284bbe` (NOS _blueSportBlauw_, the lines drawn on it); black is
+  only `#1e1e1e`; red stays NOS red. The surface is light, so chrome sitting
+  directly on the page uses ink, never white, and full-strength ink at that
+  (opacity drops below AA fast on a bright surface). The full rule, including the deliberate
   exceptions (the Dutch flag's official colors, the photo-sampled scenery
   greys, the brake/coast/throttle signal colors), lives in
   [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#brand-palette).
