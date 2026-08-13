@@ -97,7 +97,7 @@ src/hooks/useCameraFlight.ts     animated camera box (log-space zoom, step queue
 src/hooks/useElementSize.ts      ResizeObserver hook
 src/components/CircuitScene.tsx  the one canvas scene, own rAF loop (lazy repaint), every zoom level
 src/components/EmbedPoster.tsx   what an iframe gets instead of the game: poster linking out to the page
-docs/art/                        image masters (the served copies in public/images are derivatives)
+docs/art/                        image masters (public/images holds the resized, served derivatives)
 src/components/HeroCar.tsx       side-view car for the intro (public/images/auto-zij.svg)
 src/components/NOSLogo.tsx       NOS wordmark used in the app chrome
 src/components/Brand.tsx         shared pill/badge chrome

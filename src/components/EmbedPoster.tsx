@@ -13,8 +13,9 @@
 // Max in Red Bull kit), resized to 1600px wide from the 6000px master kept in
 // docs/art - crisp on a 2x display in an article column at ~170KB, where the
 // master would have been 5.6MB. Width/height are declared so the frame does
-// not reflow the article while the image loads.
-const POSTER_SRC = '/images/nos-rem-reflex-share-zandvoort-max-verstappen.webp';
+// not reflow the article while the image loads. The same file is the og:image
+// (index.html), so the embed and every social preview show one artwork.
+const POSTER_SRC = '/images/nos-rem-reflex-spel-max-verstappen-zandvoort-formule-1.webp';
 const POSTER_WIDTH = 1600;
 const POSTER_HEIGHT = 1200;
 
@@ -31,7 +32,7 @@ export function EmbedPoster() {
         src={POSTER_SRC}
         width={POSTER_WIDTH}
         height={POSTER_HEIGHT}
-        alt="NOS Rem Reflex, rem jij net zo laat als Max Verstappen op Zandvoort?"
+        alt="Max Verstappen in Red Bull-pak naast het spel NOS Rem Reflex op een telefoon, met de kaart van Circuit Zandvoort."
         className="block h-auto w-full transition-transform duration-200 group-hover:scale-[1.01]"
       />
     </a>

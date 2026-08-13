@@ -627,21 +627,32 @@ social share, not a leaderboard; don't build trust on it.
   the root `<svg>` (canvas `drawImage` of an SVG without them is unreliable
   across browsers), recolor by fill only, and verify by screenshotting the
   rendered app, not the raw file.
+- **One artwork for the poster and the social preview.**
+  `public/images/nos-rem-reflex-spel-max-verstappen-zandvoort-formule-1.webp`
+  is both the iframe poster (EmbedPoster) and the `og:image`/`twitter:image`
+  in [index.html](../index.html), so the embed and every shared link show the
+  same thing. The filename is deliberately descriptive rather than functional
+  ("share" was in it once and is worth nothing in image search): brand,
+  product, what it is, who is in it, where, which sport.
 - **Served art is a derivative; masters live in `docs/art/`.** The poster
   master is 6000x4500 (5.6MB), far too heavy to ship: `public/images` carries
   a 1600px wide, quality-78 WebP of it (~170KB, still crisp at 2x in an
   article column) and `docs/art` keeps the master for re-exports. Anything
   dropped straight into `public/` is deployed as-is, so check its weight.
-- `public/images/share.png` is the og:image, so it
-  has to match what the game currently looks like - it went stale once
-  already (old dark-navy surface, "poleronde" copy) and shipped that way into
-  social previews. Regenerate it by screenshotting the intro rather than
-  editing art: viewport 1400x875 with `deviceScaleFactor: 1200/1400`, which
-  lands exactly on the 1200x750 the meta tags declare while leaving room for
-  the whole card (a straight 1200x750 viewport clips the CTA now that the copy
-  is longer). Then `magick -strip -colors 64 PNG8:` for ~85% off (517KB ->
-  85KB) with no visible loss; compare candidates before going lower (32 colors
-  banded on the car shading).
+- **Two known trade-offs of a 4:3 og:image**, both accepted rather than
+  overlooked: link previews on X and Facebook crop to ~1.91:1, which keeps
+  Max, the phone and the "bekijk" pill but loses the NOS logo strip at the
+  top (the fix, if the logo matters there, is a second 1200x630 derivative
+  cropped from the top); and the file is WebP, which every current scraper
+  reads, though LinkedIn has historically been the last to support it - if a
+  preview ever comes up blank there, a JPEG copy of the same art is the
+  answer. Keep `og:image:width`/`height` in step with the file: they say
+  1600x1200 now.
+- The earlier `share.png` (a screenshot of the intro card) is gone. If a
+  screenshot is ever wanted again, take it at viewport 1400x875 with
+  `deviceScaleFactor: 1200/1400` and quantize with
+  `magick -strip -colors 64 PNG8:` - a straight 1200x750 viewport clips the
+  CTA now the intro copy is longer.
 
 ## Verification workflow
 
