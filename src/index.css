@@ -11,13 +11,16 @@
    and landscape tablets/phones; portrait keeps the stacked layout. */
 @custom-variant wide (@media (orientation: landscape) and (min-width: 48rem));
 
+/* The whole app runs on three brand colors plus neutrals: NOS sport blue as
+   the surface, a light blue for accents/decoration, and #1e1e1e as the only
+   black (text, scrims, dark buttons, illustration outlines). Light blue is
+   ~2.8:1 on white, so it is decoration only, never text on a light surface. */
 @theme {
   --font-sans: 'Effra', 'Helvetica Neue', Helvetica, Arial, sans-serif;
 
-  --color-track-blue: #294cbd;
-  --color-track-blue-dark: #101d63;
-  --color-badge-blue: #2f6fed;
-  --color-ink: #0b1440;
+  --color-track-blue: #284bbe;
+  --color-light-blue: #3ca0ff;
+  --color-ink: #1e1e1e;
 }
 
 body {
@@ -35,23 +38,30 @@ button:disabled {
 }
 
 /* NOS F1 graphics carbon: a fine diagonal hatch over the brand blue, same as
-   the broadcast/WK-stand visuals. Hatch lines in the darker brand blue
-   (#001189) per design. */
+   the broadcast/WK-stand visuals. The hatch used to be a third, darker blue;
+   with the palette down to two blues it draws in translucent light blue, so
+   the texture reads as a sheen on the sport blue instead of a new color. */
 .bg-carbon {
   background-color: var(--color-track-blue);
   /* the solid rounded curve rising from the bottom paints over the hatch,
      exactly like the NOS F1 broadcast graphics */
   background-image:
     radial-gradient(95% 58% at 50% 124%, var(--color-track-blue) 0 99.6%, transparent 100%),
-    repeating-linear-gradient(115deg, #001189 0px, #001189 2px, transparent 2px, transparent 8px);
+    repeating-linear-gradient(
+      115deg,
+      rgba(60, 160, 255, 0.28) 0px,
+      rgba(60, 160, 255, 0.28) 2px,
+      transparent 2px,
+      transparent 8px
+    );
 }
 
 /* The same hatch woven into modal backdrops, on top of the dark blur. */
 .backdrop-carbon {
   background-image: repeating-linear-gradient(
     115deg,
-    rgba(0, 17, 137, 0.45) 0px,
-    rgba(0, 17, 137, 0.45) 2px,
+    rgba(60, 160, 255, 0.16) 0px,
+    rgba(60, 160, 255, 0.16) 2px,
     transparent 2px,
     transparent 8px
   );
@@ -101,9 +111,7 @@ button:disabled {
 .focus-ring-white {
   --ring: #fff;
 }
+/* ink and the old "dark" ring are the same #1e1e1e now, so there is one class */
 .focus-ring-ink {
-  --ring: #0b1440;
-}
-.focus-ring-dark {
   --ring: #1e1e1e;
 }

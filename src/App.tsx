@@ -55,8 +55,8 @@ const ROUND_PAD_M = 55;
 // darker NOS red on red CTAs, 150ms ease transitions, scale press feedback,
 // and a 2px offset focus outline (`.focus-ring` in index.css).
 const BTN_BASE =
-  'select-none touch-manipulation rounded-full font-extrabold shadow-lg transition-all duration-150 active:scale-95 focus-ring';
-const BTN_LIGHT = `${BTN_BASE} focus-ring-dark bg-white text-ink hover:bg-[#f3f3f0] hover:scale-[1.02]`;
+  'mx-auto block w-fit max-w-full select-none touch-manipulation rounded-full font-extrabold shadow-lg transition-all duration-150 active:scale-95 focus-ring';
+const BTN_LIGHT = `${BTN_BASE} focus-ring-ink bg-white text-ink hover:bg-[#f3f3f0] hover:scale-[1.02]`;
 const BTN_RED = `${BTN_BASE} focus-ring-ink bg-[#e61f15] text-white hover:bg-[#ca1a11] hover:scale-[1.02]`;
 const BTN_DARK = `${BTN_BASE} bg-ink text-white hover:bg-track-blue hover:scale-[1.02]`;
 
@@ -221,20 +221,20 @@ function PedalArt({ variant, idPrefix, className }: { variant: 'brake' | 'gas'; 
     <svg viewBox="0 0 120 200" aria-hidden="true" className={className}>
       <defs>
         <pattern id={`${id}-carbon`} width="6" height="6" patternUnits="userSpaceOnUse">
-          <rect width="6" height="6" fill="#1e1f24" />
-          <rect width="3" height="3" fill="#2a2b31" />
-          <rect x="3" y="3" width="3" height="3" fill="#2a2b31" />
+          <rect width="6" height="6" fill="#1e1e1e" />
+          <rect width="3" height="3" fill="#2b2b2b" />
+          <rect x="3" y="3" width="3" height="3" fill="#2b2b2b" />
         </pattern>
         <linearGradient id={`${id}-metal`} x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="#b9bcc4" />
-          <stop offset="0.5" stopColor="#eef0f4" />
-          <stop offset="1" stopColor="#8f939c" />
+          <stop offset="0" stopColor="#bcbcbc" />
+          <stop offset="0.5" stopColor="#f0f0f0" />
+          <stop offset="1" stopColor="#939393" />
         </linearGradient>
       </defs>
 
       {/* base bracket */}
-      <rect x="26" y="178" width="68" height="16" rx="4" fill="#26272c" />
-      <rect x="26" y="178" width="68" height="4" rx="2" fill="#3a3b42" />
+      <rect x="26" y="178" width="68" height="16" rx="4" fill="#262626" />
+      <rect x="26" y="178" width="68" height="4" rx="2" fill="#3a3a3a" />
       <circle cx="37" cy="186" r="2.6" fill={`url(#${id}-metal)`} />
       <circle cx="83" cy="186" r="2.6" fill={`url(#${id}-metal)`} />
 
@@ -244,7 +244,7 @@ function PedalArt({ variant, idPrefix, className }: { variant: 'brake' | 'gas'; 
           <rect x="99" y="112" width="5" height="54" rx="2.5" fill={`url(#${id}-metal)`} />
           <path
             d="M 96 118 h 11 M 95 126 h 13 M 94 134 h 15 M 95 142 h 13 M 96 150 h 11 M 97 158 h 9"
-            stroke="#6b6e77"
+            stroke="#6e6e6e"
             strokeWidth="3"
             strokeLinecap="round"
             fill="none"
@@ -256,12 +256,12 @@ function PedalArt({ variant, idPrefix, className }: { variant: 'brake' | 'gas'; 
       <path
         d={isBrake ? 'M 46 92 L 74 92 L 80 180 L 40 180 Z' : 'M 49 98 L 71 98 L 77 180 L 43 180 Z'}
         fill={`url(#${id}-carbon)`}
-        stroke="#111216"
+        stroke="#1e1e1e"
         strokeWidth="2"
       />
       {/* pivot */}
-      <circle cx="60" cy={isBrake ? 132 : 136} r="8" fill={`url(#${id}-metal)`} stroke="#43454c" strokeWidth="1.5" />
-      <circle cx="60" cy={isBrake ? 132 : 136} r="3" fill="#565962" />
+      <circle cx="60" cy={isBrake ? 132 : 136} r="8" fill={`url(#${id}-metal)`} stroke="#454545" strokeWidth="1.5" />
+      <circle cx="60" cy={isBrake ? 132 : 136} r="3" fill="#575757" />
 
       {/* face plate */}
       <rect
@@ -271,14 +271,14 @@ function PedalArt({ variant, idPrefix, className }: { variant: 'brake' | 'gas'; 
         height={face.h}
         rx="10"
         fill={`url(#${id}-carbon)`}
-        stroke="#0d0e12"
+        stroke="#1e1e1e"
         strokeWidth="2.5"
       />
       {/* accent strip along the top edge */}
       <rect x={face.x + 7} y={face.y + 6} width={face.w - 14} height="5" rx="2.5" fill={accent} />
       {/* grip bars */}
       {gripYs.map((y) => (
-        <rect key={y} x={face.x + 12} y={y} width={face.w - 24} height="6" rx="3" fill="#3b3d45" />
+        <rect key={y} x={face.x + 12} y={y} width={face.w - 24} height="6" rx="3" fill="#3b3b3b" />
       ))}
       {/* corner bolts */}
       {[
@@ -287,7 +287,7 @@ function PedalArt({ variant, idPrefix, className }: { variant: 'brake' | 'gas'; 
         [face.x + 9, face.y + face.h - 9],
         [face.x + face.w - 9, face.y + face.h - 9],
       ].map(([cx, cy]) => (
-        <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="3" fill={`url(#${id}-metal)`} stroke="#43454c" />
+        <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="3" fill={`url(#${id}-metal)`} stroke="#454545" />
       ))}
     </svg>
   );
@@ -352,7 +352,7 @@ function Pedal({
       <PedalArt
         variant={variant}
         idPrefix="pedal"
-        className={`mx-auto h-16 w-auto drop-shadow-[0_6px_10px_rgba(6,12,60,0.5)] transition-transform duration-100 sm:h-28 wide:h-[clamp(6rem,30vh,10rem)] ${
+        className={`mx-auto h-16 w-auto drop-shadow-[0_6px_10px_rgba(30,30,30,0.5)] transition-transform duration-100 sm:h-28 wide:h-[clamp(6rem,30vh,10rem)] ${
           held ? '[transform:perspective(360px)_rotateX(22deg)] origin-bottom' : ''
         }`}
       />
@@ -392,7 +392,7 @@ function DutchFlag({ className }: { className?: string }) {
 function EventCard({ roundLabel }: { roundLabel: string }) {
   return (
     <div className="hidden flex-col items-center gap-3 wide:flex">
-      <DutchFlag className="h-14 w-14 drop-shadow-[0_4px_10px_rgba(0,0,0,0.35)]" />
+      <DutchFlag className="h-14 w-14 drop-shadow-[0_4px_10px_rgba(30,30,30,0.35)]" />
       <div className="rounded-full bg-white px-7 py-2 text-xl font-extrabold text-[#1e1e1e] shadow-lg xl:text-2xl">
         Circuit Zandvoort
       </div>
@@ -408,7 +408,7 @@ function EventCard({ roundLabel }: { roundLabel: string }) {
 // Visual keycap for the keyboard explainer in the intro modal.
 function Key({ children }: { children: React.ReactNode }) {
   return (
-    <kbd className="inline-block min-w-7 rounded-md border border-ink/15 bg-white px-1.5 py-0.5 text-center text-xs font-extrabold text-ink shadow-[0_2px_0_rgba(11,20,64,0.15)]">
+    <kbd className="inline-block min-w-7 rounded-md border border-ink/15 bg-white px-1.5 py-0.5 text-center text-xs font-extrabold text-ink shadow-[0_2px_0_rgba(30,30,30,0.15)]">
       {children}
     </kbd>
   );
@@ -447,7 +447,7 @@ const DIAGRAM_DIFF_STRIPS = [
   { leftPct: 54, widthPct: 2 },
   { leftPct: 62, widthPct: 6 },
 ];
-const DIAGRAM_DIFF_COLOR = '#0b1440';
+const DIAGRAM_DIFF_COLOR = '#1e1e1e';
 
 function DiagramZoneBar({ label, segments }: { label: string; segments: { color: string; widthPct: number }[] }) {
   return (
@@ -470,7 +470,7 @@ function ScoreDiagram() {
         <DiagramZoneBar label="Jij" segments={DIAGRAM_PLAYER_SEGMENTS} />
         <div className="flex items-center gap-2">
           <span className="w-8 shrink-0" />
-          <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-[#0b1440]/10">
+          <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-[#1e1e1e]/10">
             {DIAGRAM_DIFF_STRIPS.map((strip) => (
               <span
                 key={strip.leftPct}
@@ -485,7 +485,7 @@ function ScoreDiagram() {
         <span className="font-extrabold text-emerald-600">Groen</span> = vol gas,{' '}
         <span className="font-extrabold text-[#c77b0a]">oranje</span> = uitrollen,{' '}
         <span className="font-extrabold text-[#e61f15]">rood</span> = remmen. De{' '}
-        <span className="font-extrabold text-[#0b1440]">donkerblauwe</span> vakjes in de onderste strook markeren waar
+        <span className="font-extrabold text-[#1e1e1e]">donkerblauwe</span> vakjes in de onderste strook markeren waar
         jij iets anders deed dan Max, daar verlies je punten.
       </p>
     </div>
@@ -780,7 +780,7 @@ function App() {
           is never dimmed or blurred by a backdrop; pointer-events-none keeps
           it from swallowing clicks on a card corner it may overlap. */}
       <div className="pointer-events-none absolute top-0 left-4 z-[60] sm:left-8 wide:left-10">
-        <div className="bg-white px-[18px] pt-[12px] pb-[15px] rounded-b-[10px] shadow-[0_6px_24px_rgba(6,12,60,0.45)] inline-block">
+        <div className="bg-white px-[18px] pt-[12px] pb-[15px] rounded-b-[10px] shadow-[0_6px_24px_rgba(30,30,30,0.45)] inline-block">
           <NOSLogo className="w-12 h-auto text-white fill-current" />
         </div>
       </div>
@@ -859,7 +859,7 @@ function App() {
             {/* verdict banner (round result) */}
             <div
               inert={!verdict || undefined}
-              className={`absolute inset-x-3 top-3 mx-auto max-w-md rounded-2xl px-5 py-3 text-center shadow-lg transition-all duration-500 ${verdict ? 'opacity-100 translate-y-0' : 'pointer-events-none opacity-0 -translate-y-2'} ${TONE_STYLES[verdict?.tone ?? 'okay']}`}
+              className={`absolute inset-x-3 top-3 mx-auto w-fit max-w-md rounded-2xl px-5 py-3 text-center shadow-lg transition-all duration-500 ${verdict ? 'opacity-100 translate-y-0' : 'pointer-events-none opacity-0 -translate-y-2'} ${TONE_STYLES[verdict?.tone ?? 'okay']}`}
             >
               <h2 className="text-lg font-extrabold sm:text-xl">{verdict?.title}</h2>
               {lastResult && (
@@ -949,7 +949,7 @@ function App() {
                 />
               </div>
               <button
-                {...layer(showRoundResult, `${BTN_LIGHT} w-full max-w-sm px-8 py-4 text-lg sm:text-xl`)}
+                {...layer(showRoundResult, `${BTN_LIGHT} px-8 py-4 text-lg sm:text-xl`)}
                 ref={nextBtnRef}
                 type="button"
                 onClick={isLastRound ? showFinal : nextRound}
@@ -973,7 +973,7 @@ function App() {
           aria-modal="true"
           aria-labelledby="intro-title"
           inert={!(phase === 'intro' && !hideIntroChrome) || undefined}
-          className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-ink/70 px-4 pb-4 pt-16 backdrop-blur-[3px] sm:pt-4 transition-all duration-500 ${phase === 'intro' && !hideIntroChrome ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+          className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-track-blue/85 px-4 pb-4 pt-16 backdrop-blur-[3px] sm:pt-4 transition-all duration-500 ${phase === 'intro' && !hideIntroChrome ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
           <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:max-w-md sm:p-10">
             <HeroCar className="mx-auto h-9 w-auto sm:h-12" />
@@ -1028,7 +1028,7 @@ function App() {
               ref={introBtnRef}
               type="button"
               onClick={startGame}
-              className={`${BTN_RED} mt-5 w-full px-6 py-4 text-lg sm:mt-6`}
+              className={`${BTN_RED} mt-5 px-6 py-4 text-lg sm:mt-6`}
             >
               Naar de Tarzanbocht
             </button>
@@ -1041,7 +1041,7 @@ function App() {
           aria-modal="true"
           aria-labelledby="final-title"
           inert={!(phase === 'finished' && !showShared) || showScoreInfo || undefined}
-          className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-ink/60 px-4 pb-4 pt-16 backdrop-blur-[2px] sm:pt-4 transition-all duration-700 ${phase === 'finished' && !showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+          className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-track-blue/80 px-4 pb-4 pt-16 backdrop-blur-[2px] sm:pt-4 transition-all duration-700 ${phase === 'finished' && !showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
           <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:max-w-md sm:p-10">
             <h2 id="final-title" className="text-sm font-extrabold uppercase tracking-wide text-[#e61f15]">
@@ -1061,13 +1061,13 @@ function App() {
               ))}
             </ul>
             {runContext && savedScores.best && (
-              <div className="mb-3 grid grid-cols-2 gap-2 text-left sm:mb-4">
+              <div className="mb-3 grid grid-cols-1 gap-2 text-left min-[360px]:grid-cols-2 sm:mb-4">
                 <div className="rounded-2xl bg-[#f3f3f0] px-3 py-2">
                   <p className="text-[10px] font-extrabold uppercase tracking-wide text-[#1e1e1e]/50">Beste score</p>
                   <p className="text-xl font-extrabold tabular-nums text-[#1e1e1e]">
                     {savedScores.best.total}
                     {runContext.isNewBest && (
-                      <span className="ml-2 rounded-full bg-emerald-500 px-2 py-0.5 align-middle text-[10px] font-extrabold text-white">
+                      <span className="ml-2 whitespace-nowrap rounded-full bg-emerald-500 px-2 py-0.5 align-middle text-[10px] font-extrabold text-white">
                         nieuw record!
                       </span>
                     )}
@@ -1091,10 +1091,10 @@ function App() {
               </p>
             )}
             <div className="flex flex-col gap-2">
-              <button ref={shareBtnRef} type="button" onClick={share} className={`${BTN_RED} w-full px-6 py-3`}>
+              <button ref={shareBtnRef} type="button" onClick={share} className={`${BTN_RED} px-6 py-3`}>
                 {copied ? 'Link gekopieerd!' : 'Deel je score'}
               </button>
-              <button type="button" onClick={restart} className={`${BTN_DARK} w-full px-6 py-3`}>
+              <button type="button" onClick={restart} className={`${BTN_DARK} px-6 py-3`}>
                 Nog een keer
               </button>
             </div>
@@ -1102,7 +1102,7 @@ function App() {
               ref={scoreInfoOpenRef}
               type="button"
               onClick={() => setShowScoreInfo(true)}
-              className="mx-auto mt-3 block rounded text-xs font-bold text-ink/60 underline underline-offset-2 transition-colors hover:text-ink focus-ring focus-ring-dark"
+              className="mx-auto mt-3 block rounded text-xs font-bold text-ink/60 underline underline-offset-2 transition-colors hover:text-ink focus-ring focus-ring-ink"
             >
               Hoe wordt je score berekend?
             </button>
@@ -1116,7 +1116,7 @@ function App() {
           aria-modal="true"
           aria-labelledby="score-info-title"
           inert={!showScoreInfo || undefined}
-          className={`fixed inset-0 z-50 backdrop-carbon flex overflow-y-auto bg-ink/70 px-4 pb-4 pt-16 backdrop-blur-[3px] sm:pt-4 transition-all duration-300 ${showScoreInfo ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+          className={`fixed inset-0 z-50 backdrop-carbon flex overflow-y-auto bg-track-blue/85 px-4 pb-4 pt-16 backdrop-blur-[3px] sm:pt-4 transition-all duration-300 ${showScoreInfo ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
           <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-left text-ink shadow-2xl sm:max-w-md sm:p-8">
             <h2 id="score-info-title" className="text-sm font-extrabold uppercase tracking-wide text-[#e61f15]">
@@ -1167,7 +1167,7 @@ function App() {
               ref={scoreInfoCloseRef}
               type="button"
               onClick={() => setShowScoreInfo(false)}
-              className={`${BTN_RED} mt-5 w-full px-6 py-3`}
+              className={`${BTN_RED} mt-5 px-6 py-3`}
             >
               Terug naar je score
             </button>
@@ -1180,7 +1180,7 @@ function App() {
           aria-modal="true"
           aria-labelledby="shared-title"
           inert={!showShared || undefined}
-          className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-ink/60 px-4 pb-4 pt-16 backdrop-blur-[2px] sm:pt-4 transition-all duration-500 ${showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+          className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-track-blue/80 px-4 pb-4 pt-16 backdrop-blur-[2px] sm:pt-4 transition-all duration-500 ${showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
           <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:max-w-md sm:p-8">
             <h2 id="shared-title" className="text-sm font-extrabold uppercase tracking-wide text-[#e61f15]">
@@ -1201,7 +1201,7 @@ function App() {
             <p className="mb-5 text-sm font-bold sm:mb-6">
               Iemand daagt je uit: rem jij net zo laat als Max Verstappen op Zandvoort?
             </p>
-            <button ref={sharedBtnRef} type="button" onClick={restart} className={`${BTN_RED} w-full px-6 py-3`}>
+            <button ref={sharedBtnRef} type="button" onClick={restart} className={`${BTN_RED} px-6 py-3`}>
               Speel zelf
             </button>
           </div>

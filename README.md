@@ -126,6 +126,17 @@ for how the pieces fit together; the rules below are about how to change them.
   rounds (or drive them with Playwright); for race-line/geometry work, follow
   the verification criteria in the
   [Hugenholtz playbook](docs/DEVELOPMENT.md#repairing-a-race-line-with-gps-data-gaps-the-hugenholtz-playbook).
+- **Three brand colors, no fourth.** Blue is only `#284bbe` (NOS
+  _blueSportBlauw_) or `#3ca0ff`; black is only `#1e1e1e`; red stays NOS red.
+  Light blue is ~2.8:1 on white, so it is decoration (hatch, water, accents)
+  and never text on a light surface. The full rule, including the deliberate
+  exceptions (the Dutch flag's official colors, the photo-sampled scenery
+  greys, the brake/coast/throttle signal colors), lives in
+  [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#brand-palette).
+- **Pills, badges and buttons hug their label.** They are sized by their
+  content (`BTN_BASE` carries `w-fit`), never stretched to the container, so
+  the rounded end starts right after the text. Progress bars, cards and the
+  pedals are the exceptions: those are meant to fill their width.
 - **User-facing copy is Dutch; code, comments, docs and commit messages are
   English.** Keep new UI strings consistent with the existing verdict/copy
   tone in [scoring.ts](src/lib/scoring.ts) and [App.tsx](src/App.tsx). Never

@@ -10,18 +10,21 @@ const GRAVEL_FROM_M = ROAD_WIDTH_M / 2 + 3.5;
 const GRAVEL_TO_M = GRAVEL_FROM_M + 26;
 const GREEN_BAND_M = 110; // grass corridor around the track, F1 TV map style
 
-// Sampled from the aerial/broadcast photos in docs/corners: medium-gray
-// asphalt with a lighter worn line, paved beige-gray run-offs, khaki dune
-// sand with olive scrub, muted grass banks. Curbs are white + NOS red
-// (docs/colors.ts redNosRood) per design.
-// The flat/coast/brake colors shared by every phase-colored line: the canvas
-// ribbons (CircuitScene), the practice corridor and the shared-score mini map.
+// The flat/coast/brake colors shared by every phase-colored line: Max's
+// dashed reference line, the player's line (CircuitScene) and the on-map
+// legend swatches (App).
 export const PHASE_COLOR: Record<'flat' | 'coast' | 'brake', string> = {
   flat: '#12a37f',
   coast: '#f2a11c',
   brake: '#e61f15',
 };
 
+// Sampled from the aerial/broadcast photos in docs/corners: medium-gray
+// asphalt with a lighter worn line, paved beige-gray run-offs, khaki dune
+// sand with olive scrub, muted grass banks. Curbs are white + NOS red
+// (docs/colors.ts redNosRood) per design. Water is the one place the scene
+// carries brand blue: the two allowed blues double as shallow (light) and
+// deep (dark) water.
 const PALETTE = {
   sand: '#d8cdb2',
   sandLight: '#e4dbc6',
@@ -36,9 +39,12 @@ const PALETTE = {
   paddock: '#aaa8a4',
   white: '#ffffff',
   curbRed: '#e61f15', // redNosRood
-  water: '#8fb8d4',
+  // Light blue, but let down onto the sand/grass underneath: at full strength
+  // the palette blue makes the lakes glow brighter than the car and the race
+  // line. The shoreline stroke is the dark blue, reading as deeper water.
+  water: 'rgba(60, 160, 255, 0.72)',
   bush: '#4c7d46',
-  waterEdge: '#7aa6c4',
+  waterEdge: '#284bbe',
   beach: '#efe4c3',
 };
 
@@ -782,7 +788,7 @@ export function drawMapLabel(
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
   ctx.lineWidth = 4;
-  ctx.strokeStyle = '#0b1440';
+  ctx.strokeStyle = '#1e1e1e';
   ctx.strokeText(label, screenX, screenY);
   ctx.fillStyle = PALETTE.white;
   ctx.fillText(label, screenX, screenY);
