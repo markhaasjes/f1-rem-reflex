@@ -18,6 +18,10 @@ function isEmbedded(): boolean {
   }
 }
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>{isEmbedded() ? <EmbedPoster /> : <App />}</StrictMode>,
-);
+const embedded = isEmbedded();
+// Marks the document so the poster page can be locked to the frame: see
+// `.is-embed` in index.css. Set before the first render so there is never a
+// frame where the host shows a scrollbar.
+if (embedded) document.documentElement.classList.add('is-embed');
+
+createRoot(document.getElementById('root')!).render(<StrictMode>{embedded ? <EmbedPoster /> : <App />}</StrictMode>);

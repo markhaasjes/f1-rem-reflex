@@ -586,10 +586,22 @@ launch. Its copy (and the checked facts behind it) live in
 [docs/embed-test-article.md](embed-test-article.md), quotes and the lead photo
 left as marked placeholders rather than invented.
 
-The one thing worth re-testing there after any change to EmbedPoster: click the
-poster inside the frame and confirm the **top-level** URL becomes the game, not
-the frame's. That is the whole point of `target="_top"`, and a frame that
-navigates itself instead looks fine in a screenshot while being broken.
+Two things worth re-testing there after any change to EmbedPoster:
+
+1. **Click the poster and confirm the _top-level_ URL becomes the game**, not
+   the frame's. That is the whole point of `target="_top"`, and a frame that
+   navigates itself instead looks fine in a screenshot while being broken.
+2. **Hover the poster and check the frame cannot scroll.** The first version
+   grew the image 1% on hover, which pushed it past the frame's viewport and
+   gave the embedding article scrollbars - visible only while hovering, so easy
+   to ship. The page now locks itself: `main.tsx` puts `.is-embed` on the
+   document, which sets `height: 100%; overflow: hidden` on html/body/#root and
+   paints the body in the brand blue, and the poster is `object-contain`, so
+   whatever height the host gives the frame the artwork fits inside it and any
+   leftover band matches the art's own field colour. Hover cues on the poster
+   must not change layout: brightness, not transform. Measured across host
+   ratios 16:9, 4:3, 2.13:1 and a 340x220 phone column - zero overflow at rest
+   and while hovering in all four.
 
 ## Share flow
 

@@ -68,6 +68,28 @@ button:disabled {
   );
 }
 
+/* Embedded in an iframe (main.tsx sets this class) the page is a single poster
+   image, and the host decides the frame's height. Lock the document to that
+   height and forbid scrolling, so an embedding article can never show
+   scrollbars around the poster - a hover effect that grew the image by 1% used
+   to be enough to summon them. The background is the artwork's own field
+   colour, so a frame whose ratio is not 16:9 letterboxes invisibly. */
+.is-embed,
+.is-embed body,
+.is-embed #root {
+  height: 100%;
+  overflow: hidden;
+}
+.is-embed body {
+  background: var(--color-track-blue);
+}
+
+/* Draws the focus outline inside the element: on a poster that fills the whole
+   frame, an outset ring would fall outside the clipped viewport. */
+.focus-ring-inset:focus-visible {
+  outline-offset: -6px;
+}
+
 /* Scrollable but without scrollbar chrome. Used on the wide side panel: it
    scrolls for real on landscape phones (touch/wheel keep working), but
    sub-pixel text heights can leave it 1px "scrollable" on desktop, which

@@ -27,14 +27,19 @@ export function EmbedPoster() {
       target="_top"
       rel="noopener"
       aria-label="Speel NOS Rem Reflex, rem jij net zo laat als Max Verstappen?"
-      className="group block focus-ring focus-ring-ink"
+      className="group block h-full w-full focus-ring focus-ring-inset focus-ring-white"
     >
+      {/* object-contain over the brand-blue page: the whole artwork stays
+          visible whatever height the host gives the frame, instead of being
+          cropped or pushing the document into a scroll. The hover cue brightens
+          rather than scales - scaling grew the image past the frame and the
+          article got scrollbars. */}
       <img
         src={POSTER_SRC}
         width={POSTER_WIDTH}
         height={POSTER_HEIGHT}
         alt="Max Verstappen in Red Bull-pak naast het spel NOS Rem Reflex op een telefoon, met de kaart van Circuit Zandvoort."
-        className="block h-auto w-full transition-transform duration-200 group-hover:scale-[1.01]"
+        className="block h-full w-full object-contain transition-[filter] duration-200 group-hover:brightness-110"
       />
     </a>
   );
