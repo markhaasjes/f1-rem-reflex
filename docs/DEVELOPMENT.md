@@ -521,6 +521,12 @@ Rules that keep it that way:
   that could wrap mid-phrase gets `whitespace-nowrap` plus room to sit on one
   line — see the "nieuw record!" badge, which stacks its stat tiles below
   360px rather than breaking in half.
+- **The NOS badge is the way home.** It is a real `<button>` that calls
+  `restart()`, so it works from anywhere: mid-run, from the score card, and
+  from a shared-score landing (where it also strips the `?r=` token). On hover
+  the tab pulls further out of the top edge and warms up, so it reads as
+  pressable. It is deliberately still clickable while a modal is open, which
+  is what makes it a home button rather than decoration.
 - **The NOS badge outranks the modals.** It sits at `z-[60]`, above every
   dialog layer (`z-40`, score explainer `z-50`), so a backdrop never dims or
   blurs the brand, plus `pointer-events-none` so it can't swallow a click.
@@ -544,6 +550,29 @@ Rules that keep it that way:
   side-scrolled, clipping the pedals/CTA on the left. `clip` forbids all
   horizontal scrolling. Keep every panel child narrower than the panel
   (that's also why the wide accuracy card stacks its bars).
+
+## Embedded in an article (iframe)
+
+`main.tsx` decides what to mount by frame context: standalone it renders the
+game, inside an iframe it renders
+[EmbedPoster.tsx](../src/components/EmbedPoster.tsx) - the share art as one
+big link that breaks out to the standalone page. A hold-to-drive game needs
+the whole viewport (pedals, corner map, camera) which a content column cannot
+give it, and a run started in a frame fights the article's scrolling.
+
+This is the pattern NOS already uses for its other games, where the embed is a
+_separate_ static document (a thumbnail linking out, plus a redirect for
+anyone opening that document directly). Here one app covers both cases, which
+keeps a single URL and a single build. The trade-off: an embedding article
+downloads the app bundle to render a poster. If that ever matters, the fix is
+a dynamic `import('./App')` behind the check, so the frame case only pulls the
+poster chunk - deliberately not done yet, because it would put an extra
+round trip in front of every real player.
+
+Two details worth keeping: the link targets **`_top`**, not `_parent`, so a
+CMS that wraps embeds in its own frame cannot end up loading the game into
+that wrapper; and the href is rebuilt from `origin + pathname`, so a stale
+`?r=` share token in the frame's src can never ride along into the article.
 
 ## Share flow
 
@@ -597,9 +626,16 @@ social share, not a leaderboard; don't build trust on it.
   the root `<svg>` (canvas `drawImage` of an SVG without them is unreliable
   across browsers), recolor by fill only, and verify by screenshotting the
   rendered app, not the raw file.
-- `public/images/share.png` is flat art: `magick -strip -colors 64 PNG8:`
-  gives ~80% size reduction with no visible loss; compare candidates before
-  going lower (32 colors banded on the car shading).
+- `public/images/share.png` is the og:image **and** the iframe poster, so it
+  has to match what the game currently looks like - it went stale once
+  already (old dark-navy surface, "poleronde" copy) and shipped that way into
+  social previews. Regenerate it by screenshotting the intro rather than
+  editing art: viewport 1400x875 with `deviceScaleFactor: 1200/1400`, which
+  lands exactly on the 1200x750 the meta tags declare while leaving room for
+  the whole card (a straight 1200x750 viewport clips the CTA now that the copy
+  is longer). Then `magick -strip -colors 64 PNG8:` for ~85% off (517KB ->
+  85KB) with no visible loss; compare candidates before going lower (32 colors
+  banded on the car shading).
 
 ## Verification workflow
 

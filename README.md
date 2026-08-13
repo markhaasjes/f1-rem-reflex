@@ -44,6 +44,9 @@ corner — one continuous map, no separate per-corner artwork.
 - Tailwind CSS v4 (`@tailwindcss/vite`), Effra with Helvetica fallback
 - One Canvas 2D scene for every zoom level (devicePixelRatio capped at 2),
   inline SVG for the hero car
+- Playable on its own page only: embedded in an iframe the app renders a
+  poster that links out (see
+  [Embedded in an article](docs/DEVELOPMENT.md#embedded-in-an-article-iframe))
 - No backend and no runtime network calls: one baked fixture
   (`src/data/zandvoort2025.json`, ~385 KB raw) carries the circuit geometry,
   the full pole lap at 20 Hz and the four rounds.
@@ -93,6 +96,7 @@ src/hooks/useCircuitGame.ts      game state machine (intro/flying/ready/running/
 src/hooks/useCameraFlight.ts     animated camera box (log-space zoom, step queues)
 src/hooks/useElementSize.ts      ResizeObserver hook
 src/components/CircuitScene.tsx  the one canvas scene, own rAF loop (lazy repaint), every zoom level
+src/components/EmbedPoster.tsx   what an iframe gets instead of the game: poster linking out to the page
 src/components/HeroCar.tsx       side-view car for the intro (public/images/auto-zij.svg)
 src/components/NOSLogo.tsx       NOS wordmark used in the app chrome
 src/components/Brand.tsx         shared pill/badge chrome

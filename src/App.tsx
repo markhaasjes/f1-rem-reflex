@@ -794,12 +794,19 @@ function App() {
   return (
     <>
       {/* The NOS badge stays above every modal layer (z-40/z-50) so the brand
-          is never dimmed or blurred by a backdrop; pointer-events-none keeps
-          it from swallowing clicks on a card corner it may overlap. */}
-      <div className="pointer-events-none absolute top-0 left-4 z-[60] sm:left-8 wide:left-10">
-        <div className="bg-white px-[18px] pt-[12px] pb-[15px] rounded-b-[10px] shadow-[0_6px_24px_rgba(30,30,30,0.45)] inline-block">
-          <NOSLogo className="w-12 h-auto text-white fill-current max-[359px]:w-9" />
-        </div>
+          is never dimmed or blurred by a backdrop, and it doubles as the way
+          back to the start: it restarts the flow from anywhere, including
+          mid-run and from the score card. On hover the tab pulls a little
+          further out of the top edge, so it reads as pressable. */}
+      <div className="absolute top-0 left-4 z-[60] sm:left-8 wide:left-10">
+        <button
+          type="button"
+          onClick={restart}
+          aria-label="NOS Rem Reflex, terug naar het begin"
+          className="inline-block rounded-b-[10px] bg-white px-[18px] pt-[12px] pb-[15px] shadow-[0_6px_24px_rgba(30,30,30,0.45)] transition-all duration-150 hover:bg-[#f3f3f0] hover:pb-[19px] hover:shadow-[0_10px_28px_rgba(30,30,30,0.5)] focus-ring focus-ring-ink max-[359px]:px-3 max-[359px]:pb-2.5 max-[359px]:pt-2 max-[359px]:hover:pb-3.5"
+        >
+          <NOSLogo className="w-12 h-auto fill-current text-white max-[359px]:w-9" />
+        </button>
       </div>
       <div className="bg-carbon flex h-svh flex-col items-center gap-3 overflow-hidden px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-white sm:gap-4 sm:px-8 sm:pt-5 wide:px-10 wide:pt-20">
         <Pill className="gap-3 text-base max-[359px]:hidden wide:hidden">{fixture.meta.circuit}</Pill>
