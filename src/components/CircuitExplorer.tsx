@@ -3,6 +3,14 @@ import { useElementSize } from '../hooks/useElementSize';
 import { viewBoxFromCam, type CamBox } from '../hooks/useCameraFlight';
 import { fitProjection } from '../lib/canvas';
 import { CircuitScene, type ResultLine } from './CircuitScene';
+import {
+  CompressIcon,
+  LineModeToggle,
+  MapControlButton,
+  MinusIcon,
+  PlusIcon,
+  WholeCircuitIcon,
+} from './MapControls';
 import { MapLegend, activeLineLabel } from './MapLegend';
 import type { Bounds, LineMode, ZandvoortFixture } from '../types';
 
@@ -185,8 +193,6 @@ export function CircuitExplorer({
   }, []);
 
   const lastRound = resultLines.at(-1)?.round ?? fixture.rounds[0];
-  const buttonClass =
-    'grid h-12 w-12 place-items-center rounded-full bg-white/95 text-xl font-extrabold text-ink shadow-lg transition-colors hover:bg-white focus-ring focus-ring-ink';
 
   return (
     <div role="dialog" aria-modal="true" aria-label={title} className="fixed inset-0 z-50 flex flex-col bg-carbon">
@@ -216,43 +222,14 @@ export function CircuitExplorer({
           />
         </div>
 
-        {/* Controls float over the map: line toggle top-right, zoom bottom-right,
-            both clear of the badge in the top-left corner. */}
-        <div className="pointer-events-none absolute inset-0 p-3 sm:p-4">
-          <div className="pointer-events-auto absolute right-3 top-3 flex items-center gap-2 sm:right-4 sm:top-4">
-            <LineModeToggle mode={lineMode} onChange={onLineModeChange} />
-            <button ref={closeRef} type="button" onClick={onClose} aria-label="Kaart sluiten" className={buttonClass}>
-              <span aria-hidden="true">&times;</span>
-            </button>
-          </div>
-
-          {/* Colour key, tucked under the NOS badge in the top-left: the lines
-              here mean exactly what they mean in the game. */}
-          <div className="absolute left-3 top-16 sm:left-4 sm:top-20">
-            <MapLegend activeLine={activeLineLabel(true, lineMode, false)} align="start" />
-          </div>
-
-          <div className="pointer-events-auto absolute bottom-3 right-3 flex flex-col gap-2 sm:bottom-4 sm:right-4">
-            <button type="button" onClick={() => zoomAt(1 / ZOOM_STEP)} aria-label="Inzoomen" className={buttonClass}>
-              <span aria-hidden="true">+</span>
-            </button>
-            <button type="button" onClick={() => zoomAt(ZOOM_STEP)} aria-label="Uitzoomen" className={buttonClass}>
-              <span aria-hidden="true">&minus;</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setBox(overviewBox)}
-              aria-label="Hele circuit tonen"
-              className={`${buttonClass} text-base`}
-            >
-              <span aria-hidden="true">⤢</span>
-            </button>
-          </div>
-
-          {/* Above the canvas scale bar, which the scene draws in this same
-              bottom-left corner. On its own pill because the text sits over the
-              map: white on dark asphalt reads, white on sand does not. */}
-          <p className="absolute bottom-11 left-3 max-w-[13rem] rounded-lg bg-ink/75 px-2 py-1 text-sm font-bold text-white sm:bottom-12 sm:left-4 sm:max-w-[30rem] sm:text-base">
+        {/* One chrome for both maps (see MAP_CHROME in App.tsx): controls stack
+            up from the bottom-right corner with the legend under them, the
+            explanatory text sits top-left under the NOS badge, and the canvas
+            keeps the bottom-left for its scale bar. Every button the game stage
+            also has (the line toggle, the full-screen button) is in exactly the
+            place it is there. */}
+        <div className="pointer-events-none absolute inset-0">
+          <p className="absolute left-3 top-16 max-w-[16rem] rounded-lg bg-ink/75 px-2 py-1 text-sm font-bold text-white sm:left-4 sm:top-20 sm:max-w-[30rem] sm:text-base">
             <span className="sm:hidden">Sleep om te bewegen, knijp om te zoomen.</span>
             <span className="hidden sm:inline">
               Sleep om te bewegen, scroll of <kbd className="rounded bg-white/15 px-1.5">+</kbd>
@@ -260,38 +237,33 @@ export function CircuitExplorer({
               <kbd className="rounded bg-white/15 px-1.5">0</kbd> voor het hele circuit.
             </span>
           </p>
+
+          {/* On a landscape phone the five buttons plus the legend do not fit
+              in one column, so the legend steps beside them (same corner, one
+              row) exactly like it does on the game stage. */}
+          <div className="absolute bottom-2 right-2 flex flex-col items-end gap-2 sm:bottom-3 sm:right-3 short:flex-row-reverse">
+            <div className="pointer-events-auto flex flex-col items-end gap-2">
+              <LineModeToggle mode={lineMode} onChange={onLineModeChange} />
+              <MapControlButton label="Inzoomen" onClick={() => zoomAt(1 / ZOOM_STEP)}>
+                <PlusIcon />
+              </MapControlButton>
+              <MapControlButton label="Uitzoomen" onClick={() => zoomAt(ZOOM_STEP)}>
+                <MinusIcon />
+              </MapControlButton>
+              <MapControlButton label="Hele circuit tonen" onClick={() => setBox(overviewBox)}>
+                <WholeCircuitIcon />
+              </MapControlButton>
+              {/* Same slot, same size as the button that opened this view, so
+                  full screen is one button that toggles rather than two that
+                  have to be found separately. */}
+              <MapControlButton label="Volledig scherm sluiten" onClick={onClose} buttonRef={closeRef}>
+                <CompressIcon />
+              </MapControlButton>
+            </div>
+            <MapLegend activeLine={activeLineLabel(true, lineMode, false)} />
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-/** Which line is on the track. Both sit on the same path, so this is a real
- * either/or: the active side is filled in and marked for screen readers. */
-export function LineModeToggle({ mode, onChange }: { mode: LineMode; onChange: (mode: LineMode) => void }) {
-  const option = (value: LineMode, label: string) => {
-    const active = mode === value;
-    return (
-      <button
-        type="button"
-        onClick={() => onChange(value)}
-        aria-pressed={active}
-        className={`rounded-full px-3 py-1.5 text-sm font-extrabold transition-colors focus-ring focus-ring-ink sm:text-base ${
-          active ? 'bg-ink text-white' : 'text-ink/70 hover:text-ink'
-        }`}
-      >
-        {label}
-      </button>
-    );
-  };
-  return (
-    <div
-      role="group"
-      aria-label="Welke lijn op de baan"
-      className="flex items-center gap-1 rounded-full bg-white/95 p-1 shadow-lg"
-    >
-      {option('max', 'Max')}
-      {option('player', 'Jij')}
     </div>
   );
 }

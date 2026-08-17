@@ -13,19 +13,15 @@ const PHASES: { phase: DrivingPhase; short: string; full: string }[] = [
 
 export function MapLegend({
   activeLine,
-  align = 'end',
 }: {
   /** Which line is currently drawn, spelled out. Null while no result line is
    * on the map (a scoring round in progress), when the row is left off. */
   activeLine: { short: string; full: string } | null;
-  align?: 'start' | 'end';
 }) {
   return (
-    <div
-      className={`flex flex-col gap-0.5 rounded-lg bg-white/95 px-2 py-1 shadow sm:gap-1.5 sm:rounded-2xl sm:px-4 sm:py-2.5 ${
-        align === 'end' ? 'items-end' : 'items-start'
-      }`}
-    >
+    // Right-aligned: the legend lives at the bottom-right of every map, under
+    // the control stack, and its rows line up with the buttons above it.
+    <div className="flex flex-col items-end gap-0.5 rounded-lg bg-white/95 px-2 py-1 shadow sm:gap-1.5 sm:rounded-2xl sm:px-4 sm:py-2.5">
       <div className="flex items-center gap-1.5 sm:gap-3">
         {PHASES.map((row) => (
           <span key={row.phase} className="flex items-center gap-1">

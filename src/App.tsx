@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pill } from './components/Brand';
-import { CircuitExplorer, LineModeToggle } from './components/CircuitExplorer';
+import { CircuitExplorer } from './components/CircuitExplorer';
 import { CircuitScene, type ResultLine } from './components/CircuitScene';
+import { ExpandIcon, LineModeToggle, MapControlButton } from './components/MapControls';
 import { MapLegend, activeLineLabel } from './components/MapLegend';
 import { HeroCar } from './components/HeroCar';
 import { NOSLogo } from './components/NOSLogo';
@@ -865,26 +866,6 @@ function App() {
               showScaleBar={!legendVisible}
             />
 
-            {/* Result controls, bottom-left of the stage: which line is drawn
-                and the way into the full-screen map. Bottom-left because the
-                verdict banner owns the top, the legend the bottom-right, and
-                the canvas hides its scale bar while the legend is up. Only up
-                once there is a result to look at. */}
-            <div
-              inert={!showResultControls || undefined}
-              className={`absolute bottom-3 left-3 flex items-center gap-2 transition-opacity duration-300 short:wide:bottom-24 ${showResultControls ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
-            >
-              <LineModeToggle mode={lineMode} onChange={setLineMode} />
-              <button
-                type="button"
-                onClick={() => setExploreOpen(true)}
-                aria-label="Bekijk de baan op volledig scherm"
-                className="grid h-10 w-10 place-items-center rounded-full bg-white/95 text-base font-extrabold text-ink shadow-lg transition-colors hover:bg-white focus-ring focus-ring-ink sm:h-12 sm:w-12"
-              >
-                <span aria-hidden="true">⤢</span>
-              </button>
-            </div>
-
             {/* Practice marker: the deck label says "Oefenbocht" too, but the
                 player is looking at the circuit, so the stage carries its own
                 unmissable badge in NOS yellow while the practice corner is
@@ -899,20 +880,37 @@ function App() {
               <span className="text-sm font-bold text-ink/70 sm:text-base">telt niet mee</span>
             </div>
 
-            {/* Bottom-right stack, same on every viewport: the map legend hugs
-                the corner and the live speed badge sits directly above it.
-                The speed is positioned against this wrapper's top edge
-                (bottom-full) instead of being a flex sibling, so it can fade
-                in and out without leaving a gap when hidden, and the stack
-                holds whether the legend shows one row (scoring rounds) or two
-                (Max's line on screen). The canvas scale bar keeps the
-                bottom-left and yields while the legend is up. */}
+            {/* Bottom-right stack, same on every viewport and the same stack
+                the full-screen map builds (MAP_CHROME): controls first, legend
+                under them, hugging the corner. The live speed badge and the
+                result controls share the slot above the legend - they are
+                never on screen at the same time - and both are positioned
+                against this wrapper's top edge (bottom-full) instead of being
+                flex siblings, so they fade in and out without leaving a gap,
+                and the stack holds whether the legend shows one row (scoring
+                rounds) or two (Max's line on screen). The canvas scale bar
+                keeps the bottom-left and yields while the legend is up. */}
             <div className="pointer-events-none absolute bottom-2 right-2 sm:bottom-3 sm:right-3">
               <div
                 aria-hidden={liveSpeed === null}
                 className={`absolute bottom-full right-0 mb-1.5 whitespace-nowrap rounded-full bg-white/95 px-4 py-1.5 font-extrabold tabular-nums text-ink shadow transition-opacity duration-300 sm:mb-2 sm:text-lg ${liveSpeed === null ? 'opacity-0' : 'opacity-100'}`}
               >
                 {liveSpeed ?? 0} km/u
+              </div>
+
+              {/* Which line is drawn and the way into the full-screen map.
+                  Only up once there is a result to look at. On a landscape
+                  phone the stage is ~230px tall, so there the controls step to
+                  the left of the legend instead of stacking on top of it -
+                  same corner, one row instead of a column. */}
+              <div
+                inert={!showResultControls || undefined}
+                className={`pointer-events-auto absolute bottom-full right-0 mb-1.5 flex flex-col items-end gap-2 transition-opacity duration-300 sm:mb-2 short:bottom-0 short:right-full short:mb-0 short:mr-2 short:flex-row short:items-end ${showResultControls ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+              >
+                <LineModeToggle mode={lineMode} onChange={setLineMode} hint={showResultControls} />
+                <MapControlButton label="Bekijk de baan op volledig scherm" onClick={() => setExploreOpen(true)}>
+                  <ExpandIcon />
+                </MapControlButton>
               </div>
 
               <div
