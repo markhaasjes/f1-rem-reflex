@@ -158,10 +158,13 @@ export function LineModeToggle({
       {calloutVisible && (
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute bottom-full right-0 mb-2 whitespace-nowrap rounded-full bg-white px-3 py-1.5 text-sm font-bold text-ink shadow-lg transition-opacity sm:text-base"
+          // Wraps rather than running off: the callout hangs above a toggle
+          // that is itself near the right edge of a stage only ~356px wide on
+          // a landscape phone, so a single nowrap line would leave the screen.
+          className="pointer-events-none absolute bottom-full right-0 mb-2 w-max max-w-[13rem] rounded-2xl bg-white px-3 py-1.5 text-left text-sm font-bold leading-snug text-ink shadow-lg transition-opacity sm:text-base short:left-0 short:right-auto"
         >
           Wissel tussen jouw lijn en die van Max
-          <span className="absolute right-6 top-full -mt-1 h-2 w-2 rotate-45 bg-white" />
+          <span className="absolute right-6 top-full -mt-1 h-2 w-2 rotate-45 bg-white short:left-6 short:right-auto" />
         </span>
       )}
       <div
