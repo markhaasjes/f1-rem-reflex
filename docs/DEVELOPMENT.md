@@ -801,26 +801,29 @@ social share, not a leaderboard; don't build trust on it.
   depend on. **Type in it is sized for the worst case**: an article lead
   shrinks ~4x on a 390px phone, so nothing under ~40px survives - that is why
   the credit and date lines moved out of the artwork and into the figcaption.
-- **One artwork for the poster and the social preview.**
-  `public/images/nos-rem-reflex-spel-max-verstappen-zandvoort-formule-1.webp`
-  is both the iframe poster (EmbedPoster) and the `og:image`/`twitter:image`
-  in [index.html](../index.html), so the embed and every shared link show the
-  same thing. The filename is deliberately descriptive rather than functional
-  ("share" was in it once and is worth nothing in image search): brand,
-  product, what it is, who is in it, where, which sport.
+- **One artwork for the poster and the social preview, served from the CDN.**
+  `https://static.nos.nl/img/f1-zandvoort-rem-en-gas/thumb.webp` (1200x675,
+  ~215KB) is both the iframe poster (EmbedPoster) and the
+  `og:image`/`twitter:image` in [index.html](../index.html), so the embed and
+  every shared link show the same thing from one place, and reworking the art
+  is a CDN upload instead of a redeploy. The trade is that the filename no
+  longer does any SEO work - `thumb.webp` under a product path, where the
+  shipped copy was deliberately descriptive (brand, product, what it is, who
+  is in it, where, which sport), which is what image search reads.
 - **Served art is a derivative; masters live in `docs/art/`.** The promo
-  masters are 6000x4500 and 8000x4500 (5.6-6.3MB), far too heavy to ship:
-  `public/images` carries a 1600px wide WebP (~160KB, still crisp at 2x in an
-  article column) and `docs/art` keeps both masters, ratio in the filename.
+  masters are 6000x4500 and 8000x4500 (5.6-6.3MB), far too heavy to ship or to
+  put on the CDN: what is served is a 1200px wide WebP, still crisp at 2x in an
+  article column, and `docs/art` keeps both masters, ratio in the filename.
   Anything dropped straight into `public/` is deployed as-is, so check its
   weight before committing.
 - **The promo art is 16:9 for a reason.** A 4:3 version shipped first and
   lost its top strip - NOS logo included - to the ~1.91:1 crop that X and
   Facebook apply to link previews. 16:9 survives that crop, and it is a
-  calmer shape for an embed in a content column too. The served file keeps
-  the same name across that swap, so anything already crawled or shared still
-  resolves. Keep `og:image:width`/`height` in step with the file (1600x900
-  now), and set the embed wrapper's `aspect-ratio` to `16 / 9` to match.
+  calmer shape for an embed in a content column too. Keep
+  `og:image:width`/`height` and `EmbedPoster`'s `POSTER_WIDTH`/`HEIGHT` in step
+  with the file (1200x675 now), and set the embed wrapper's `aspect-ratio` to
+  `16 / 9` to match. Re-uploading over the same CDN URL keeps anything already
+  crawled or shared resolving; a new filename does not.
 - **WebP as og:image** is read by every current scraper, though LinkedIn was
   the last to get there; if a preview ever comes up blank on one platform, a
   JPEG copy of the same art is the answer.

@@ -10,15 +10,17 @@
 // The href drops any query string so a stale share token can never ride along.
 //
 // The poster is the designed promo art (phone mock, "bekijk" CTA, Max in Red
-// Bull kit), resized to 1600x900 from the 8000px master kept in docs/art -
-// crisp on a 2x display in an article column at ~160KB, where the master would
-// have been 6.3MB. Width/height are declared so the frame does not reflow the
-// article while the image loads. The same file is the og:image (index.html),
-// so the embed and every social preview show one artwork; 16:9 is deliberate,
-// since a social card crops to ~1.91:1 and a 4:3 version lost its top strip.
-const POSTER_SRC = '/images/nos-rem-reflex-spel-max-verstappen-zandvoort-formule-1.webp';
-const POSTER_WIDTH = 1600;
-const POSTER_HEIGHT = 900;
+// Bull kit), served from static.nos.nl rather than out of public/ - it is the
+// exact URL used for og:image/twitter:image in index.html, so the embed and
+// every social preview pull one artwork from one place, and swapping the art
+// is a CDN upload rather than a redeploy. Width/height are the file's own
+// 1200x675, declared so the frame does not reflow the article while the image
+// loads; keep them in step with the file, and with the og:image dimensions.
+// 16:9 is deliberate, since a social card crops to ~1.91:1 and a 4:3 version
+// lost its top strip.
+const POSTER_SRC = 'https://static.nos.nl/img/f1-zandvoort-rem-en-gas/thumb.webp';
+const POSTER_WIDTH = 1200;
+const POSTER_HEIGHT = 675;
 
 export function EmbedPoster() {
   return (
