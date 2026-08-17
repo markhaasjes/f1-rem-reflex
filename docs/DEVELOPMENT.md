@@ -577,16 +577,10 @@ that wrapper; and the href is rebuilt from `origin + pathname`, so a stale
 
 ### Testing the embed
 
-[public/embed-test.html](../public/embed-test.html) is an nos.nl-shaped article
-with the real iframe in it, so the embed can be tried in a content column
-instead of a bare frame - locally at `/embed-test.html` and, after a deploy, on
-a phone. It carries a yellow TESTPAGINA banner and `robots: noindex, nofollow`
-because it deliberately looks like an article; delete it before any real
-launch. Its copy (and the checked facts behind it) live in
-[docs/embed-test-article.md](embed-test-article.md), quotes and the lead photo
-left as marked placeholders rather than invented.
-
-Two things worth re-testing there after any change to EmbedPoster:
+An iframe pointing at the dev server, dropped in a content column that is
+roughly article-width, is enough to try the embed for real - a bare frame
+hides both of the failure modes below. Two things worth re-testing after any
+change to EmbedPoster:
 
 1. **Click the poster and confirm the _top-level_ URL becomes the game**, not
    the frame's. That is the whole point of `target="_top"`, and a frame that
@@ -684,9 +678,7 @@ social share, not a leaderboard; don't build trust on it.
   calmer shape for an embed in a content column too. The served file keeps
   the same name across that swap, so anything already crawled or shared still
   resolves. Keep `og:image:width`/`height` in step with the file (1600x900
-  now), and the embed wrapper's `aspect-ratio` too - both
-  [public/embed-test.html](../public/embed-test.html) and the markdown
-  article set `16 / 9`.
+  now), and set the embed wrapper's `aspect-ratio` to `16 / 9` to match.
 - **WebP as og:image** is read by every current scraper, though LinkedIn was
   the last to get there; if a preview ever comes up blank on one platform, a
   JPEG copy of the same art is the answer.
