@@ -64,6 +64,24 @@ npm install
 npm run dev
 ```
 
+## Deploy it
+
+`npm run build`, then upload the **contents** of `dist/` to the S3 bucket under
+the prefix `sport/f1-zandvoort-rem-en-gas/`, which is served as:
+
+```
+https://app.nos.nl/sport/f1-zandvoort-rem-en-gas/index.html
+```
+
+The app therefore runs from a subdirectory, not a domain root. That is why the
+build sets a relative `base` (`vite.config.ts`) and why asset paths in source
+must go through `assetUrl()` rather than starting with a `/` — a root-relative
+path resolves to `app.nos.nl/images/...` and 404s. Since `npm run dev` serves
+at the root, that whole class of bug is invisible locally unless you reproduce
+the prefix. Cache headers, the stale-chunk trap and that reproduction recipe
+are in
+[Deployment](docs/DEVELOPMENT.md#deployment-s3-appnosnl).
+
 ## Data provenance
 
 `src/data/zandvoort2025.json` is produced by
@@ -99,6 +117,7 @@ src/lib/playerInput.ts           the player's pedal timeline: state lookup + col
 src/lib/scoring.ts               zone-match scoring (0-100 share matched) + Dutch verdicts
 src/lib/storage.ts               localStorage persistence for the last run + best run
 src/lib/tips.ts                  turns a round's worst zone into a Dutch coaching tip
+src/lib/assetUrl.ts              URLs for public/ files, resolved against the deploy subdirectory
 src/hooks/useCircuitGame.ts      game state machine (intro/flying/ready/running/result/finished)
 src/hooks/useCameraFlight.ts     animated camera box (log-space zoom, step queues)
 src/hooks/useElementSize.ts      ResizeObserver hook
@@ -119,7 +138,8 @@ src/App.tsx                      layout shell, flow wiring, share flow, copy
 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) covers the internals for anyone
 extending the game: the fixture data shape and pipeline, the detailed game
 flow state machine, the camera system, the rendering pipeline, scoring, the
-share-link format, and a prioritized list of extension points.
+share-link format, how the build is deployed, and a prioritized list of
+extension points.
 
 ## Contributing
 

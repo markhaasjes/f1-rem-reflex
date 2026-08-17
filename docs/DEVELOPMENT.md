@@ -879,12 +879,145 @@ Hard-won additions to that pattern:
   round ids from the fixture (`tarzan`, `hugenholtz`, `bocht9-10`,
   `hansernst`), don't guess them.
 
-## Deployment (Vercel)
+## Deployment (S3, app.nos.nl)
 
-Still a 100%-static SPA — no functions, so Vercel's runtime dials (Fluid
-Compute, Function CPU/Region, Cold Start Prevention) are inert; don't tune
-them. `vercel.json` has the SPA rewrite + cache headers: hashed `/assets/*`
-immutable for a year, `/images/*` 1 hour (`must-revalidate`) so replacing an
-image under the same filename propagates fast. Skew Protection (Project
-Settings) is worth enabling so an open tab doesn't 404 on old chunk hashes
-after a redeploy. Node version (`.nvmrc`) only affects the build.
+`npm run build` writes `dist/`, and the **contents** of `dist/` are uploaded to
+an S3 bucket under the prefix `sport/f1-zandvoort-rem-en-gas/`, which is served
+as:
+
+```
+https://app.nos.nl/sport/f1-zandvoort-rem-en-gas/index.html
+```
+
+There is no CI and no deploy script in the repo: the build is run locally and
+the folder is uploaded by hand. Nothing here talks to AWS, so the bucket name,
+the profile and whether a CDN fronts it are knowledge outside this repo - the
+commands below are the shape of the deploy, with `<bucket>` to fill in.
+
+```bash
+PREFIX=s3://<bucket>/sport/f1-zandvoort-rem-en-gas
+npm run build
+
+# 1. everything on a short TTL. images/ and the favicons keep the same
+#    filenames across builds, so they must never be cached hard.
+aws s3 sync dist/ $PREFIX/ --cache-control 'public, max-age=3600, must-revalidate'
+
+# 2. re-put the hashed bundle: its filenames change every build, so a URL
+#    can never change meaning and a year is safe. `cp` rather than `sync`
+#    because sync skips files it considers unchanged and would leave the
+#    headers from step 1 in place.
+aws s3 cp dist/assets/ $PREFIX/assets/ --recursive \
+  --cache-control 'public, max-age=31536000, immutable'
+
+# 3. the document that names those hashes, last and uncached.
+aws s3 cp dist/index.html $PREFIX/index.html --cache-control 'no-cache'
+```
+
+**`index.html` goes up last**, in its own step, for two reasons. It is the only
+file that names the new chunk hashes, so uploading it first opens a window where
+visitors get a document referencing files that are not there yet. And it is the
+one file that must not be cached: hard-cache it and the next deploy is invisible
+until every cache expires.
+
+What has to land in the bucket is `index.html` **at the root of that prefix**,
+not `dist/index.html`. Dragging the `dist` folder into the S3 console nests it
+one level deeper and every URL silently gains a `/dist`.
+
+Uploaded artifacts: `index.html`, `assets/` (hashed JS+CSS), `images/` (the two
+car SVGs), `favicon.svg`, `favicon.ico`, `apple-touch-icon.png`. Everything in
+`public/` is copied into `dist/` verbatim by Vite, hash-free and unreferenced by
+the import graph - so anything dropped in there is deployed as-is, whether or
+not the app uses it.
+
+### The subdirectory shapes the whole build
+
+The app is not at a domain root. `vite.config.ts` therefore sets `base: './'`,
+which makes every generated URL relative to the document, so the same build
+works under any prefix. Two rules follow, and breaking either is invisible
+until it is live:
+
+- **Never write a root-relative asset path in source.** Vite rewrites the
+  references it can see in `index.html` (favicons, the bundle) to `./`, but a
+  string literal inside a component is copied through untouched. A
+  `'/images/auto-zij.svg'` in a component asks for
+  `app.nos.nl/images/auto-zij.svg` - the domain root, not the app - and 404s.
+  Use [assetUrl()](../src/lib/assetUrl.ts), which prefixes
+  `import.meta.env.BASE_URL`. This was a real bug, fixed after the first S3
+  deploy: the hero car and the canvas car both vanished.
+- **The page must be reached at `.../f1-zandvoort-rem-en-gas/index.html` or
+  with a trailing slash.** Relative URLs resolve against the document, so a
+  bare `.../f1-zandvoort-rem-en-gas` (no slash, no redirect to one) makes `./`
+  mean `/sport/` and every single asset 404s at once. Any static host worth the
+  name redirects to the slash; a CloudFront origin pointed at the REST endpoint
+  rather than the website endpoint does not.
+
+Absolute URLs to other hosts are unaffected and fine: the Effra font on
+`static.nos.nl` (`index.css`) and the poster/`og:image` on
+`static.nos.nl/img/f1-zandvoort-rem-en-gas/thumb.webp`.
+
+### There is no server, so `vercel.json` does nothing here
+
+That file configures Vercel (below), and none of it applies to a bucket. Its
+two jobs have to be done another way, or consciously skipped:
+
+- **The SPA rewrite** (`/(.*)` -> `/index.html`) has no S3 equivalent unless
+  bucket website hosting points its error document at `index.html`, or a
+  CloudFront function does the rewrite. **This does not matter today** - the
+  app has no router, and all its state travels in query params (`?r=`, `?s=`),
+  which never reach the server as a path. It matters the day anyone adds a
+  path-based route: it will work in dev and 404 in production.
+- **Cache headers** are object metadata on S3, set at upload time with
+  `--cache-control` (as above) or by a CloudFront behaviour. Without them S3
+  sends no `Cache-Control` at all and every layer applies its own heuristics.
+  The one that actually bites: a cached `index.html` keeps pointing at the
+  previous build's asset hashes, so a deploy looks like it did nothing, or
+  breaks outright once those files are gone.
+
+If a CDN fronts the bucket, `index.html` needs an invalidation after each
+upload, or the new build is invisible however correct the upload was.
+
+### Do not prune old assets in the same breath
+
+`aws s3 sync --delete` removes the previous build's hashed chunks. A browser
+holding the old `index.html` - or an already-open tab - then requests files
+that no longer exist and the app dies on a chunk load error. This is what
+Vercel's Skew Protection handles for us there and nothing handles here: upload
+the new build **without** `--delete`, and prune stale `assets/` in a separate
+pass later (a lifecycle rule on that prefix does it without anyone
+remembering).
+
+### Reproducing a production-only bug locally
+
+`npm run dev` and `npm run preview` both serve at the domain root, so the
+entire class of subdirectory bugs cannot happen in either. Serve the build from
+a nested path instead - this is the reproduction that matters:
+
+```bash
+npm run build
+mkdir -p /tmp/s3/sport/f1-zandvoort-rem-en-gas
+cp -r dist/. /tmp/s3/sport/f1-zandvoort-rem-en-gas/
+(cd /tmp/s3 && python3 -m http.server 8899)
+open http://localhost:8899/sport/f1-zandvoort-rem-en-gas/index.html
+```
+
+Play a round and watch the network panel: a request for anything at
+`localhost:8899/images/...` or `localhost:8899/assets/...` (no `/sport/`
+prefix) is the bug, and it is the same one that will hit `app.nos.nl`.
+
+For the iframe case, point the frame's `src` at that local subpath URL rather
+than at the dev server, since `EmbedPoster` builds its break-out href from
+`origin + pathname` - correct under a prefix, but only exercised if the prefix
+is there.
+
+### Still on Vercel too
+
+`vercel.json` and the Vercel project remain, useful as a preview/staging
+target: a 100%-static SPA there as well, no functions, so the runtime dials
+(Fluid Compute, Function CPU/Region, Cold Start Prevention) are inert - don't
+tune them. It has the SPA rewrite plus the cache headers described above, and
+Skew Protection (Project Settings) is worth enabling so an open tab doesn't
+404 on old chunk hashes after a redeploy. `.nvmrc` only affects the build.
+
+Note that `canonical` and `og:url` in [index.html](../index.html) still point
+at `f1-rem-reflex.vercel.app`, not at the app.nos.nl URL. For a page that is
+published under NOS that is wrong and worth fixing before it is indexed.
