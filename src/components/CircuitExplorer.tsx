@@ -222,7 +222,10 @@ export function CircuitExplorer({
             also has (the line toggle, the full-screen button) is in exactly the
             place it is there. */}
         <div className="pointer-events-none absolute inset-0">
-          <p className="absolute left-3 top-16 max-w-[16rem] rounded-lg bg-ink/75 px-2 py-1 text-sm font-bold text-white sm:left-4 sm:top-20 sm:max-w-[30rem] sm:text-base">
+          {/* Top-right, opposite the NOS badge: it is the one thing here that
+              is read rather than operated, so it stays clear of the badge on
+              the left and of the control column below it. */}
+          <p className="absolute right-3 top-3 max-w-[16rem] rounded-lg bg-ink/75 px-2 py-1 text-right text-sm text-white sm:right-4 sm:top-4 sm:max-w-[30rem] sm:text-base">
             <span className="sm:hidden">Sleep om te bewegen, knijp om te zoomen.</span>
             <span className="hidden sm:inline">
               Sleep om te bewegen, scroll of <kbd className="rounded bg-white/15 px-1.5">+</kbd>

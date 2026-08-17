@@ -451,7 +451,7 @@ function Key({ children }: { children: React.ReactNode }) {
 // The yellow TIP marker, shared by the ready-screen advice and the score card.
 function TipBadge() {
   return (
-    <span className="mr-1.5 rounded-full bg-[#ffc828] px-2 py-0.5 align-middle text-sm font-extrabold text-[#1e1e1e] sm:text-base">
+    <span className="mr-1.5 rounded-full bg-[#ffc828] px-2 py-0.5 align-middle text-sm font-bold text-[#1e1e1e] sm:text-base">
       Tip
     </span>
   );
@@ -954,12 +954,17 @@ function App() {
               </div>
             </div>
 
-            {/* verdict banner (round result) */}
+            {/* Verdict banner (round result). It owns the top of the stage and
+                the control column owns the bottom-right; on a 320x568 phone the
+                stage is barely 230px tall and the two met in the middle, so
+                there the banner sheds a step of padding and type. */}
             <div
               inert={!verdict || undefined}
-              className={`absolute inset-x-3 top-3 mx-auto w-fit max-w-md rounded-2xl px-5 py-3 text-center shadow-lg transition-all duration-500 ${verdict ? 'opacity-100 translate-y-0' : 'pointer-events-none opacity-0 -translate-y-2'} ${TONE_STYLES[verdict?.tone ?? 'okay']}`}
+              className={`absolute inset-x-3 top-3 mx-auto w-fit max-w-md rounded-2xl px-5 py-3 text-center shadow-lg transition-all duration-500 max-[359px]:px-3 max-[359px]:py-1.5 ${verdict ? 'opacity-100 translate-y-0' : 'pointer-events-none opacity-0 -translate-y-2'} ${TONE_STYLES[verdict?.tone ?? 'okay']}`}
             >
-              <h2 className="font-display text-lg font-extrabold text-white sm:text-xl">{verdict?.title}</h2>
+              <h2 className="font-display text-lg font-extrabold text-white max-[359px]:text-base sm:text-xl">
+                {verdict?.title}
+              </h2>
               {lastResult && (
                 <p className="text-sm text-white/90 sm:text-base">
                   {round.practice ? 'Oefenbocht' : round.label}:{' '}
@@ -978,23 +983,29 @@ function App() {
               pedals/buttons on the left */}
           <div className="scrollbar-hidden contents wide:flex wide:min-h-0 wide:flex-col wide:gap-[clamp(0.75rem,3vh,1.75rem)] wide:overflow-y-auto wide:overflow-x-clip wide:px-1.5">
             <EventCard roundLabel={roundLabel} />
-            <div
-              aria-live="polite"
-              className="grid h-20 place-items-center py-1 text-center sm:h-24 wide:h-auto wide:flex-1"
-            >
+            {/* Fixed height per breakpoint so the canvas never jumps when the
+                layers swap, and tall enough for the tallest layer: the ready
+                block is a pill plus a two-line "Vorige keer: ..." tip, which at
+                h-20 hung over the pedals and collided with the gas pedal's
+                highlight ring on every phone. */}
+            <div aria-live="polite" className="grid h-28 place-items-center py-1 text-center wide:h-auto wide:flex-1">
               <p {...layer(phase === 'flying', 'text-base font-extrabold text-white/85 sm:text-lg')}>
                 Onderweg naar de {round.label}...
               </p>
-              <div {...layer(phase === 'ready', 'flex flex-col items-center gap-3')}>
+              <div {...layer(phase === 'ready', 'flex flex-col items-center gap-2')}>
+                {/* Below 360px the full sentence wraps the pill onto a second
+                    line, which is exactly the height the tip underneath needs. */}
                 <div className="flex items-center gap-2 rounded-full bg-white px-4 py-1.5 shadow-lg">
                   <span className="text-sm font-extrabold text-ink sm:text-base">Houd</span>
                   <span className="rounded-full bg-emerald-500 px-3 py-0.5 text-sm font-extrabold text-white sm:text-base">
                     Gas
                   </span>
-                  <span className="text-sm font-extrabold text-ink sm:text-base">ingedrukt om te starten</span>
+                  <span className="whitespace-nowrap text-sm font-extrabold text-ink sm:text-base">
+                    ingedrukt<span className="hidden min-[360px]:inline"> om te starten</span>
+                  </span>
                 </div>
                 {lastRoundAdvice ? (
-                  <p className="text-base font-bold text-white">
+                  <p className="line-clamp-3 max-w-[22rem] text-sm text-white sm:text-base">
                     <TipBadge />
                     Vorige keer: {lastRoundAdvice}
                   </p>
@@ -1150,7 +1161,7 @@ function App() {
             <p className="font-display text-6xl font-extrabold tabular-nums">{total}</p>
             <p className="mb-3 text-base font-bold text-ink/60">van de 100 punten</p>
             <p className="mb-4 text-base font-bold sm:mb-5">{scoreSentence(total)}</p>
-            <ul className="mb-5 space-y-1 text-left text-sm font-bold sm:mb-6 sm:space-y-1.5 sm:text-base">
+            <ul className="mb-5 space-y-1 text-left text-sm sm:mb-6 sm:space-y-1.5 sm:text-base">
               {results.map((r) => (
                 <li key={r.round.id} className="flex justify-between gap-3">
                   <span className={r.round.practice ? 'text-ink/50' : ''}>
@@ -1182,7 +1193,7 @@ function App() {
               </div>
             )}
             {improvementTip && (
-              <p className="mb-4 text-sm font-bold text-[#1e1e1e]/70 sm:mb-5 sm:text-base">
+              <p className="mb-4 text-sm text-[#1e1e1e]/75 sm:mb-5 sm:text-base">
                 <TipBadge />
                 In de <span className="font-extrabold">{improvementTip.round.label}</span>
                 {adviceForRound(improvementTip)
@@ -1190,11 +1201,14 @@ function App() {
                   : ` valt de meeste winst te halen (${improvementTip.score}/100).`}
               </p>
             )}
-            <div className="flex flex-col gap-2">
-              <button ref={shareBtnRef} type="button" onClick={share} className={`${BTN_RED} px-6 py-3`}>
+            {/* Share and replay are peers, so they sit side by side. They stack
+                again below 360px, where two pills next to each other would each
+                have to break their label over two lines. */}
+            <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
+              <button ref={shareBtnRef} type="button" onClick={share} className={`${BTN_RED} px-5 py-3`}>
                 {copied ? 'Link gekopieerd!' : 'Deel je score'}
               </button>
-              <button type="button" onClick={restart} className={`${BTN_DARK} px-6 py-3`}>
+              <button type="button" onClick={restart} className={`${BTN_DARK} px-5 py-3`}>
                 Nog een keer
               </button>
             </div>
@@ -1238,18 +1252,16 @@ function App() {
                 hij, rolt hij uit of geeft hij vol gas.
               </li>
               <li>
-                Reactietijd krijg je cadeau: zit je bij een overgang maximaal 0,2 seconde naast Max, dan telt dat gewoon
-                als goed.
+                Reactietijd krijg je cadeau: wissel je van pedaal en zit je daarbij maximaal 0,2 seconde naast Max, dan
+                telt dat gewoon als goed. Houd je een pedaal gewoon ingedrukt, dan valt er ook niets goed te praten.
               </li>
               <li>
-                Elke seconde dat je een pedaal ingedrukt houdt waar Max dat niet doet, gaat er weer van dat pedaal af.
-                Gas geven waar Max remt of uitrolt levert dus niets op, het kost je punten: geef je de hele bocht gas,
-                dan blijft er van je gas 0% over.
+                Elke balk zegt hoeveel van Max zijn tijd op dat pedaal jij er ook op stond. Geef je de hele bocht gas,
+                dan staat je gas op 100% en je rem en los op 0%: precies wat je deed.
               </li>
               <li>
-                Per pedaalstand houd je zo een percentage over, de drie balken op je bochtkaart. Die drie worden met
-                elkaar verrekend, dus je moet ze alle drie goed doen: sla je er één over, bijvoorbeeld door nooit te
-                remmen, dan drukt dat je bochtscore hard omlaag.
+                Die drie balken worden met elkaar verrekend, dus je moet ze alle drie goed doen. Gebruik je maar één
+                pedaal, dan blijven er twee op 0 staan en is je bochtscore ook 0.
               </li>
               <li>Je eindscore is het gemiddelde van de drie echte bochten, de oefenbocht telt niet mee.</li>
             </ul>
