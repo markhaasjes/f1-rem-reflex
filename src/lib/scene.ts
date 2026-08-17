@@ -10,6 +10,13 @@ const GRAVEL_FROM_M = ROAD_WIDTH_M / 2 + 3.5;
 const GRAVEL_TO_M = GRAVEL_FROM_M + 26;
 const GREEN_BAND_M = 110; // grass corridor around the track, F1 TV map style
 
+// The two font stacks from index.css, spelled out for canvas: names and
+// badges (corner numbers, corner names, score badges) are set in Effra like
+// every other name in the app, the scale bar is interface chrome and takes
+// the reading font.
+const BADGE_FONT = "Effra, 'Helvetica Neue', Helvetica, Arial, sans-serif";
+const CHROME_FONT = "'Helvetica Neue', Helvetica, Arial, sans-serif";
+
 // The flat/coast/brake colors shared by every phase-colored line: Max's
 // dashed reference line, the player's line (CircuitScene) and the on-map
 // legend swatches (App).
@@ -757,7 +764,7 @@ export function drawCornerBadge(
   let fontPx = 16;
   if (highlight) fontPx = 18;
   else if (minor) fontPx = 12;
-  ctx.font = `800 ${Math.round(fontPx * scale)}px Effra, 'Helvetica Neue', Helvetica, Arial, sans-serif`;
+  ctx.font = `800 ${Math.round(fontPx * scale)}px ${BADGE_FONT}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = PALETTE.white;
@@ -777,7 +784,7 @@ export function drawMapLabel(
   if (alpha <= 0.01) return;
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.font = `800 ${fontPx}px Effra, 'Helvetica Neue', Helvetica, Arial, sans-serif`;
+  ctx.font = `800 ${fontPx}px ${BADGE_FONT}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
   ctx.lineWidth = 4;
@@ -804,7 +811,7 @@ export function drawScoreBadge(
 ) {
   const label = practice ? `${score} · oefen` : `${score}`;
   ctx.save();
-  ctx.font = "800 16px Effra, 'Helvetica Neue', Helvetica, Arial, sans-serif";
+  ctx.font = `800 16px ${BADGE_FONT}`;
   const width = ctx.measureText(label).width + 22;
   const height = 30;
   // Clear of the corner-number badge either way; the caller picks the side the
@@ -843,7 +850,7 @@ export function drawScaleBar(ctx: CanvasRenderingContext2D, projection: ScreenPr
   ctx.moveTo(x + lengthPx, y - 4);
   ctx.lineTo(x + lengthPx, y + 4);
   ctx.stroke();
-  ctx.font = "700 16px Effra, 'Helvetica Neue', Helvetica, Arial, sans-serif";
+  ctx.font = `700 16px ${CHROME_FONT}`;
   ctx.textAlign = 'center';
   ctx.fillStyle = '#5b5648';
   ctx.fillText(`${lengthM} m`, x + lengthPx / 2, y - 9);

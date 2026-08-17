@@ -126,11 +126,11 @@ function parseSharedScore(): SharedScore | null {
 }
 
 // Display config for the three driving phases, in pedal order: brake on the
-// left like the REM pedal, full throttle on the right like the GAS pedal.
+// left like the brake pedal, full throttle on the right like the gas pedal.
 const PHASE_ROWS: { phase: DrivingPhase; label: string; sublabel: string; color: string }[] = [
-  { phase: 'brake', label: 'REM', sublabel: 'remmen', color: '#e61f15' },
-  { phase: 'coast', label: 'LOS', sublabel: 'uitrollen', color: '#f2a11c' },
-  { phase: 'flat', label: 'GAS', sublabel: 'vol gas', color: '#10b981' },
+  { phase: 'brake', label: 'Rem', sublabel: 'remmen', color: '#e61f15' },
+  { phase: 'coast', label: 'Los', sublabel: 'uitrollen', color: '#f2a11c' },
+  { phase: 'flat', label: 'Gas', sublabel: 'vol gas', color: '#10b981' },
 ];
 
 // How well the player matched each of Max's three pedal states, as one card
@@ -178,7 +178,7 @@ function RoundAccuracyCard({ result, layout }: { result: RoundResult; layout: 'r
   if (layout === 'stack') {
     return (
       <div className="w-full max-w-xs rounded-2xl bg-white px-4 py-3 text-left shadow-lg">
-        <p className="text-sm font-extrabold uppercase tracking-wide text-[#1e1e1e]/50 sm:text-base">Gelijk met Max</p>
+        <p className="text-sm font-extrabold tracking-wide text-[#1e1e1e]/50 sm:text-base">Gelijk met Max</p>
         <div className="mt-1.5">
           <AccuracyBarsStack accuracy={result.phaseAccuracy} />
         </div>
@@ -189,7 +189,7 @@ function RoundAccuracyCard({ result, layout }: { result: RoundResult; layout: 'r
   const rows = accuracyRows(result.phaseAccuracy);
   return (
     <div className="rounded-2xl bg-white px-2.5 py-1.5 shadow-lg">
-      <p className="text-left text-sm font-extrabold uppercase tracking-wide text-[#1e1e1e]/50 sm:text-base">
+      <p className="text-left text-sm font-extrabold tracking-wide text-[#1e1e1e]/50 sm:text-base">
         Gelijk met Max
       </p>
       <div className="flex gap-2.5">
@@ -368,7 +368,7 @@ function Pedal({
         className="mt-1 block text-center text-base font-extrabold tracking-widest wide:text-base"
         style={{ color: accent }}
       >
-        {isBrake ? 'REM!' : 'GAS!'}
+        {isBrake ? 'Rem!' : 'Gas!'}
       </span>
       <span aria-hidden="true" className="mt-1 hidden items-center justify-center gap-1 sm:flex">
         <Key>{isBrake ? 'R' : 'G'}</Key>
@@ -401,11 +401,11 @@ function EventCard({ roundLabel }: { roundLabel: string }) {
   return (
     <div className="hidden flex-col items-center gap-3 wide:flex short:wide:hidden">
       <DutchFlag className="h-14 w-14 drop-shadow-[0_4px_10px_rgba(30,30,30,0.35)]" />
-      <div className="rounded-full bg-white px-7 py-2 text-xl font-extrabold text-[#1e1e1e] shadow-lg xl:text-2xl">
+      <div className="font-display rounded-full bg-white px-7 py-2 text-xl font-extrabold text-[#1e1e1e] shadow-lg xl:text-2xl">
         Circuit Zandvoort
       </div>
       <div
-        className={`rounded-full bg-[#1e1e1e] px-5 py-1.5 text-base font-extrabold text-white shadow transition-opacity ${roundLabel ? 'opacity-100' : 'opacity-0'}`}
+        className={`font-display rounded-full bg-[#1e1e1e] px-5 py-1.5 text-base font-extrabold text-white shadow transition-opacity ${roundLabel ? 'opacity-100' : 'opacity-0'}`}
       >
         {roundLabel || '\u00b7'}
       </div>
@@ -426,7 +426,7 @@ function Key({ children }: { children: React.ReactNode }) {
 function TipBadge() {
   return (
     <span className="mr-1.5 rounded-full bg-[#ffc828] px-2 py-0.5 align-middle text-sm font-extrabold text-[#1e1e1e] sm:text-base">
-      TIP
+      Tip
     </span>
   );
 }
@@ -489,7 +489,7 @@ function ScoreDiagram() {
           </div>
         </div>
       </div>
-      <p className="mt-2 text-sm font-bold leading-snug text-[#1e1e1e]/60 sm:text-base">
+      <p className="mt-2 text-sm leading-snug text-[#1e1e1e]/70 sm:text-base">
         <span className="font-extrabold text-emerald-600">Groen</span> = vol gas,{' '}
         <span className="font-extrabold text-[#c77b0a]">oranje</span> = uitrollen,{' '}
         <span className="font-extrabold text-[#e61f15]">rood</span> = remmen. De{' '}
@@ -539,7 +539,7 @@ function App() {
 
   const camera = useCameraFlight(debugCornerBox ?? overviewBox);
   const [shared] = useState(parseSharedScore);
-  // The sharer's overall REM/LOS/GAS bars, recomputed from the timelines in
+  // The sharer's overall Rem/Los/Gas bars, recomputed from the timelines in
   // the link (the displayed scores come from the token itself, so they always
   // match what the sharer saw).
   const sharedAccuracy = useMemo(() => {
@@ -841,7 +841,7 @@ function App() {
           <Pill className="gap-3 text-base">{fixture.meta.circuit}</Pill>
 
           <div
-            className={`rounded-full px-4 py-1 text-sm font-extrabold tracking-wide transition-opacity sm:text-base ${roundLabel ? 'opacity-100' : 'opacity-0'} ${round?.practice ? 'bg-ink/25 text-white' : 'bg-[#e61f15] text-white'}`}
+            className={`font-display rounded-full px-4 py-1 text-sm font-extrabold tracking-wide transition-opacity sm:text-base ${roundLabel ? 'opacity-100' : 'opacity-0'} ${round?.practice ? 'bg-ink/25 text-white' : 'bg-[#e61f15] text-white'}`}
           >
             <span className="min-[360px]:hidden">{roundLabelShort || '·'}</span>
             <span className="hidden min-[360px]:inline">{roundLabel || '·'}</span>
@@ -876,7 +876,7 @@ function App() {
               aria-hidden={!round.practice || phase === 'roundResult'}
               className={`pointer-events-none absolute left-3 top-3 flex items-center gap-2 rounded-full bg-[#ffc828] px-3 py-1.5 shadow transition-opacity duration-300 ${round.practice && (phase === 'flying' || phase === 'ready' || phase === 'running') ? 'opacity-100' : 'opacity-0'}`}
             >
-              <span className="text-sm font-extrabold uppercase tracking-wide text-ink sm:text-base">Oefenbocht</span>
+              <span className="font-display text-sm font-extrabold tracking-wide text-ink sm:text-base">Oefenbocht</span>
               <span className="text-sm font-bold text-ink/70 sm:text-base">telt niet mee</span>
             </div>
 
@@ -928,7 +928,7 @@ function App() {
               inert={!verdict || undefined}
               className={`absolute inset-x-3 top-3 mx-auto w-fit max-w-md rounded-2xl px-5 py-3 text-center shadow-lg transition-all duration-500 ${verdict ? 'opacity-100 translate-y-0' : 'pointer-events-none opacity-0 -translate-y-2'} ${TONE_STYLES[verdict?.tone ?? 'okay']}`}
             >
-              <h2 className="text-lg font-extrabold text-white sm:text-xl">{verdict?.title}</h2>
+              <h2 className="font-display text-lg font-extrabold text-white sm:text-xl">{verdict?.title}</h2>
               {lastResult && (
                 <p className="text-sm text-white/90 sm:text-base">
                   {round.practice ? 'Oefenbocht' : round.label}:{' '}
@@ -958,7 +958,7 @@ function App() {
                 <div className="flex items-center gap-2 rounded-full bg-white px-4 py-1.5 shadow-lg">
                   <span className="text-sm font-extrabold text-ink sm:text-base">Houd</span>
                   <span className="rounded-full bg-emerald-500 px-3 py-0.5 text-sm font-extrabold text-white sm:text-base">
-                    GAS
+                    Gas
                   </span>
                   <span className="text-sm font-extrabold text-ink sm:text-base">ingedrukt om te starten</span>
                 </div>
@@ -996,7 +996,7 @@ function App() {
             </div>
 
             {/* action row: the pedals are the controls from the moment a round
-                is armed - holding GAS on the ready screen is what starts it */}
+                is armed - holding gas on the ready screen is what starts it */}
             <div className="grid h-24 place-items-center sm:h-44 wide:h-auto wide:min-h-[clamp(6rem,34vh,14rem)]">
               <div {...layer(phase === 'ready' || phase === 'running', 'flex w-full max-w-sm gap-4 wide:gap-6')}>
                 <Pedal
@@ -1042,10 +1042,10 @@ function App() {
         >
           <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:max-w-md sm:p-10">
             <HeroCar className="mx-auto h-9 w-auto sm:h-12" />
-            <h1 id="intro-title" className="mt-4 text-xl font-normal leading-tight text-[#1e1e1e] sm:mt-5 sm:text-2xl">
+            <h1 id="intro-title" className="mt-4 font-display text-xl font-normal leading-tight text-[#1e1e1e] sm:mt-5 sm:text-2xl">
               Rem jij net zo laat als <span className="font-extrabold">Max Verstappen</span>?
             </h1>
-            <p className="mt-2 text-base font-bold leading-snug text-ink/70 sm:mt-3">
+            <p className="mt-2 text-base leading-snug text-ink/75 sm:mt-3">
               Rijd zijn echte kwalificatieronde over Zandvoort, ronde {fixture.meta.lapNumber} uit de kwalificatie van
               de {fixture.meta.meetingName} {fixture.meta.year}. Eerst oefenen in de Tarzanbocht, daarna drie bochten
               voor de punten: houd gas en rem precies daar ingedrukt waar Max dat doet.
@@ -1064,16 +1064,16 @@ function App() {
             {/* the two pedals the game is played with; keyboard hints join in
                 on larger screens, touch players just see what to expect */}
             <div className="mt-4 rounded-2xl bg-[#f3f3f0] p-3.5 sm:mt-5 sm:p-5">
-              <p className="text-left text-sm font-extrabold uppercase tracking-wide text-ink/50 sm:text-base">
+              <p className="text-left text-sm font-extrabold tracking-wide text-ink/50 sm:text-base">
                 Zo speel je
               </p>
-              <p className="mt-2 text-left text-base font-bold leading-snug text-ink/60">
+              <p className="mt-2 text-left text-base leading-snug text-ink/70">
                 Houd een pedaal ingedrukt om gas te geven of te remmen, laat beide los om uit te rollen.
               </p>
               <div className="mt-2 flex items-end justify-center gap-10 sm:mt-3 sm:gap-14">
                 <div className="flex flex-col items-center gap-1">
                   <PedalArt variant="brake" idPrefix="intro" className="h-14 w-auto sm:h-20" />
-                  <span className="text-base font-extrabold tracking-widest text-[#e61f15]">REM!</span>
+                  <span className="font-display text-base font-extrabold tracking-widest text-[#e61f15]">Rem!</span>
                   <span aria-hidden="true" className="hidden gap-1 sm:flex">
                     <Key>R</Key>
                     <Key>&larr;</Key>
@@ -1081,7 +1081,7 @@ function App() {
                 </div>
                 <div className="flex flex-col items-center gap-1">
                   <PedalArt variant="gas" idPrefix="intro" className="h-14 w-auto sm:h-20" />
-                  <span className="text-base font-extrabold tracking-widest text-emerald-600">GAS!</span>
+                  <span className="font-display text-base font-extrabold tracking-widest text-emerald-600">Gas!</span>
                   <span aria-hidden="true" className="hidden gap-1 sm:flex">
                     <Key>G</Key>
                     <Key>&rarr;</Key>
@@ -1112,10 +1112,10 @@ function App() {
           className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-track-blue/80 px-4 pb-4 pt-16 backdrop-blur-[2px] sm:pt-4 transition-all duration-700 ${phase === 'finished' && !showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
           <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:max-w-md sm:p-10">
-            <h2 id="final-title" className="text-base font-extrabold uppercase tracking-wide text-[#e61f15]">
+            <h2 id="final-title" className="font-display text-base font-extrabold tracking-wide text-[#e61f15]">
               Jouw eindscore
             </h2>
-            <p className="text-6xl font-extrabold tabular-nums">{total}</p>
+            <p className="font-display text-6xl font-extrabold tabular-nums">{total}</p>
             <p className="mb-3 text-base font-bold text-ink/60">van de 100 punten</p>
             <p className="mb-4 text-base font-bold sm:mb-5">{scoreSentence(total)}</p>
             <ul className="mb-5 space-y-1 text-left text-sm font-bold sm:mb-6 sm:space-y-1.5 sm:text-base">
@@ -1131,10 +1131,10 @@ function App() {
             {runContext && savedScores.best && (
               <div className="mb-3 grid grid-cols-1 gap-2 text-left min-[360px]:grid-cols-2 sm:mb-4">
                 <div className="rounded-2xl bg-[#f3f3f0] px-3 py-2">
-                  <p className="text-sm font-extrabold uppercase tracking-wide text-[#1e1e1e]/50 sm:text-base">
+                  <p className="text-sm font-extrabold tracking-wide text-[#1e1e1e]/50 sm:text-base">
                     Beste score
                   </p>
-                  <p className="text-xl font-extrabold tabular-nums text-[#1e1e1e]">
+                  <p className="font-display text-xl font-extrabold tabular-nums text-[#1e1e1e]">
                     {savedScores.best.total}
                     {runContext.isNewBest && (
                       <span className="ml-2 whitespace-nowrap rounded-full bg-emerald-500 px-2 py-0.5 align-middle text-sm font-extrabold text-white sm:text-base">
@@ -1144,10 +1144,10 @@ function App() {
                   </p>
                 </div>
                 <div className="rounded-2xl bg-[#f3f3f0] px-3 py-2">
-                  <p className="text-sm font-extrabold uppercase tracking-wide text-[#1e1e1e]/50 sm:text-base">
+                  <p className="text-sm font-extrabold tracking-wide text-[#1e1e1e]/50 sm:text-base">
                     Vorige poging
                   </p>
-                  <p className="text-xl font-extrabold tabular-nums text-[#1e1e1e]">
+                  <p className="font-display text-xl font-extrabold tabular-nums text-[#1e1e1e]">
                     {runContext.previousLast ? runContext.previousLast.total : '\u2014'}
                   </p>
                 </div>
@@ -1194,13 +1194,13 @@ function App() {
           className={`fixed inset-0 z-50 backdrop-carbon flex overflow-y-auto bg-track-blue/85 px-4 pb-4 pt-16 backdrop-blur-[3px] sm:pt-4 transition-all duration-300 ${showScoreInfo ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
           <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-left text-ink shadow-2xl sm:max-w-md sm:p-8">
-            <h2 id="score-info-title" className="text-base font-extrabold uppercase tracking-wide text-[#e61f15]">
+            <h2 id="score-info-title" className="font-display text-base font-extrabold tracking-wide text-[#e61f15]">
               Zo werkt je score
             </h2>
             <div className="mt-3">
               <ScoreDiagram />
             </div>
-            <ul className="mt-4 list-disc space-y-2 pl-4 text-base font-bold leading-snug text-[#1e1e1e]/80">
+            <ul className="mt-4 list-disc space-y-2 pl-4 text-base leading-snug text-[#1e1e1e]/80">
               <li>
                 Tijdens de bocht vergelijken we jouw pedalen 20 keer per seconde met de echte telemetrie van Max: remt
                 hij, rolt hij uit of geeft hij vol gas.
@@ -1222,8 +1222,8 @@ function App() {
               <li>Je eindscore is het gemiddelde van de drie echte bochten, de oefenbocht telt niet mee.</li>
             </ul>
             <div className="mt-5 border-t border-ink/10 pt-4">
-              <h3 className="text-base font-extrabold uppercase tracking-wide text-[#1e1e1e]/50">Over dit spel</h3>
-              <p className="mt-2 text-base font-bold leading-snug text-[#1e1e1e]/70">
+              <h3 className="font-display text-base font-extrabold tracking-wide text-[#1e1e1e]/50">Over dit spel</h3>
+              <p className="mt-2 text-base leading-snug text-[#1e1e1e]/75">
                 Dit spel is gemaakt met hulp van AI (Claude). De rijdata is de echte poleronde van Max Verstappen: ronde{' '}
                 {fixture.meta.lapNumber} uit de kwalificatie van de {fixture.meta.meetingName} {fixture.meta.year},
                 opgehaald via{' '}
@@ -1267,16 +1267,16 @@ function App() {
           className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-track-blue/80 px-4 pb-4 pt-16 backdrop-blur-[2px] sm:pt-4 transition-all duration-500 ${showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
           <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:max-w-md sm:p-8">
-            <h2 id="shared-title" className="text-base font-extrabold uppercase tracking-wide text-[#e61f15]">
+            <h2 id="shared-title" className="font-display text-base font-extrabold tracking-wide text-[#e61f15]">
               Gedeelde score
             </h2>
-            <p className="text-6xl font-extrabold tabular-nums">{shared?.total}</p>
+            <p className="font-display text-6xl font-extrabold tabular-nums">{shared?.total}</p>
             <p className="mb-3 text-base font-bold text-ink/60">van de 100 punten</p>
             {/* run links carry the sharer's pedal timelines: their overall
                 accuracy bars are recomputed from them right here */}
             {sharedAccuracy && (
               <div className="mb-4 rounded-2xl bg-[#f3f3f0] px-4 py-3 text-left">
-                <p className="text-sm font-extrabold uppercase tracking-wide text-[#1e1e1e]/50 sm:text-base">
+                <p className="text-sm font-extrabold tracking-wide text-[#1e1e1e]/50 sm:text-base">
                   Gelijk met Max
                 </p>
                 <div className="mt-1.5">

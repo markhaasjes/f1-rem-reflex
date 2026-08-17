@@ -21,7 +21,13 @@
    and #1e1e1e is the only black. The surface is dark, so page-level chrome is
    white (7.3:1) - ink would be 2.3:1 on it. */
 @theme {
-  --font-sans: 'Effra', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  /* Two families, like nos.nl itself: Effra Bold carries the titles and the
+     name badges (the circuit, the corner, the score), Helvetica Neue does the
+     reading and the interface. Effra is only loaded in 700-900, so it used to
+     render every paragraph in bold no matter what weight was asked for; body
+     copy on Helvetica Neue gets its real weights back. */
+  --font-sans: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-display: 'Effra', 'Helvetica Neue', Helvetica, Arial, sans-serif;
 
   --color-track-blue: #294cbd;
   --color-deep-blue: #02118a;

@@ -17,7 +17,7 @@ const MIN_PHASE_S = 0.5;
 
 // A second on the wrong pedal costs a little more than a right second earns.
 // Straight 1:1 subtraction still left "hold the gas through the whole corner"
-// with a positive GAS bar in the windows where Max happens to be flat out for
+// with a positive gas bar in the windows where Max happens to be flat out for
 // more than half the time (Hugenholtz: 18%), which is exactly the free credit
 // the penalty exists to remove. At 1.25 every single-pedal run bottoms out at
 // 0 for that pedal in every corner, while a mirrored lap is untouched.
@@ -55,7 +55,7 @@ export interface RoundResult {
 /** A phase's score as the whole percentage the result card shows: the share of
  * Max's time on this pedal the player matched, *minus* the time they held the
  * pedal where Max did not. Without that second term the bar rewards holding one
- * pedal down: gas through a whole corner used to read GAS 100% (every flat-out
+ * pedal down: gas through a whole corner used to read Gas 100% (every flat-out
  * moment matched) while the player was demonstrably not driving the corner. */
 export function phasePercent(accuracy: PhaseAccuracy): number {
   if (accuracy.totalS === 0) return 0;
@@ -67,7 +67,7 @@ export function phasePercent(accuracy: PhaseAccuracy): number {
 // the player's pedal timeline against Max's telemetry moment by moment.
 //
 // The score is the **geometric** mean of the three per-phase match percentages
-// (the REM/LOS/GAS bars on the result card). Both simpler formulas hand out
+// (the Rem/Los/Gas bars on the result card). Both simpler formulas hand out
 // ~50 points for not playing:
 //
 //   - matched share of *time*: Max is flat out 40-55% of every window, so
@@ -137,7 +137,7 @@ export function scoreRound(round: GameRound, samples: LapSample[], transitions: 
     } else {
       // The mistake is charged to the pedal the player actually held, not to
       // the one they should have been on: "gas where Max brakes" has to cost
-      // GAS points, otherwise gas-through-the-corner keeps a perfect GAS bar.
+      // gas points, otherwise gas-through-the-corner keeps a perfect gas bar.
       phaseAccuracy[playerPhase].wrongS += STEP_S;
       if (zoneWrong) zoneWrong[playerInput] += STEP_S;
     }
