@@ -6,13 +6,12 @@ F1 TV race map, zoom into four corners of Max Verstappen's real pole lap,
 and drive them with held pedals: keep **Gas!** pressed where Max is flat
 out, release everything where he coasts, and hold **Rem!** through his
 braking zones. Your pedal timeline is compared against his real telemetry
-moment by moment. Per pedal state you get a percentage that is net of its own
-mistakes (the time you held that pedal where Max did not is subtracted), and
-the three are multiplied into the corner score, so you have to answer all
-three: one pedal you never use drags the corner down however good the rest
-is, and holding one pedal through the whole corner scores 0. The final score
-is shareable via a link, and the score card explains the whole calculation,
-including an AI-assistance and data-provenance disclaimer.
+moment by moment. Per pedal state you get the share of Max's time on it that
+you matched, and the three are multiplied into the corner score, so you have to
+answer all three: one pedal you never use drags the corner down however good
+the rest is, and holding a single pedal through the whole corner scores 0. The
+final score is shareable via a link, and the score card explains the whole
+calculation, including an AI-assistance and data-provenance disclaimer.
 
 This is a POC for a nos.nl feature around the Dutch Grand Prix, not
 production code.
@@ -24,7 +23,7 @@ production code.
 2. **Tarzanbocht** — practice corner (does not count): Max's brake, coast
    and full-throttle zones run alongside you as a dashed, half-transparent
    colored line, so you can see the telemetry you have to match and tell his
-   guide apart from your own solid trail.
+   guide apart from your own line, which is always solid.
 3. **Gerlach & Hugenholtz** — a double: two braking zones, two returns to
    throttle.
 4. **Bocht 9 & 10** — the slow double after Mastersbocht.

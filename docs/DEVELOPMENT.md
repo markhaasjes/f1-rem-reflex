@@ -75,9 +75,10 @@ Things worth knowing before changing the flow:
 - **Practice does not count.** The Tarzanbocht round (`practice: true`) is
   played and scored like any other and shown on the final card, but
   `totalScore` excludes practice rounds from the overall 0-100. During
-  practice, Max's zones render as a dashed, half-transparent guide line, and
-  that round's line stays dashed on the accumulated results map so it reads as
-  the corner that did not count.
+  practice, **Max's** zones render as a dashed, half-transparent guide line,
+  there and afterwards on the results map; the player's own line is always
+  solid, practice included, since dashing both made them indistinguishable -
+  the one thing the dash exists to prevent.
 - **Held pedals, one 3-state input.** Rem! and Gas! are held, not tapped
   (pointer capture keeps a press alive when the finger drifts off; keyboard
   is keydown/keyup with auto-repeat ignored). The combined state is a single
@@ -381,18 +382,16 @@ step the player's pedal state (from the transition timeline) is compared
 against Max's phase (`classifyAt`: brakeActive → brake, throttle < 95 →
 coast, else flat).
 
-- **Per phase, net of its own mistakes**: a phase's percentage
-  (`phasePercent`, the Rem/Los/Gas bars) is
-  `(matchedS - 1.25 * wrongS) / totalS`, clamped to 0-100, where `matchedS` is
-  the share of Max's time on that pedal the player matched and `wrongS` is the
-  time the player held **that** pedal while Max was doing something else. The
-  mistake is charged to the pedal that was wrong, not to the one that was
-  missed: without that, holding the gas through a whole corner kept a perfect
-  gas bar (every flat-out moment does match) while the player was demonstrably
-  not driving the corner. The penalty is 1.25x rather than 1:1 because at 1:1
-  the gas-only run still kept a positive gas bar (18%) in Hugenholtz, where Max
-  is flat out for more than half the window - exactly the free credit the
-  penalty exists to remove.
+- **Per phase, a plain share**: a phase's percentage (`phasePercent`, the
+  Rem/Los/Gas bars) is `matchedS / totalS` - of the time Max spent on that
+  pedal, how much of it the player was on it too. It reads back as a sentence
+  ("van de tijd dat Max remt, remde jij 0%"), which is the point: a bar
+  describes what the player did, and the round score is where doing only one of
+  the three gets punished. A penalty term lived here briefly
+  (`matched - 1.25 * wrong`), to stop a held pedal collecting a perfect bar; it
+  was treating the symptom of the grace bug below, and it cost the bars their
+  honesty (coasting through a whole corner scored Los 0%, when coasting is
+  exactly what the player did).
 - **Numeric**: the round score is the **geometric** mean of those per-phase
   percentages, rounded per phase first so a 0% bar really does zero the round.
   Both simpler formulas pay out ~50 for not playing, and both were shipped and
@@ -403,16 +402,26 @@ coast, else flat).
   averaging means every phase has to be answered - one pedal you never use
   drags the whole round down however good the other two are. Calibration
   (scripted through the real module, see the verification workflow): mirroring
-  Max's telemetry 120ms late **100**, 250ms late **90**, 400ms late **71**, and
+  Max's telemetry 120ms late **100**, 250ms late **92**, 400ms late **78**, and
   every single-pedal strategy **0** - gas-only, brake-only and touch-nothing
-  alike, each with that pedal's bar reading 0 in every corner. The trade-off is
+  alike. Their bars read back exactly what they did: gas-only is Gas 100 /
+  Los 0 / Rem 0, coast-only is Los 100 with ~3% of gas for the mandatory start
+  press, and two empty bars are what make the round score 0. The trade-off is
   that the player can no longer verify the score by averaging the bars, so the
   explainer modal states both rules in words instead of arithmetic. A step
   counts as matched when the player's state matches Max's phase directly or
   0.2s to either side (`REACTION_GRACE_S`), forgiving reaction lag at zone
-  boundaries; phases shorter than `MIN_PHASE_S` in a window are left out.
-  `totalScore` still averages the scoring rounds' rounded scores (equal round
-  weight, practice excluded).
+  boundaries - **but only when the player actually changed pedal within that
+  window**. Ungated, the grace forgives _Max's_ transitions rather than the
+  player's reaction to them and pays out for pedals that were never touched:
+  coasting through a whole corner scored 20% on the brake bar, because for 0.2s
+  on either side of every braking zone "coast" matched Max's neighbouring
+  phase. Reaction time is a reaction to something; no pedal change, no grace.
+  Phases shorter than `MIN_PHASE_S` in a window are left out. `totalScore`
+  still averages the scoring rounds' rounded scores (equal round weight,
+  practice excluded), and the bars need no penalty term of their own because
+  using the wrong pedal already costs the phase it was stolen from - that is
+  the geometric mean's whole job.
 - **Zones**: the same walk is grouped into contiguous same-phase zones
   (`ZoneResult`: match fraction + the dominant wrong input) and into
   per-phase totals (`phaseAccuracy`: matched, wrong and total seconds), which
@@ -511,9 +520,14 @@ Rules that keep it that way:
 ## Layout invariants (portrait / landscape)
 
 - **Portrait deck never resizes.** The info row and the action row under the
-  stage have _fixed_ heights per breakpoint (`h-20`/`h-24` etc.), so the
-  canvas doesn't jump when phases swap content (ready chips ↔ running hint ↔
-  result). The round-result cards therefore overlay the **stage** on portrait
+  stage have _fixed_ heights (`h-28`/`h-24`), so the canvas doesn't jump when
+  phases swap content (ready chips ↔ running hint ↔ result). The info row is
+  sized for its **tallest** layer, which is the ready block: pill plus a
+  two-line "Vorige keer: ..." tip. At `h-20` that tip hung out of the row and
+  collided with the gas pedal's highlight ring on every phone; the ring reaches
+  ~5px past the button and the pulse another 5, so the tip needs real clearance,
+  not a hairline. Below 360px the start pill drops "om te starten" so it stays
+  one line, and the tip clamps at three lines. The round-result cards therefore overlay the **stage** on portrait
   (`wide:hidden` absolute layer at its bottom edge) instead of living in the
   deck; the deck copy of the cards is `hidden` + `wide:flex`.
 - **Type floor: 14px on phones, 16px from `sm:` up.** Nothing renders below
@@ -554,6 +568,12 @@ Rules that keep it that way:
   button diameter, so they all have the same optical weight, and "hele circuit
   tonen" gets a track-in-a-viewfinder of its own instead of borrowing the
   full-screen arrows.
+- **The banner and the control column share a short stage.** The verdict
+  banner owns the top of the stage, the control column plus legend the
+  bottom-right; on a 320x568 phone the stage is ~230px tall and the two met in
+  the middle. There (`max-[359px]:`) the banner sheds a step of padding and
+  type. Any future growth of the deck rows eats the same 230px, so re-run the
+  sweep at iPhone SE after touching them.
 - **Chrome shrinks by stage size, not by viewport size.** Those two come apart
   on a landscape phone: 844px counts as a roomy screen, but half of it is the
   control panel, so the stage is 356px wide. The roomy legend (259px) plus the
@@ -829,8 +849,8 @@ score 100 on every round; the three lazy strategies are part of the suite,
 because they are what the scoring rules exist to punish: `STRATEGY=fullgas`
 (hold gas, never brake), `STRATEGY=fullbrake` and `STRATEGY=nothing` (release
 everything after the mandatory start press) must each land on **0**, with the
-held pedal's own bar reading 0 in every corner. If any of them drifts, the
-reaction grace, the wrong-pedal penalty, the geometric mean or the transition
+held pedal's bar at 100 and the other two at 0. If any of them drifts, the
+reaction grace, its pedal-change gate, the geometric mean or the transition
 recording broke. Three traps: layered UI
 keeps hidden buttons in the DOM (`opacity-0` + `pointer-events-none`), so
 Playwright's `visible` check passes early — gate on _clickability_, not
