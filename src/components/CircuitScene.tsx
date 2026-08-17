@@ -118,11 +118,11 @@ const LABEL_OFFSETS: Record<string, { dx: number; dy: number }> = {
 // scored line needs no dashes.
 const RESULT_LINE_WIDTH_M = 3.4;
 
-// The practice corner is the exception, in both directions: Max's coaching
-// line runs *next to* the player's own trail while they drive it, and its
-// result stays on the map next to three corners that did count. Dashed and
-// half-transparent says both things at once, "follow this" and "this one is
-// practice", without a second color.
+// Max's line on the practice corner is the exception: there it is a line to
+// follow rather than a result to compare against, and it runs alongside the
+// player's own trail while they drive it. Dashed and half-transparent keeps
+// the two apart - which is also why the player's line is never dashed, not
+// even there.
 const GUIDE_LINE_DASH_M: [number, number] = [6, 4.5];
 const GUIDE_LINE_ALPHA = 0.55;
 
@@ -293,30 +293,24 @@ export function CircuitScene(props: CircuitSceneProps) {
       // went. ---
       for (const result of resultLines) {
         const index = fixture.rounds.indexOf(result.round);
-        // The practice corner stays dashed and faded here too, so a map with
-        // every driven corner on it says at a glance which one did not count.
-        const guide = result.round.practice;
         if (lineMode === 'max') {
-          if (index >= 0) drawMaxLine(ctx, projection, index, guide);
+          // Dashed only where Max's line is a guide: the practice corner, the
+          // one place his line is something to follow rather than a result to
+          // compare against. Everywhere else both lines are solid, and the
+          // toggle plus the legend say which one is on the track.
+          if (index >= 0) drawMaxLine(ctx, projection, index, result.round.practice);
         } else {
-          ctx.save();
-          if (guide) ctx.globalAlpha = GUIDE_LINE_ALPHA;
+          // The player's own line is always solid, practice included: dashing
+          // it too made the two indistinguishable, which is the one thing the
+          // dash exists to prevent.
           for (const segment of buildInputSegments(
             samples,
             result.transitions,
             result.round.tStart,
             result.round.tEnd,
           )) {
-            drawRibbon(
-              ctx,
-              segment.points,
-              PHASE_COLOR[segment.phase],
-              projection,
-              RESULT_LINE_WIDTH_M,
-              guide ? GUIDE_LINE_DASH_M : undefined,
-            );
+            drawRibbon(ctx, segment.points, PHASE_COLOR[segment.phase], projection, RESULT_LINE_WIDTH_M);
           }
-          ctx.restore();
         }
       }
 
