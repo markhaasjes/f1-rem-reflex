@@ -1,3 +1,4 @@
+import { assetUrl } from './assetUrl';
 import type { ScreenProjection } from './canvas';
 
 interface CarDynamics {
@@ -20,7 +21,7 @@ export interface DrawCarOptions {
 // the same footprint the previous path-drawn sprite used, so the size math in
 // CircuitScene (CAR_SCALE, CAR_MIN_LENGTH_PX) keeps meaning what it did.
 export const CAR_ART_LENGTH_UNITS = 37;
-const CAR_IMAGE_URL = '/images/auto-boven.svg';
+const CAR_IMAGE_URL = assetUrl('images/auto-boven.svg');
 const CAR_IMAGE_ASPECT = 102.67 / 278; // viewBox height / width
 
 let carImage: HTMLImageElement | null = null;
