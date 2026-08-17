@@ -88,6 +88,10 @@ export interface ZandvoortFixture {
 
 export type GamePhase = 'intro' | 'flying' | 'ready' | 'running' | 'roundResult' | 'finished';
 
+/** Which of the two lines the result views draw. They share one position on
+ * the track (no offset), so only one can be on screen at a time. */
+export type LineMode = 'max' | 'player';
+
 /** What the player's pedals say at a moment: gas held, brake held, or neither. */
 export type PedalInput = 'gas' | 'brake' | 'coast';
 

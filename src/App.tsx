@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pill } from './components/Brand';
-import { CircuitScene } from './components/CircuitScene';
+import { CircuitExplorer } from './components/CircuitExplorer';
+import { CircuitScene, type ResultLine } from './components/CircuitScene';
+import { ExpandIcon, LineModeToggle, MapControlButton } from './components/MapControls';
+import { MapLegend, activeLineLabel } from './components/MapLegend';
 import { HeroCar } from './components/HeroCar';
 import { NOSLogo } from './components/NOSLogo';
 import fixtureJson from './data/zandvoort2025.json';
@@ -8,7 +11,6 @@ import { boxFromBounds, useCameraFlight, type CamBox } from './hooks/useCameraFl
 import { useCircuitGame } from './hooks/useCircuitGame';
 import { positionAt, sampleAt } from './lib/corner';
 import type { DrivingPhase } from './lib/phases';
-import { PHASE_COLOR } from './lib/scene';
 import {
   aggregatePhaseAccuracy,
   phasePercent,
@@ -21,7 +23,7 @@ import {
 import { decodeRunToken, decodeShareToken, encodeRunToken } from './lib/shareToken';
 import { loadScores, saveRun, type SavedRun, type SavedScores } from './lib/storage';
 import { adviceForRound, adviceForRun } from './lib/tips';
-import type { GamePhase, GameRound, InputTransition, ZandvoortFixture } from './types';
+import type { GamePhase, GameRound, InputTransition, LineMode, ZandvoortFixture } from './types';
 
 const fixture = fixtureJson as unknown as ZandvoortFixture;
 
@@ -47,6 +49,10 @@ function useWideViewport(): boolean {
   return isWide;
 }
 
+// Stable identity so the scene's lazy repaint is not woken by a new empty
+// array on every render.
+const EMPTY_RESULT_LINES: ResultLine[] = [];
+
 const OVERVIEW_PAD_M = 90;
 const OVERVIEW_SEA_PAD_M = 190;
 const ROUND_PAD_M = 55;
@@ -59,6 +65,9 @@ const BTN_BASE =
 const BTN_LIGHT = `${BTN_BASE} focus-ring-ink bg-white text-ink hover:bg-[#f3f3f0] hover:scale-[1.02]`;
 const BTN_RED = `${BTN_BASE} focus-ring-ink bg-[#e61f15] text-white hover:bg-[#ca1a11] hover:scale-[1.02]`;
 const BTN_DARK = `${BTN_BASE} bg-ink text-white hover:bg-track-blue hover:scale-[1.02]`;
+// White on white is invisible, so the third action on the score card is an
+// outlined button instead: red primary, dark secondary, outlined tertiary.
+const BTN_OUTLINE = `${BTN_BASE} focus-ring-ink border-2 border-ink bg-white text-ink hover:bg-[#f3f3f0] hover:scale-[1.02]`;
 
 // The share link carries the sharer's whole run - per-round scores plus the
 // pedal timelines, packed into one short opaque token (~80 characters, see
@@ -120,11 +129,15 @@ function parseSharedScore(): SharedScore | null {
 }
 
 // Display config for the three driving phases, in pedal order: brake on the
-// left like the REM pedal, full throttle on the right like the GAS pedal.
-const PHASE_ROWS: { phase: DrivingPhase; label: string; sublabel: string; color: string }[] = [
-  { phase: 'brake', label: 'REM', sublabel: 'remmen', color: '#e61f15' },
-  { phase: 'coast', label: 'LOS', sublabel: 'uitrollen', color: '#f2a11c' },
-  { phase: 'flat', label: 'GAS', sublabel: 'vol gas', color: '#10b981' },
+// left like the brake pedal, full throttle on the right like the gas pedal.
+// `color` fills the bar, `textColor` writes the label and the percentage: the
+// signal orange and green are 2.1:1 and 2.5:1 on white, so as text they get a
+// darkened version of the same hue (4.7:1 and 5.5:1) while the bar keeps the
+// colour the map uses.
+const PHASE_ROWS: { phase: DrivingPhase; label: string; sublabel: string; color: string; textColor: string }[] = [
+  { phase: 'brake', label: 'Rem', sublabel: 'remmen', color: '#e61f15', textColor: '#e61f15' },
+  { phase: 'coast', label: 'Los', sublabel: 'uitrollen', color: '#f2a11c', textColor: '#a86407' },
+  { phase: 'flat', label: 'Gas', sublabel: 'vol gas', color: '#10b981', textColor: '#047857' },
 ];
 
 // How well the player matched each of Max's three pedal states, as one card
@@ -140,6 +153,13 @@ function accuracyRows(accuracy: RoundResult['phaseAccuracy']) {
   );
 }
 
+// "Gelijk met Max" read as Max's own numbers, so the card now says whose score
+// it is, and the percentages carry the same green/orange/red as the pedal they
+// belong to and as the lines on the map: your gas number is the green of the
+// gas stretches, your brake number the red of the braking zones.
+const ACCURACY_TITLE = 'Jouw score per pedaal';
+const ACCURACY_SUBTITLE = 'hoe vaak deed jij hetzelfde als Max';
+
 // The stacked bars themselves, without card chrome: the wide round-result
 // card and the shared-score landing both render these.
 function AccuracyBarsStack({ accuracy }: { accuracy: RoundResult['phaseAccuracy'] }) {
@@ -149,12 +169,14 @@ function AccuracyBarsStack({ accuracy }: { accuracy: RoundResult['phaseAccuracy'
         <div key={row.phase}>
           <div className="flex items-baseline justify-between gap-2">
             <span>
-              <span className="text-base font-extrabold" style={{ color: row.color }}>
+              <span className="text-base font-extrabold" style={{ color: row.textColor }}>
                 {row.label}
               </span>
-              <span className="ml-1.5 text-sm font-bold text-[#1e1e1e]/45 sm:text-base">{row.sublabel}</span>
+              <span className="ml-1.5 text-sm text-[#1e1e1e]/55 sm:text-base">{row.sublabel}</span>
             </span>
-            <span className="text-base font-extrabold tabular-nums text-[#1e1e1e]">{row.percent}%</span>
+            <span className="text-base font-extrabold tabular-nums" style={{ color: row.textColor }}>
+              {row.percent}%
+            </span>
           </div>
           <div className="relative mt-1 h-2.5 overflow-hidden rounded-full bg-[#ececec]">
             <span
@@ -168,11 +190,21 @@ function AccuracyBarsStack({ accuracy }: { accuracy: RoundResult['phaseAccuracy'
   );
 }
 
+function AccuracyCardTitle({ subtitle = false }: { subtitle?: boolean }) {
+  return (
+    <p className="text-left">
+      <span className="text-sm font-extrabold tracking-wide text-[#1e1e1e] sm:text-base">{ACCURACY_TITLE}</span>
+      {subtitle && <span className="ml-1.5 text-sm text-[#1e1e1e]/55 sm:text-base">{ACCURACY_SUBTITLE}</span>}
+    </p>
+  );
+}
+
 function RoundAccuracyCard({ result, layout }: { result: RoundResult; layout: 'row' | 'stack' }) {
   if (layout === 'stack') {
     return (
       <div className="w-full max-w-xs rounded-2xl bg-white px-4 py-3 text-left shadow-lg">
-        <p className="text-sm font-extrabold uppercase tracking-wide text-[#1e1e1e]/50 sm:text-base">Gelijk met Max</p>
+        <AccuracyCardTitle />
+        <p className="text-left text-sm text-[#1e1e1e]/55 sm:text-base">{ACCURACY_SUBTITLE}</p>
         <div className="mt-1.5">
           <AccuracyBarsStack accuracy={result.phaseAccuracy} />
         </div>
@@ -183,17 +215,17 @@ function RoundAccuracyCard({ result, layout }: { result: RoundResult; layout: 'r
   const rows = accuracyRows(result.phaseAccuracy);
   return (
     <div className="rounded-2xl bg-white px-2.5 py-1.5 shadow-lg">
-      <p className="text-left text-sm font-extrabold uppercase tracking-wide text-[#1e1e1e]/50 sm:text-base">
-        Gelijk met Max
-      </p>
+      <AccuracyCardTitle />
       <div className="flex gap-2.5">
         {rows.map((row) => (
           <div key={row.phase} className="w-20">
             <div className="flex items-baseline justify-between gap-2">
-              <span className="text-sm font-extrabold sm:text-base" style={{ color: row.color }}>
+              <span className="text-sm font-extrabold sm:text-base" style={{ color: row.textColor }}>
                 {row.label}
               </span>
-              <span className="text-sm font-extrabold tabular-nums text-[#1e1e1e] sm:text-base">{row.percent}%</span>
+              <span className="text-sm font-extrabold tabular-nums sm:text-base" style={{ color: row.textColor }}>
+                {row.percent}%
+              </span>
             </div>
             <div className="relative mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#ececec]">
               <span
@@ -344,7 +376,7 @@ function Pedal({
           />
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute -top-2 left-1/2 hidden whitespace-nowrap rounded-full bg-white px-3 py-1 text-base font-extrabold text-[#1e1e1e] shadow-lg [animation:callout-bob_1.6s_ease-in-out_infinite] sm:block"
+            className="pointer-events-none absolute -top-2 left-1/2 hidden whitespace-nowrap rounded-full bg-white px-3 py-1 text-base font-extrabold text-[#1e1e1e] shadow-lg [animation:callout-bob_1.6s_ease-in-out_infinite] wide:block short:wide:hidden"
           >
             Houd ingedrukt!
             <span className="absolute left-1/2 top-full -mt-1 h-2 w-2 -translate-x-1/2 rotate-45 bg-white" />
@@ -362,7 +394,7 @@ function Pedal({
         className="mt-1 block text-center text-base font-extrabold tracking-widest wide:text-base"
         style={{ color: accent }}
       >
-        {isBrake ? 'REM!' : 'GAS!'}
+        {isBrake ? 'Rem!' : 'Gas!'}
       </span>
       <span aria-hidden="true" className="mt-1 hidden items-center justify-center gap-1 sm:flex">
         <Key>{isBrake ? 'R' : 'G'}</Key>
@@ -393,13 +425,13 @@ function DutchFlag({ className }: { className?: string }) {
 // sub-pill). Lives in the control panel on wide screens.
 function EventCard({ roundLabel }: { roundLabel: string }) {
   return (
-    <div className="hidden flex-col items-center gap-3 wide:flex">
+    <div className="hidden flex-col items-center gap-3 wide:flex short:wide:hidden">
       <DutchFlag className="h-14 w-14 drop-shadow-[0_4px_10px_rgba(30,30,30,0.35)]" />
-      <div className="rounded-full bg-white px-7 py-2 text-xl font-extrabold text-[#1e1e1e] shadow-lg xl:text-2xl">
+      <div className="font-display rounded-full bg-white px-7 py-2 text-xl font-extrabold text-[#1e1e1e] shadow-lg xl:text-2xl">
         Circuit Zandvoort
       </div>
       <div
-        className={`rounded-full bg-[#1e1e1e] px-5 py-1.5 text-base font-extrabold text-white shadow transition-opacity ${roundLabel ? 'opacity-100' : 'opacity-0'}`}
+        className={`font-display rounded-full bg-[#1e1e1e] px-5 py-1.5 text-base font-extrabold text-white shadow transition-opacity ${roundLabel ? 'opacity-100' : 'opacity-0'}`}
       >
         {roundLabel || '\u00b7'}
       </div>
@@ -419,8 +451,8 @@ function Key({ children }: { children: React.ReactNode }) {
 // The yellow TIP marker, shared by the ready-screen advice and the score card.
 function TipBadge() {
   return (
-    <span className="mr-1.5 rounded-full bg-[#ffc828] px-2 py-0.5 align-middle text-sm font-extrabold text-[#1e1e1e] sm:text-base">
-      TIP
+    <span className="mr-1.5 rounded-full bg-[#ffc828] px-2 py-0.5 align-middle text-sm font-bold text-[#1e1e1e] sm:text-base">
+      Tip
     </span>
   );
 }
@@ -483,12 +515,12 @@ function ScoreDiagram() {
           </div>
         </div>
       </div>
-      <p className="mt-2 text-sm font-bold leading-snug text-[#1e1e1e]/60 sm:text-base">
-        <span className="font-extrabold text-emerald-600">Groen</span> = vol gas,{' '}
-        <span className="font-extrabold text-[#c77b0a]">oranje</span> = uitrollen,{' '}
+      <p className="mt-2 text-sm leading-snug text-[#1e1e1e]/70 sm:text-base">
+        <span className="font-extrabold text-[#047857]">Groen</span> = vol gas,{' '}
+        <span className="font-extrabold text-[#a86407]">oranje</span> = uitrollen,{' '}
         <span className="font-extrabold text-[#e61f15]">rood</span> = remmen. De{' '}
-        <span className="font-extrabold text-[#1e1e1e]">donkerblauwe</span> vakjes in de onderste strook markeren waar
-        jij iets anders deed dan Max, daar verlies je punten.
+        <span className="font-extrabold text-[#1e1e1e]">zwarte</span> vakjes in de onderste strook markeren waar jij
+        iets anders deed dan Max, daar verlies je punten.
       </p>
     </div>
   );
@@ -533,7 +565,7 @@ function App() {
 
   const camera = useCameraFlight(debugCornerBox ?? overviewBox);
   const [shared] = useState(parseSharedScore);
-  // The sharer's overall REM/LOS/GAS bars, recomputed from the timelines in
+  // The sharer's overall Rem/Los/Gas bars, recomputed from the timelines in
   // the link (the displayed scores come from the token itself, so they always
   // match what the sharer saw).
   const sharedAccuracy = useMemo(() => {
@@ -549,6 +581,11 @@ function App() {
   const [runContext, setRunContext] = useState<{ previousLast: SavedRun | null; isNewBest: boolean } | null>(null);
   const [showShared, setShowShared] = useState(shared !== null);
   const [showScoreInfo, setShowScoreInfo] = useState(false);
+  const [exploreOpen, setExploreOpen] = useState(false);
+  // Which line the result views draw. Starts on the player's own line: after
+  // driving a corner, "what did I do" is the first question, and Max's line is
+  // one tap away.
+  const [lineMode, setLineMode] = useState<LineMode>('player');
   const [copied, setCopied] = useState(false);
   const hideIntroChrome = showShared || debugCornerBox !== null;
 
@@ -589,6 +626,7 @@ function App() {
   const restart = useCallback(() => {
     setShowShared(false);
     setShowScoreInfo(false);
+    setExploreOpen(false);
     setRunContext(null);
     history.replaceState(null, '', location.pathname);
     game.restart();
@@ -601,13 +639,14 @@ function App() {
   // keep the static corner framing.
   //
   // The zoom happens BEFORE the player drives, on the ready screen: the corner
-  // overview holds for a few seconds so they can read the corner, then one
-  // eased dive settles on the parked car, and the run starts already zoomed in
+  // overview holds for a second after the fly-in lands, so the corner registers
+  // as a shape, then one eased dive settles on the parked car and the run
+  // starts already zoomed in
   // (the frame-by-frame follow then takes over from a box it is already on, so
   // there is no jump). Starting early is allowed: a gas press mid-hold flips
   // the phase to `running`, which flies the remaining distance to the car in
   // CHASE_SNAP_MS instead of waiting out the storyboard.
-  const CHASE_HOLD_MS = 2500;
+  const CHASE_HOLD_MS = 1000;
   const CHASE_DIVE_MS = 1600;
   const CHASE_SNAP_MS = 650;
   const isWide = useWideViewport();
@@ -664,7 +703,7 @@ function App() {
     const pedalsLive = phase === 'ready' || phase === 'running';
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (showShared) return;
+      if (showShared || exploreOpen) return;
       if (showScoreInfo) {
         if (event.code === 'Escape') setShowScoreInfo(false);
         return;
@@ -682,6 +721,7 @@ function App() {
       else if (phase === 'roundResult') (isLastRound ? showFinal : nextRound)();
     };
     const onKeyUp = (event: KeyboardEvent) => {
+      if (exploreOpen) return;
       const pedal = pedalForCode(event.code);
       if (pedal) game.setPedal(pedal, false);
     };
@@ -691,7 +731,7 @@ function App() {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
     };
-  }, [phase, showShared, showScoreInfo, game, startGame, nextRound, showFinal, isLastRound]);
+  }, [phase, showShared, showScoreInfo, exploreOpen, game, startGame, nextRound, showFinal, isLastRound]);
 
   // Move keyboard focus along with the flow, so Tab/Enter always lands on the
   // primary action and screen-reader users follow the game without hunting.
@@ -733,6 +773,12 @@ function App() {
     return () => clearTimeout(id);
   }, [phase, showShared]);
 
+  // Everything driven so far, so the map accumulates corner by corner instead
+  // of only ever showing the round just finished.
+  const resultLines = useMemo<ResultLine[]>(
+    () => results.map((r) => ({ round: r.round, transitions: r.transitions, score: r.score })),
+    [results],
+  );
   const total = totalScore(results);
   // What went wrong at this corner last time, shown while the round is armed.
   const lastRoundAdvice = savedScores.last?.advice?.[round.id] ?? null;
@@ -772,6 +818,9 @@ function App() {
   // (dashed = Max, solid = you) only makes sense while both lines can appear.
   const referenceVisible = (round.practice && (phase === 'ready' || phase === 'running')) || showRoundResult;
   const legendVisible = referenceVisible || phase === 'running';
+  // The line toggle and the full-screen button only make sense once a round has
+  // been scored; they stay up on the final card too.
+  const showResultControls = (showRoundResult || phase === 'finished') && resultLines.length > 0;
   const verdict = showRoundResult ? verdictForScore(lastResult.score) : null;
 
   let roundLabel = '';
@@ -798,29 +847,39 @@ function App() {
           back to the start: it restarts the flow from anywhere, including
           mid-run and from the score card. On hover the tab pulls a little
           further out of the top edge, so it reads as pressable. */}
-      <div className="absolute top-0 left-4 z-[60] sm:left-8 wide:left-10">
-        <button
-          type="button"
-          onClick={restart}
-          aria-label="NOS Rem Reflex, terug naar het begin"
-          className="inline-block rounded-b-[10px] bg-white px-[18px] pt-[12px] pb-[15px] shadow-[0_6px_24px_rgba(30,30,30,0.45)] transition-all duration-150 hover:bg-[#f3f3f0] hover:pb-[19px] hover:shadow-[0_10px_28px_rgba(30,30,30,0.5)] focus-ring focus-ring-ink max-[359px]:px-3 max-[359px]:pb-2.5 max-[359px]:pt-2 max-[359px]:hover:pb-3.5"
-        >
-          <NOSLogo className="w-12 h-auto fill-current text-white max-[359px]:w-9" />
-        </button>
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-[60] flex justify-center px-4 sm:px-8 wide:px-10">
+        <div className="w-full max-w-[1600px]">
+          <button
+            type="button"
+            onClick={restart}
+            aria-label="NOS Rem Reflex, terug naar het begin"
+            className="pointer-events-auto inline-block rounded-b-[10px] bg-white px-[18px] pt-[12px] pb-[15px] shadow-[0_6px_24px_rgba(30,30,30,0.45)] transition-all duration-150 hover:bg-[#f3f3f0] hover:pb-[19px] hover:shadow-[0_10px_28px_rgba(30,30,30,0.5)] focus-ring focus-ring-ink max-[359px]:px-3 max-[359px]:pb-2.5 max-[359px]:pt-2 max-[359px]:hover:pb-3.5"
+          >
+            <NOSLogo className="w-12 h-auto fill-current text-white max-[359px]:w-9" />
+          </button>
+        </div>
       </div>
-      <div className="bg-carbon flex h-svh flex-col items-center gap-3 overflow-hidden px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-white sm:gap-4 sm:px-8 sm:pt-5 wide:px-10 wide:pt-20">
-        <Pill className="gap-3 text-base max-[359px]:hidden wide:hidden">{fixture.meta.circuit}</Pill>
+      <div
+        inert={exploreOpen || undefined}
+        className="bg-carbon flex h-svh flex-col items-center gap-3 overflow-hidden px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] text-white sm:gap-4 sm:px-8 sm:pt-5 wide:px-10 wide:pt-20"
+      >
+        {/* Padded clear of the NOS badge on phones: these pills are centred in
+            the column, and at ~360px wide a centred pill reaches under the
+            badge. The padding only shifts the pills, not the stage below. */}
+        <div className="flex w-full flex-col items-center gap-3 pl-[76px] pr-1 sm:gap-4 sm:pl-0 sm:pr-0 wide:hidden">
+          <Pill className="gap-3 text-base">{fixture.meta.circuit}</Pill>
 
-        <div
-          className={`rounded-full px-4 py-1 text-sm font-extrabold tracking-wide transition-opacity sm:text-base wide:hidden ${roundLabel ? 'opacity-100' : 'opacity-0'} ${round?.practice ? 'bg-ink/25 text-white' : 'bg-[#e61f15] text-white'}`}
-        >
-          <span className="min-[360px]:hidden">{roundLabelShort || '·'}</span>
-          <span className="hidden min-[360px]:inline">{roundLabel || '·'}</span>
+          <div
+            className={`font-display rounded-full px-4 py-1 text-sm font-extrabold tracking-wide transition-opacity sm:text-base ${roundLabel ? 'opacity-100' : 'opacity-0'} ${round?.practice ? 'bg-ink/25 text-white' : 'bg-[#e61f15] text-white'}`}
+          >
+            <span className="min-[360px]:hidden">{roundLabelShort || '·'}</span>
+            <span className="hidden min-[360px]:inline">{roundLabel || '·'}</span>
+          </div>
         </div>
 
-        <main className="flex min-h-0 w-full max-w-md flex-1 flex-col gap-3 sm:max-w-2xl lg:max-w-4xl wide:grid wide:w-full wide:max-w-none wide:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)] wide:items-stretch wide:gap-6">
+        <main className="flex min-h-0 w-full max-w-md flex-1 flex-col gap-3 sm:max-w-2xl lg:max-w-4xl wide:grid wide:w-full wide:max-w-[1600px] wide:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)] wide:items-stretch wide:gap-6">
           {/* Stage */}
-          <div className="relative min-h-[13rem] w-full flex-1 overflow-hidden rounded-3xl wide:h-full wide:min-h-[22rem]">
+          <div className="relative min-h-[13rem] w-full flex-1 overflow-hidden rounded-3xl wide:h-full wide:min-h-[min(22rem,60svh)]">
             <CircuitScene
               fixture={fixture}
               camBox={camera.box}
@@ -830,7 +889,9 @@ function App() {
               elapsedT={elapsedT}
               transitions={transitions}
               heldInput={heldInput}
-              showReference={phase === 'roundResult' || phase === 'finished'}
+              resultLines={phase === 'roundResult' || phase === 'finished' ? resultLines : EMPTY_RESULT_LINES}
+              lineMode={lineMode}
+              showScoreBadges={false}
               showScaleBar={!legendVisible}
             />
 
@@ -844,18 +905,22 @@ function App() {
               aria-hidden={!round.practice || phase === 'roundResult'}
               className={`pointer-events-none absolute left-3 top-3 flex items-center gap-2 rounded-full bg-[#ffc828] px-3 py-1.5 shadow transition-opacity duration-300 ${round.practice && (phase === 'flying' || phase === 'ready' || phase === 'running') ? 'opacity-100' : 'opacity-0'}`}
             >
-              <span className="text-sm font-extrabold uppercase tracking-wide text-ink sm:text-base">Oefenbocht</span>
+              <span className="font-display text-sm font-extrabold tracking-wide text-ink sm:text-base">
+                Oefenbocht
+              </span>
               <span className="text-sm font-bold text-ink/70 sm:text-base">telt niet mee</span>
             </div>
 
-            {/* Bottom-right stack, same on every viewport: the map legend hugs
-                the corner and the live speed badge sits directly above it.
-                The speed is positioned against this wrapper's top edge
-                (bottom-full) instead of being a flex sibling, so it can fade
-                in and out without leaving a gap when hidden, and the stack
-                holds whether the legend shows one row (scoring rounds) or two
-                (Max's line on screen). The canvas scale bar keeps the
-                bottom-left and yields while the legend is up. */}
+            {/* Bottom-right stack, same on every viewport and the same stack
+                the full-screen map builds (MAP_CHROME): controls first, legend
+                under them, hugging the corner. The live speed badge and the
+                result controls share the slot above the legend - they are
+                never on screen at the same time - and both are positioned
+                against this wrapper's top edge (bottom-full) instead of being
+                flex siblings, so they fade in and out without leaving a gap,
+                and the stack holds whether the legend shows one row (scoring
+                rounds) or two (Max's line on screen). The canvas scale bar
+                keeps the bottom-left and yields while the legend is up. */}
             <div className="pointer-events-none absolute bottom-2 right-2 sm:bottom-3 sm:right-3">
               <div
                 aria-hidden={liveSpeed === null}
@@ -864,64 +929,42 @@ function App() {
                 {liveSpeed ?? 0} km/u
               </div>
 
-              {/* the three phase colors, plus - when Max's reference line is
-                  on screen - which line is whose. Sized down hard on phones,
-                  where the full-size card covered a third of the corner. */}
+              {/* Which line is drawn and the way into the full-screen map.
+                  Only up once there is a result to look at. On a landscape
+                  phone the stage is ~230px tall, so there the controls step to
+                  the left of the legend instead of stacking on top of it -
+                  same corner, one row instead of a column. */}
+              <div
+                inert={!showResultControls || undefined}
+                className={`pointer-events-auto absolute bottom-full right-0 mb-1.5 flex flex-col items-end gap-2 transition-opacity duration-300 sm:mb-2 short:bottom-0 short:right-full short:mb-0 short:mr-2 short:flex-row short:items-end ${showResultControls ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+              >
+                <LineModeToggle mode={lineMode} onChange={setLineMode} hint={showResultControls} />
+                <MapControlButton label="Bekijk de baan op volledig scherm" onClick={() => setExploreOpen(true)}>
+                  <ExpandIcon />
+                </MapControlButton>
+              </div>
+
               <div
                 aria-hidden={!legendVisible}
-                className={`flex flex-col items-end gap-0.5 rounded-lg bg-white/95 px-2 py-1 shadow transition-opacity duration-300 sm:gap-1.5 sm:rounded-2xl sm:px-4 sm:py-2.5 ${legendVisible ? 'opacity-100' : 'opacity-0'}`}
+                className={`transition-opacity duration-300 ${legendVisible ? 'opacity-100' : 'opacity-0'}`}
               >
-                <div className="flex items-center gap-1.5 sm:gap-3">
-                  {PHASE_ROWS.map((row) => (
-                    <span key={row.phase} className="flex items-center gap-1">
-                      {/* dots use the exact line colors from the map, not the UI accents */}
-                      <span
-                        className="h-1.5 w-1.5 rounded-full sm:h-3.5 sm:w-3.5"
-                        style={{ backgroundColor: PHASE_COLOR[row.phase] }}
-                      />
-                      <span className="text-sm font-extrabold leading-tight text-ink sm:text-base">
-                        <span className="sm:hidden">{row.label.toLowerCase()}</span>
-                        <span className="hidden sm:inline">{row.sublabel}</span>
-                      </span>
-                    </span>
-                  ))}
-                </div>
-                {referenceVisible && (
-                  <div className="flex items-center gap-1.5 border-t border-ink/10 pt-0.5 sm:gap-3 sm:pt-1.5">
-                    <span className="flex items-center gap-1">
-                      {/* dashes, matching how Max's reference line is drawn */}
-                      <span
-                        className="h-1 w-4 sm:h-1.5 sm:w-8"
-                        style={{
-                          backgroundImage: `repeating-linear-gradient(90deg, ${PHASE_COLOR.flat} 0 6px, transparent 6px 10px)`,
-                        }}
-                      />
-                      <span className="text-sm font-extrabold leading-tight text-ink sm:text-base">
-                        <span className="sm:hidden">Max</span>
-                        <span className="hidden sm:inline">lijn van Max</span>
-                      </span>
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <span
-                        className="h-1 w-4 rounded-full sm:h-1.5 sm:w-8"
-                        style={{ backgroundColor: PHASE_COLOR.flat }}
-                      />
-                      <span className="text-sm font-extrabold leading-tight text-ink sm:text-base">
-                        <span className="sm:hidden">jij</span>
-                        <span className="hidden sm:inline">jouw lijn</span>
-                      </span>
-                    </span>
-                  </div>
-                )}
+                <MapLegend
+                  activeLine={activeLineLabel(showResultControls, lineMode, round.practice && phase !== 'roundResult')}
+                />
               </div>
             </div>
 
-            {/* verdict banner (round result) */}
+            {/* Verdict banner (round result). It owns the top of the stage and
+                the control column owns the bottom-right; on a 320x568 phone the
+                stage is barely 230px tall and the two met in the middle, so
+                there the banner sheds a step of padding and type. */}
             <div
               inert={!verdict || undefined}
-              className={`absolute inset-x-3 top-3 mx-auto w-fit max-w-md rounded-2xl px-5 py-3 text-center shadow-lg transition-all duration-500 ${verdict ? 'opacity-100 translate-y-0' : 'pointer-events-none opacity-0 -translate-y-2'} ${TONE_STYLES[verdict?.tone ?? 'okay']}`}
+              className={`absolute inset-x-3 top-3 mx-auto w-fit max-w-md rounded-2xl px-5 py-3 text-center shadow-lg transition-all duration-500 max-[359px]:px-3 max-[359px]:py-1.5 ${verdict ? 'opacity-100 translate-y-0' : 'pointer-events-none opacity-0 -translate-y-2'} ${TONE_STYLES[verdict?.tone ?? 'okay']}`}
             >
-              <h2 className="text-lg font-extrabold text-white sm:text-xl">{verdict?.title}</h2>
+              <h2 className="font-display text-lg font-extrabold text-white max-[359px]:text-base sm:text-xl">
+                {verdict?.title}
+              </h2>
               {lastResult && (
                 <p className="text-sm text-white/90 sm:text-base">
                   {round.practice ? 'Oefenbocht' : round.label}:{' '}
@@ -940,23 +983,29 @@ function App() {
               pedals/buttons on the left */}
           <div className="scrollbar-hidden contents wide:flex wide:min-h-0 wide:flex-col wide:gap-[clamp(0.75rem,3vh,1.75rem)] wide:overflow-y-auto wide:overflow-x-clip wide:px-1.5">
             <EventCard roundLabel={roundLabel} />
-            <div
-              aria-live="polite"
-              className="grid h-20 place-items-center py-1 text-center sm:h-24 wide:h-auto wide:flex-1"
-            >
+            {/* Fixed height per breakpoint so the canvas never jumps when the
+                layers swap, and tall enough for the tallest layer: the ready
+                block is a pill plus a two-line "Vorige keer: ..." tip, which at
+                h-20 hung over the pedals and collided with the gas pedal's
+                highlight ring on every phone. */}
+            <div aria-live="polite" className="grid h-28 place-items-center py-1 text-center wide:h-auto wide:flex-1">
               <p {...layer(phase === 'flying', 'text-base font-extrabold text-white/85 sm:text-lg')}>
                 Onderweg naar de {round.label}...
               </p>
-              <div {...layer(phase === 'ready', 'flex flex-col items-center gap-3')}>
+              <div {...layer(phase === 'ready', 'flex flex-col items-center gap-2')}>
+                {/* Below 360px the full sentence wraps the pill onto a second
+                    line, which is exactly the height the tip underneath needs. */}
                 <div className="flex items-center gap-2 rounded-full bg-white px-4 py-1.5 shadow-lg">
                   <span className="text-sm font-extrabold text-ink sm:text-base">Houd</span>
                   <span className="rounded-full bg-emerald-500 px-3 py-0.5 text-sm font-extrabold text-white sm:text-base">
-                    GAS
+                    Gas
                   </span>
-                  <span className="text-sm font-extrabold text-ink sm:text-base">ingedrukt om te starten</span>
+                  <span className="whitespace-nowrap text-sm font-extrabold text-ink sm:text-base">
+                    ingedrukt<span className="hidden min-[360px]:inline"> om te starten</span>
+                  </span>
                 </div>
                 {lastRoundAdvice ? (
-                  <p className="text-base font-bold text-white">
+                  <p className="line-clamp-3 max-w-[22rem] text-sm text-white sm:text-base">
                     <TipBadge />
                     Vorige keer: {lastRoundAdvice}
                   </p>
@@ -989,7 +1038,7 @@ function App() {
             </div>
 
             {/* action row: the pedals are the controls from the moment a round
-                is armed - holding GAS on the ready screen is what starts it */}
+                is armed - holding gas on the ready screen is what starts it */}
             <div className="grid h-24 place-items-center sm:h-44 wide:h-auto wide:min-h-[clamp(6rem,34vh,14rem)]">
               <div {...layer(phase === 'ready' || phase === 'running', 'flex w-full max-w-sm gap-4 wide:gap-6')}>
                 <Pedal
@@ -1017,7 +1066,7 @@ function App() {
             </div>
 
             {/* keyboard hint (pointer-fine devices only) */}
-            <p className="hidden text-center text-base font-bold text-white/75 sm:block">
+            <p className="hidden text-center text-base font-bold text-white/75 sm:block short:hidden">
               Houd <kbd className="rounded bg-white/10 px-1.5 py-0.5">R</kbd> = rem ·{' '}
               <kbd className="rounded bg-white/10 px-1.5 py-0.5">G</kbd> = gas ·{' '}
               <kbd className="rounded bg-white/10 px-1.5 py-0.5">spatie</kbd> = verder
@@ -1033,12 +1082,15 @@ function App() {
           inert={!(phase === 'intro' && !hideIntroChrome) || undefined}
           className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-track-blue/85 px-4 pb-4 pt-16 backdrop-blur-[3px] sm:pt-4 transition-all duration-500 ${phase === 'intro' && !hideIntroChrome ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
-          <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:max-w-md sm:p-10">
+          <div className="m-auto w-full max-w-md rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:max-w-lg sm:p-10">
             <HeroCar className="mx-auto h-9 w-auto sm:h-12" />
-            <h1 id="intro-title" className="mt-4 text-xl font-normal leading-tight text-[#1e1e1e] sm:mt-5 sm:text-2xl">
+            <h1
+              id="intro-title"
+              className="mt-4 font-display text-xl font-normal leading-tight text-[#1e1e1e] sm:mt-5 sm:text-2xl"
+            >
               Rem jij net zo laat als <span className="font-extrabold">Max Verstappen</span>?
             </h1>
-            <p className="mt-2 text-base font-bold leading-snug text-ink/70 sm:mt-3">
+            <p className="mt-2 text-base leading-snug text-ink/75 sm:mt-3">
               Rijd zijn echte kwalificatieronde over Zandvoort, ronde {fixture.meta.lapNumber} uit de kwalificatie van
               de {fixture.meta.meetingName} {fixture.meta.year}. Eerst oefenen in de Tarzanbocht, daarna drie bochten
               voor de punten: houd gas en rem precies daar ingedrukt waar Max dat doet.
@@ -1057,16 +1109,14 @@ function App() {
             {/* the two pedals the game is played with; keyboard hints join in
                 on larger screens, touch players just see what to expect */}
             <div className="mt-4 rounded-2xl bg-[#f3f3f0] p-3.5 sm:mt-5 sm:p-5">
-              <p className="text-left text-sm font-extrabold uppercase tracking-wide text-ink/50 sm:text-base">
-                Zo speel je
-              </p>
-              <p className="mt-2 text-left text-base font-bold leading-snug text-ink/60">
+              <p className="text-left text-sm font-extrabold tracking-wide text-ink/50 sm:text-base">Zo speel je</p>
+              <p className="mt-2 text-left text-base leading-snug text-ink/70">
                 Houd een pedaal ingedrukt om gas te geven of te remmen, laat beide los om uit te rollen.
               </p>
               <div className="mt-2 flex items-end justify-center gap-10 sm:mt-3 sm:gap-14">
                 <div className="flex flex-col items-center gap-1">
                   <PedalArt variant="brake" idPrefix="intro" className="h-14 w-auto sm:h-20" />
-                  <span className="text-base font-extrabold tracking-widest text-[#e61f15]">REM!</span>
+                  <span className="font-display text-base font-extrabold tracking-widest text-[#e61f15]">Rem!</span>
                   <span aria-hidden="true" className="hidden gap-1 sm:flex">
                     <Key>R</Key>
                     <Key>&larr;</Key>
@@ -1074,7 +1124,7 @@ function App() {
                 </div>
                 <div className="flex flex-col items-center gap-1">
                   <PedalArt variant="gas" idPrefix="intro" className="h-14 w-auto sm:h-20" />
-                  <span className="text-base font-extrabold tracking-widest text-emerald-600">GAS!</span>
+                  <span className="font-display text-base font-extrabold tracking-widest text-emerald-600">Gas!</span>
                   <span aria-hidden="true" className="hidden gap-1 sm:flex">
                     <Key>G</Key>
                     <Key>&rarr;</Key>
@@ -1104,14 +1154,14 @@ function App() {
           inert={!(phase === 'finished' && !showShared) || showScoreInfo || undefined}
           className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-track-blue/80 px-4 pb-4 pt-16 backdrop-blur-[2px] sm:pt-4 transition-all duration-700 ${phase === 'finished' && !showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
-          <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:max-w-md sm:p-10">
-            <h2 id="final-title" className="text-base font-extrabold uppercase tracking-wide text-[#e61f15]">
+          <div className="m-auto w-full max-w-md rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:max-w-lg sm:p-10">
+            <h2 id="final-title" className="font-display text-base font-extrabold tracking-wide text-[#e61f15]">
               Jouw eindscore
             </h2>
-            <p className="text-6xl font-extrabold tabular-nums">{total}</p>
+            <p className="font-display text-6xl font-extrabold tabular-nums">{total}</p>
             <p className="mb-3 text-base font-bold text-ink/60">van de 100 punten</p>
             <p className="mb-4 text-base font-bold sm:mb-5">{scoreSentence(total)}</p>
-            <ul className="mb-5 space-y-1 text-left text-sm font-bold sm:mb-6 sm:space-y-1.5 sm:text-base">
+            <ul className="mb-5 space-y-1 text-left text-sm sm:mb-6 sm:space-y-1.5 sm:text-base">
               {results.map((r) => (
                 <li key={r.round.id} className="flex justify-between gap-3">
                   <span className={r.round.practice ? 'text-ink/50' : ''}>
@@ -1124,10 +1174,8 @@ function App() {
             {runContext && savedScores.best && (
               <div className="mb-3 grid grid-cols-1 gap-2 text-left min-[360px]:grid-cols-2 sm:mb-4">
                 <div className="rounded-2xl bg-[#f3f3f0] px-3 py-2">
-                  <p className="text-sm font-extrabold uppercase tracking-wide text-[#1e1e1e]/50 sm:text-base">
-                    Beste score
-                  </p>
-                  <p className="text-xl font-extrabold tabular-nums text-[#1e1e1e]">
+                  <p className="text-sm font-extrabold tracking-wide text-[#1e1e1e]/50 sm:text-base">Beste score</p>
+                  <p className="font-display text-xl font-extrabold tabular-nums text-[#1e1e1e]">
                     {savedScores.best.total}
                     {runContext.isNewBest && (
                       <span className="ml-2 whitespace-nowrap rounded-full bg-emerald-500 px-2 py-0.5 align-middle text-sm font-extrabold text-white sm:text-base">
@@ -1137,17 +1185,15 @@ function App() {
                   </p>
                 </div>
                 <div className="rounded-2xl bg-[#f3f3f0] px-3 py-2">
-                  <p className="text-sm font-extrabold uppercase tracking-wide text-[#1e1e1e]/50 sm:text-base">
-                    Vorige poging
-                  </p>
-                  <p className="text-xl font-extrabold tabular-nums text-[#1e1e1e]">
+                  <p className="text-sm font-extrabold tracking-wide text-[#1e1e1e]/50 sm:text-base">Vorige poging</p>
+                  <p className="font-display text-xl font-extrabold tabular-nums text-[#1e1e1e]">
                     {runContext.previousLast ? runContext.previousLast.total : '\u2014'}
                   </p>
                 </div>
               </div>
             )}
             {improvementTip && (
-              <p className="mb-4 text-sm font-bold text-[#1e1e1e]/70 sm:mb-5 sm:text-base">
+              <p className="mb-4 text-sm text-[#1e1e1e]/75 sm:mb-5 sm:text-base">
                 <TipBadge />
                 In de <span className="font-extrabold">{improvementTip.round.label}</span>
                 {adviceForRound(improvementTip)
@@ -1155,14 +1201,24 @@ function App() {
                   : ` valt de meeste winst te halen (${improvementTip.score}/100).`}
               </p>
             )}
-            <div className="flex flex-col gap-2">
-              <button ref={shareBtnRef} type="button" onClick={share} className={`${BTN_RED} px-6 py-3`}>
+            {/* Share and replay are peers, so they sit side by side. They stack
+                again below 360px, where two pills next to each other would each
+                have to break their label over two lines. */}
+            <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
+              <button ref={shareBtnRef} type="button" onClick={share} className={`${BTN_RED} px-5 py-3`}>
                 {copied ? 'Link gekopieerd!' : 'Deel je score'}
               </button>
-              <button type="button" onClick={restart} className={`${BTN_DARK} px-6 py-3`}>
+              <button type="button" onClick={restart} className={`${BTN_DARK} px-5 py-3`}>
                 Nog een keer
               </button>
             </div>
+            <button
+              type="button"
+              onClick={() => setExploreOpen(true)}
+              className={`${BTN_OUTLINE} mt-2 w-full px-6 py-3`}
+            >
+              Bekijk je lijnen op de kaart
+            </button>
             <button
               ref={scoreInfoOpenRef}
               type="button"
@@ -1183,32 +1239,35 @@ function App() {
           inert={!showScoreInfo || undefined}
           className={`fixed inset-0 z-50 backdrop-carbon flex overflow-y-auto bg-track-blue/85 px-4 pb-4 pt-16 backdrop-blur-[3px] sm:pt-4 transition-all duration-300 ${showScoreInfo ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
-          <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-left text-ink shadow-2xl sm:max-w-md sm:p-8">
-            <h2 id="score-info-title" className="text-base font-extrabold uppercase tracking-wide text-[#e61f15]">
+          <div className="m-auto w-full max-w-md rounded-3xl bg-white p-6 text-left text-ink shadow-2xl sm:max-w-lg sm:p-8">
+            <h2 id="score-info-title" className="font-display text-base font-extrabold tracking-wide text-[#e61f15]">
               Zo werkt je score
             </h2>
             <div className="mt-3">
               <ScoreDiagram />
             </div>
-            <ul className="mt-4 list-disc space-y-2 pl-4 text-base font-bold leading-snug text-[#1e1e1e]/80">
+            <ul className="mt-4 list-disc space-y-2 pl-4 text-base leading-snug text-[#1e1e1e]/80">
               <li>
                 Tijdens de bocht vergelijken we jouw pedalen 20 keer per seconde met de echte telemetrie van Max: remt
                 hij, rolt hij uit of geeft hij vol gas.
               </li>
               <li>
-                Reactietijd krijg je cadeau: zit je bij een overgang maximaal 0,2 seconde naast Max, dan telt dat gewoon
-                als goed.
+                Reactietijd krijg je cadeau: wissel je van pedaal en zit je daarbij maximaal 0,2 seconde naast Max, dan
+                telt dat gewoon als goed. Houd je een pedaal gewoon ingedrukt, dan valt er ook niets goed te praten.
               </li>
               <li>
-                Per pedaalstand krijg je zo een percentage, de drie balken op je bochtkaart. Die drie worden met elkaar
-                verrekend, dus je moet ze alle drie goed doen: sla je er één over, bijvoorbeeld door nooit te remmen,
-                dan drukt dat je bochtscore hard omlaag.
+                Elke balk zegt hoeveel van Max zijn tijd op dat pedaal jij er ook op stond. Geef je de hele bocht gas,
+                dan staat je gas op 100% en je rem en los op 0%: precies wat je deed.
+              </li>
+              <li>
+                Die drie balken worden met elkaar verrekend, dus je moet ze alle drie goed doen. Gebruik je maar één
+                pedaal, dan blijven er twee op 0 staan en is je bochtscore ook 0.
               </li>
               <li>Je eindscore is het gemiddelde van de drie echte bochten, de oefenbocht telt niet mee.</li>
             </ul>
             <div className="mt-5 border-t border-ink/10 pt-4">
-              <h3 className="text-base font-extrabold uppercase tracking-wide text-[#1e1e1e]/50">Over dit spel</h3>
-              <p className="mt-2 text-base font-bold leading-snug text-[#1e1e1e]/70">
+              <h3 className="font-display text-base font-extrabold tracking-wide text-[#1e1e1e]/50">Over dit spel</h3>
+              <p className="mt-2 text-base leading-snug text-[#1e1e1e]/75">
                 Dit spel is gemaakt met hulp van AI (Claude). De rijdata is de echte poleronde van Max Verstappen: ronde{' '}
                 {fixture.meta.lapNumber} uit de kwalificatie van de {fixture.meta.meetingName} {fixture.meta.year},
                 opgehaald via{' '}
@@ -1251,19 +1310,18 @@ function App() {
           inert={!showShared || undefined}
           className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-track-blue/80 px-4 pb-4 pt-16 backdrop-blur-[2px] sm:pt-4 transition-all duration-500 ${showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
-          <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:max-w-md sm:p-8">
-            <h2 id="shared-title" className="text-base font-extrabold uppercase tracking-wide text-[#e61f15]">
+          <div className="m-auto w-full max-w-md rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:max-w-lg sm:p-8">
+            <h2 id="shared-title" className="font-display text-base font-extrabold tracking-wide text-[#e61f15]">
               Gedeelde score
             </h2>
-            <p className="text-6xl font-extrabold tabular-nums">{shared?.total}</p>
+            <p className="font-display text-6xl font-extrabold tabular-nums">{shared?.total}</p>
             <p className="mb-3 text-base font-bold text-ink/60">van de 100 punten</p>
             {/* run links carry the sharer's pedal timelines: their overall
                 accuracy bars are recomputed from them right here */}
             {sharedAccuracy && (
               <div className="mb-4 rounded-2xl bg-[#f3f3f0] px-4 py-3 text-left">
-                <p className="text-sm font-extrabold uppercase tracking-wide text-[#1e1e1e]/50 sm:text-base">
-                  Gelijk met Max
-                </p>
+                <p className="text-sm font-extrabold tracking-wide text-[#1e1e1e] sm:text-base">Score per pedaal</p>
+                <p className="text-sm text-[#1e1e1e]/55 sm:text-base">hoe vaak deed diegene hetzelfde als Max</p>
                 <div className="mt-1.5">
                   <AccuracyBarsStack accuracy={sharedAccuracy} />
                 </div>
@@ -1278,6 +1336,22 @@ function App() {
           </div>
         </div>
       </div>
+
+      {/* Full-screen results map. A sibling of the game container rather than a
+          child, so that container can be inert while this is open; the NOS
+          badge sits above both at z-[60] and stays clickable. */}
+      {exploreOpen && (
+        <CircuitExplorer
+          fixture={fixture}
+          resultLines={resultLines}
+          lineMode={lineMode}
+          onLineModeChange={setLineMode}
+          initialBox={phase === 'finished' ? overviewBox : roundBoxes[roundIndex]}
+          overviewBox={overviewBox}
+          onClose={() => setExploreOpen(false)}
+          title="Jouw lijnen op Circuit Zandvoort"
+        />
+      )}
     </>
   );
 }

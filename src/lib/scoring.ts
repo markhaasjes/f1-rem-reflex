@@ -5,9 +5,15 @@ import type { GameRound, InputTransition, LapSample, PedalInput } from '../types
 export type ResultTone = 'perfect' | 'good' | 'okay' | 'bad';
 
 // Human reaction lag: a pedal state also counts as matched when it matches
-// Max's phase this far to either side of t, so every zone boundary forgives
-// a fraction of a second of being late (or anticipating) without rewarding a
-// wrong pedal held through a whole zone.
+// Max's phase this far to either side of t, so every zone boundary forgives a
+// fraction of a second of being late (or anticipating).
+//
+// The grace only applies near a pedal change the player actually made. Without
+// that gate it forgives *Max's* transitions instead of the player's reaction to
+// them, and hands out credit for pedals that were never touched: coasting
+// through the whole corner used to score 20% on the brake bar, because for 0.2s
+// on either side of every braking zone "coast" matched Max's neighbouring
+// phase. Reaction time is a reaction to something; no pedal change, no grace.
 const REACTION_GRACE_S = 0.2;
 
 // A phase must fill at least this much of the window to count toward the
@@ -42,7 +48,11 @@ export interface RoundResult {
   score: number;
 }
 
-/** A phase's match share as the whole percentage the result card shows. */
+/** A phase's score as the whole percentage the result card shows: of the time
+ * Max spent on this pedal, how much of it the player was on it too. It reads
+ * back as a plain sentence - "van de tijd dat Max remt, remde jij 0%" - which
+ * is the whole point: a bar is a description of what the player did, and the
+ * round score below is where doing only one of the three gets punished. */
 export function phasePercent(accuracy: PhaseAccuracy): number {
   return accuracy.totalS === 0 ? 0 : Math.round((accuracy.matchedS / accuracy.totalS) * 100);
 }
@@ -51,7 +61,7 @@ export function phasePercent(accuracy: PhaseAccuracy): number {
 // the player's pedal timeline against Max's telemetry moment by moment.
 //
 // The score is the **geometric** mean of the three per-phase match percentages
-// (the REM/LOS/GAS bars on the result card). Both simpler formulas hand out
+// (the Rem/Los/Gas bars on the result card). Both simpler formulas hand out
 // ~50 points for not playing:
 //
 //   - matched share of *time*: Max is flat out 40-55% of every window, so
@@ -62,10 +72,19 @@ export function phasePercent(accuracy: PhaseAccuracy): number {
 //
 // Multiplying instead of averaging means every phase has to be answered: one
 // pedal you never use drags the whole round down, no matter how good the other
-// two are (do-nothing ~33, gas-only ~25), while a genuinely good run barely
-// notices the difference (85/75/80 -> 80, 95/90/95 -> 93). The trade-off is
-// that the player can no longer verify the score by averaging the bars in
-// their head, so the explainer modal describes the rule in words instead.
+// two are, while a genuinely good run barely notices the difference
+// (85/75/80 -> 80, 95/90/95 -> 93). The trade-off is that the player can no
+// longer verify the score by averaging the bars in their head, so the explainer
+// modal describes the rule in words instead.
+//
+// That is also why the bars themselves need no penalty term: using the wrong
+// pedal already costs the phase it was stolen from. Holding gas through the
+// whole corner reads Gas 100% / Los 0% / Rem 0%, which is exactly what
+// happened, and the round still scores 0 because two of the three are empty.
+// Calibration against the fixture (scripted, see the verification workflow):
+// mirroring Max's telemetry with 120ms lag **99**, 250ms **92**, 400ms **78**,
+// and every single-pedal strategy **0** - gas-only, brake-only and
+// touch-nothing alike.
 export function scoreRound(round: GameRound, samples: LapSample[], transitions: InputTransition[]): RoundResult {
   const zones: ZoneResult[] = [];
   const phaseAccuracy: Record<DrivingPhase, PhaseAccuracy> = {
@@ -73,6 +92,11 @@ export function scoreRound(round: GameRound, samples: LapSample[], transitions: 
     coast: { matchedS: 0, totalS: 0 },
     brake: { matchedS: 0, totalS: 0 },
   };
+
+  /** Did the player change pedal within the grace window of t? The grace
+   * forgives a late or early reaction, so it needs a reaction to forgive. */
+  const changedPedalNear = (t: number) =>
+    transitions.some((transition) => Math.abs(transition.t - t) <= REACTION_GRACE_S);
 
   let zone: { phase: DrivingPhase; tStart: number; tEnd: number; matchedS: number; totalS: number } | null = null;
   let zoneWrong: Record<PedalInput, number> | null = null;
@@ -96,8 +120,9 @@ export function scoreRound(round: GameRound, samples: LapSample[], transitions: 
     const playerPhase = inputToPhase(playerInput);
     const matched =
       playerPhase === maxPhase ||
-      playerPhase === classifyAt(samples, t - REACTION_GRACE_S) ||
-      playerPhase === classifyAt(samples, t + REACTION_GRACE_S);
+      (changedPedalNear(t) &&
+        (playerPhase === classifyAt(samples, t - REACTION_GRACE_S) ||
+          playerPhase === classifyAt(samples, t + REACTION_GRACE_S)));
 
     if (!zone || zone.phase !== maxPhase) {
       closeZone();
@@ -126,7 +151,7 @@ export function scoreRound(round: GameRound, samples: LapSample[], transitions: 
 
 /** The whole run's match time per phase, summed over the scoring rounds -
  * the same rounds the total reflects (practice excluded). Feeds the overall
- * REM/LOS/GAS bars on the shared-score landing. */
+ * Rem/Los/Gas bars on the shared-score landing. */
 export function aggregatePhaseAccuracy(results: RoundResult[]): Record<DrivingPhase, PhaseAccuracy> {
   const aggregate: Record<DrivingPhase, PhaseAccuracy> = {
     flat: { matchedS: 0, totalS: 0 },

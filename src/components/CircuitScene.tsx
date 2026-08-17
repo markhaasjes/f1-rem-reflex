@@ -20,13 +20,13 @@ import {
   drawSea,
   drawLakes,
   drawScaleBar,
+  drawScoreBadge,
   drawStartFinish,
   drawTrackRibbon,
   nearestIndex,
-  offsetPathPoints,
   rotateOutline,
 } from '../lib/scene';
-import type { GamePhase, GameRound, InputTransition, PedalInput, ZandvoortFixture } from '../types';
+import type { GamePhase, GameRound, InputTransition, LineMode, PedalInput, ZandvoortFixture } from '../types';
 
 interface CircuitSceneProps {
   fixture: ZandvoortFixture;
@@ -39,11 +39,25 @@ interface CircuitSceneProps {
   transitions: InputTransition[];
   /** The combined pedal state held right now (colors the live car glow). */
   heldInput: PedalInput;
-  /** Reveal the Max-vs-player comparison ribbons (round result). */
-  showReference: boolean;
+  /** Every round driven so far, newest last: their lines stay on the track and
+   * accumulate, so a zoomed-out map shows the whole run. Empty while driving. */
+  resultLines: ResultLine[];
+  /** Which line those results draw. Both sit on the same path, so they cannot
+   * be shown together; the toggle in the UI says which one is up. */
+  lineMode: LineMode;
+  /** Label each result with its score on the track (the explorer's overview). */
+  showScoreBadges: boolean;
   /** Draw the scale bar. False while the HTML legend/speed badge own that
    * corner, so the two can never overlap on a narrow stage. */
   showScaleBar: boolean;
+}
+
+/** One driven round to draw on the track: Max's window plus what the player
+ * did in it, kept together so the map can show the whole run at once. */
+export interface ResultLine {
+  round: GameRound;
+  transitions: InputTransition[];
+  score: number;
 }
 
 // The corner a round's name label anchors to: for combined rounds (e.g.
@@ -97,12 +111,20 @@ const LABEL_OFFSETS: Record<string, { dx: number; dy: number }> = {
   hansernst: { dx: 4, dy: 30 },
 };
 
-// Max's reference line runs one road-half beside the driven line, thinner and
-// dashed: the dash pattern is what separates his line from the player's solid
-// one at a glance, without needing labels on the map.
-const MAX_LINE_OFFSET_M = 4.6;
-const MAX_LINE_WIDTH_M = 2.2;
-const MAX_LINE_DASH_M: [number, number] = [5, 3.5];
+// Max's line and the player's line share one position on the track and one
+// style: comparing them by flipping between them beats reading two parallel
+// ribbons, and it leaves the drawn line exactly where the car went. Which of
+// the two is on screen is said in words by the legend and the toggle, so a
+// scored line needs no dashes.
+const RESULT_LINE_WIDTH_M = 3.4;
+
+// Max's line on the practice corner is the exception: there it is a line to
+// follow rather than a result to compare against, and it runs alongside the
+// player's own trail while they drive it. Dashed and half-transparent keeps
+// the two apart - which is also why the player's line is never dashed, not
+// even there.
+const GUIDE_LINE_DASH_M: [number, number] = [6, 4.5];
+const GUIDE_LINE_ALPHA = 0.55;
 
 // The glow disc under the car while driving, colored by the held pedal.
 const GLOW_RADIUS_M = 9;
@@ -140,15 +162,14 @@ export function CircuitScene(props: CircuitSceneProps) {
   // Corners the game visits get prominent badges; the rest render minor.
   const roundCornerNumbers = useMemo(() => new Set(fixture.rounds.flatMap((r) => r.cornerNumbers)), [fixture]);
 
-  // Max's reference line per round: his phase-colored line shifted one
-  // road-half aside, so it runs beside the player's line instead of under it.
-  // Offsetting is geometry work, so it happens once here, not per frame.
-  const maxReferenceSegments = useMemo(
+  // Max's phase-coloured line per round, built once: the practice guide and
+  // every result view read from here rather than re-segmenting per frame.
+  const maxSegments = useMemo(
     () =>
       fixture.rounds.map((round) =>
-        buildPhaseSegments(fixture.lap.samples, round.tStart, round.tEnd)
-          .map((segment) => ({ phase: segment.phase, points: offsetPathPoints(segment.points, MAX_LINE_OFFSET_M) }))
-          .filter((segment) => segment.points.length >= 2),
+        buildPhaseSegments(fixture.lap.samples, round.tStart, round.tEnd).filter(
+          (segment) => segment.points.length >= 2,
+        ),
       ),
     [fixture],
   );
@@ -173,10 +194,28 @@ export function CircuitScene(props: CircuitSceneProps) {
   useEffect(() => {
     let raf = 0;
 
-    const drawMaxReference = (ctx: CanvasRenderingContext2D, projection: ScreenProjection, roundIndex: number) => {
-      for (const segment of maxReferenceSegments[roundIndex]) {
-        drawRibbon(ctx, segment.points, PHASE_COLOR[segment.phase], projection, MAX_LINE_WIDTH_M, MAX_LINE_DASH_M);
+    // `guide` is the practice corner's coaching line: dashed and faded, so it
+    // reads as a line to follow rather than as a line that was driven, and the
+    // player's own solid trail stays legible on top of it.
+    const drawMaxLine = (
+      ctx: CanvasRenderingContext2D,
+      projection: ScreenProjection,
+      roundIndex: number,
+      guide = false,
+    ) => {
+      ctx.save();
+      if (guide) ctx.globalAlpha = GUIDE_LINE_ALPHA;
+      for (const segment of maxSegments[roundIndex]) {
+        drawRibbon(
+          ctx,
+          segment.points,
+          PHASE_COLOR[segment.phase],
+          projection,
+          RESULT_LINE_WIDTH_M,
+          guide ? GUIDE_LINE_DASH_M : undefined,
+        );
       }
+      ctx.restore();
     };
 
     const render = (now: number) => {
@@ -185,8 +224,8 @@ export function CircuitScene(props: CircuitSceneProps) {
       const canvas = canvasRef.current;
       if (!canvas || w === 0 || h === 0) return;
 
-      const { camBox, phase, round, roundIndex, elapsedT, transitions, heldInput, showReference, showScaleBar } =
-        propsRef.current;
+      const { camBox, phase, round, roundIndex, elapsedT, transitions, heldInput, showScaleBar } = propsRef.current;
+      const { resultLines, lineMode, showScoreBadges } = propsRef.current;
       const timeAnimated = phase === 'running' || phase === 'flying';
       const snapshot = [
         camBox.cx,
@@ -201,7 +240,10 @@ export function CircuitScene(props: CircuitSceneProps) {
         elapsedT,
         transitions.length,
         heldInput,
-        showReference,
+        resultLines.length,
+        resultLines.at(-1)?.transitions.length ?? 0,
+        lineMode,
+        showScoreBadges,
         showScaleBar,
         fontsLoadedRef.current,
       ].join('|');
@@ -229,12 +271,11 @@ export function CircuitScene(props: CircuitSceneProps) {
       }
       drawStartFinish(ctx, fixture.startFinish.x, fixture.startFinish.y, fixture.startFinish.headingDeg, projection);
 
-      // --- practice coaching: Max's dashed reference line runs beside the
-      // player's, so first-time players see what to match without reading
-      // anything (the zone colors say where to brake and where to get back
-      // on the gas - no point markers needed) ---
+      // --- practice coaching: Max's line, so first-time players see what to
+      // match without reading anything (the zone colors say where to brake and
+      // where to get back on the gas - no point markers needed) ---
       if (round.practice && (phase === 'ready' || phase === 'running')) {
-        drawMaxReference(ctx, projection, roundIndex);
+        drawMaxLine(ctx, projection, roundIndex, true);
       }
 
       // --- live trail: the driven line so far, colored by what the player's
@@ -245,14 +286,47 @@ export function CircuitScene(props: CircuitSceneProps) {
         }
       }
 
-      // --- result comparison: Max's dashed line beside the player's solid
-      // one (same pairing the practice round teaches with), so matching
-      // stretches read as two same-colored lines running together and a
-      // mismatch shows as two different colors side by side ---
-      if (showReference) {
-        drawMaxReference(ctx, projection, roundIndex);
-        for (const segment of buildInputSegments(samples, transitions, round.tStart, round.tEnd)) {
-          drawRibbon(ctx, segment.points, PHASE_COLOR[segment.phase], projection);
+      // --- results: every round driven so far stays on the track, so zooming
+      // out shows the whole run corner by corner. One line at a time, both on
+      // the same path: flipping between them compares far better than reading
+      // two parallel ribbons, and the drawn line sits exactly where the car
+      // went. ---
+      for (const result of resultLines) {
+        const index = fixture.rounds.indexOf(result.round);
+        if (lineMode === 'max') {
+          // Dashed only where Max's line is a guide: the practice corner, the
+          // one place his line is something to follow rather than a result to
+          // compare against. Everywhere else both lines are solid, and the
+          // toggle plus the legend say which one is on the track.
+          if (index >= 0) drawMaxLine(ctx, projection, index, result.round.practice);
+        } else {
+          // The player's own line is always solid, practice included: dashing
+          // it too made the two indistinguishable, which is the one thing the
+          // dash exists to prevent.
+          for (const segment of buildInputSegments(
+            samples,
+            result.transitions,
+            result.round.tStart,
+            result.round.tEnd,
+          )) {
+            drawRibbon(ctx, segment.points, PHASE_COLOR[segment.phase], projection, RESULT_LINE_WIDTH_M);
+          }
+        }
+      }
+
+      // --- per-corner score labels, for the explorer's overview: each driven
+      // round keeps its score on the track next to the corner it belongs to,
+      // so a zoomed-out map reads as a scorecard. ---
+      if (showScoreBadges) {
+        for (const result of resultLines) {
+          const corner = lastRoundCorner(fixture, result.round);
+          if (!corner) continue;
+          const [x, y] = projection.toScreen(corner.x, corner.y);
+          // Sit on the opposite side of the corner from its name label, which
+          // LABEL_OFFSETS puts above for some corners and below for others -
+          // otherwise the two pile up on the same spot at overview zoom.
+          const labelAbove = (LABEL_OFFSETS[result.round.id]?.dy ?? 28) < 0;
+          drawScoreBadge(ctx, x, y, result.score, result.round.practice, labelAbove ? 'below' : 'above');
         }
       }
 
@@ -345,7 +419,7 @@ export function CircuitScene(props: CircuitSceneProps) {
 
     raf = requestAnimationFrame(render);
     return () => cancelAnimationFrame(raf);
-  }, [fixture, outline, cornerIndices, maxReferenceSegments, roundCornerNumbers]);
+  }, [fixture, outline, cornerIndices, maxSegments, roundCornerNumbers]);
 
   return (
     <div ref={containerRef} className="relative h-full w-full">

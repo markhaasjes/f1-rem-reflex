@@ -3,14 +3,15 @@
 Proof of concept for a browser reflex game built on real Formula 1 telemetry
 from [OpenF1](https://openf1.org). You fly over Circuit Zandvoort like the
 F1 TV race map, zoom into four corners of Max Verstappen's real pole lap,
-and drive them with held pedals: keep **GAS!** pressed where Max is flat
-out, release everything where he coasts, and hold **REM!** through his
+and drive them with held pedals: keep **Gas!** pressed where Max is flat
+out, release everything where he coasts, and hold **Rem!** through his
 braking zones. Your pedal timeline is compared against his real telemetry
-moment by moment; per pedal state you get a matched percentage and the three
-are multiplied into the corner score, so you have to answer all three: one
-pedal you never use drags the corner down however good the rest is. The final score is shareable
-via a link, and the score card explains the whole calculation, including
-an AI-assistance and data-provenance disclaimer.
+moment by moment. Per pedal state you get the share of Max's time on it that
+you matched, and the three are multiplied into the corner score, so you have to
+answer all three: one pedal you never use drags the corner down however good
+the rest is, and holding a single pedal through the whole corner scores 0. The
+final score is shareable via a link, and the score card explains the whole
+calculation, including an AI-assistance and data-provenance disclaimer.
 
 This is a POC for a nos.nl feature around the Dutch Grand Prix, not
 production code.
@@ -20,20 +21,24 @@ production code.
 1. **Overview**: the full circuit, oriented like Google Maps, drawn in the
    F1 TV map style (green surroundings, dark asphalt, corner badges).
 2. **Tarzanbocht** — practice corner (does not count): Max's brake, coast
-   and full-throttle zones run alongside you as a dashed colored line, so
-   you can see the telemetry you have to match.
+   and full-throttle zones run alongside you as a dashed, half-transparent
+   colored line, so you can see the telemetry you have to match and tell his
+   guide apart from your own line, which is always solid.
 3. **Gerlach & Hugenholtz** — a double: two braking zones, two returns to
    throttle.
 4. **Bocht 9 & 10** — the slow double after Mastersbocht.
 5. **Hans Ernstbocht** — the chicane, one deep braking zone.
 6. **Eindscore** — 0–100 across the three scoring corners, plus a share link
    that carries your whole run (~80 characters): whoever opens it sees your
-   overall REM/LOS/GAS accuracy bars rebuilt from your actual pedal work.
+   overall Rem/Los/Gas bars rebuilt from your actual pedal work.
 
 Each corner starts the moment you first hold the gas pedal on the ready
 screen; while driving, the trail behind the car is colored by your own
-input, and the result view runs Max's dashed zone line beside your solid
-one, plus a REM/LOS/GAS accuracy card and an on-map legend.
+input, and the result view puts one line at a time on the track (yours or
+Max's, via the Max/Jij toggle), plus a "Jouw score per pedaal" card and an
+on-map legend. Every map control lives in one bottom-right column with the
+legend under it, in the game and in the full-screen map alike, and the
+full-screen button toggles: same slot, same size, in and out.
 
 Between rounds the camera zooms back to the overview and flies to the next
 corner — one continuous map, no separate per-corner artwork.
@@ -41,7 +46,8 @@ corner — one continuous map, no separate per-corner artwork.
 ## Stack
 
 - Vite + React 19 + TypeScript
-- Tailwind CSS v4 (`@tailwindcss/vite`), Effra with Helvetica fallback
+- Tailwind CSS v4 (`@tailwindcss/vite`); Effra Bold for titles, names and
+  score numbers, Helvetica Neue for reading and interface
 - One Canvas 2D scene for every zoom level (devicePixelRatio capped at 2),
   inline SVG for the hero car
 - Playable on its own page only: embedded in an iframe the app renders a
@@ -97,6 +103,9 @@ src/hooks/useCircuitGame.ts      game state machine (intro/flying/ready/running/
 src/hooks/useCameraFlight.ts     animated camera box (log-space zoom, step queues)
 src/hooks/useElementSize.ts      ResizeObserver hook
 src/components/CircuitScene.tsx  the one canvas scene, own rAF loop (lazy repaint), every zoom level
+src/components/CircuitExplorer.tsx  the results map full screen: pan/zoom by gesture, mouse, keyboard, buttons
+src/components/MapLegend.tsx     the colour key, shared by the stage and the explorer
+src/components/MapControls.tsx   the map controls, shared too: line toggle, circular buttons, icons
 src/components/EmbedPoster.tsx   what an iframe gets instead of the game: poster linking out to the page
 docs/art/                        image masters (public/images holds the resized, served derivatives)
 src/components/HeroCar.tsx       side-view car for the intro (public/images/auto-zij.svg)
@@ -140,6 +149,13 @@ for how the pieces fit together; the rules below are about how to change them.
   exceptions (the Dutch flag's official colors, the photo-sampled scenery
   greys, the brake/coast/throttle signal colors), lives in
   [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#brand-palette).
+- **Two fonts, one job each.** Effra Bold (`font-display`) is for titles, name
+  badges and score numbers; Helvetica Neue (the default `font-sans`) is for
+  everything read or operated. Only EffraBold.woff is loaded, so Effra cannot
+  render a normal weight - anything that needs one belongs in Helvetica Neue.
+- **No ALLCAPS in user-facing copy.** Not via `uppercase` and not typed out:
+  the pedals say Rem!/Gas!, the bars Rem/Los/Gas, the badge Tip. Sentence case
+  everywhere, including eyebrows and badges.
 - **Type floor: 14px on phones, 16px from `sm:` up.** Dense chrome takes the
   14px step; primary copy stays 16px everywhere. See
   [the layout notes](docs/DEVELOPMENT.md#layout-invariants-portrait--landscape)

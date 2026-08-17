@@ -10,6 +10,13 @@ const GRAVEL_FROM_M = ROAD_WIDTH_M / 2 + 3.5;
 const GRAVEL_TO_M = GRAVEL_FROM_M + 26;
 const GREEN_BAND_M = 110; // grass corridor around the track, F1 TV map style
 
+// The two font stacks from index.css, spelled out for canvas: names and
+// badges (corner numbers, corner names, score badges) are set in Effra like
+// every other name in the app, the scale bar is interface chrome and takes
+// the reading font.
+const BADGE_FONT = "Effra, 'Helvetica Neue', Helvetica, Arial, sans-serif";
+const CHROME_FONT = "'Helvetica Neue', Helvetica, Arial, sans-serif";
+
 // The flat/coast/brake colors shared by every phase-colored line: Max's
 // dashed reference line, the player's line (CircuitScene) and the on-map
 // legend swatches (App).
@@ -113,13 +120,6 @@ function offsetPolyline(points: Point[], from: number, to: number, offsetM: numb
     prevBase = points[i];
   }
   return result;
-}
-
-/** A parallel copy of an open path, shifted `offsetM` to one side: the result
- * comparison draws Max's reference line beside the player's instead of on top
- * of it. Reuses offsetPolyline, so fold-backs on tight bends are pruned. */
-export function offsetPathPoints(points: Point[], offsetM: number): Point[] {
-  return offsetPolyline(points, 0, points.length - 1, offsetM, 1);
 }
 
 // Like offsetPolyline, but splits into separate runs wherever the bend is
@@ -764,7 +764,7 @@ export function drawCornerBadge(
   let fontPx = 16;
   if (highlight) fontPx = 18;
   else if (minor) fontPx = 12;
-  ctx.font = `800 ${Math.round(fontPx * scale)}px Effra, 'Helvetica Neue', Helvetica, Arial, sans-serif`;
+  ctx.font = `800 ${Math.round(fontPx * scale)}px ${BADGE_FONT}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = PALETTE.white;
@@ -784,7 +784,7 @@ export function drawMapLabel(
   if (alpha <= 0.01) return;
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.font = `800 ${fontPx}px Effra, 'Helvetica Neue', Helvetica, Arial, sans-serif`;
+  ctx.font = `800 ${fontPx}px ${BADGE_FONT}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
   ctx.lineWidth = 4;
@@ -799,6 +799,39 @@ export function drawMapLabel(
 // caller draws it only while those are hidden (see CircuitScene's
 // `showScaleBar`). Sharing the corner by moving it right is not an option: on
 // a landscape phone the stage is ~356px wide and the legend alone is 259px.
+// A driven round's score, parked next to its corner on the explorer's map: the
+// practice round is greyed because it does not count toward the total.
+export function drawScoreBadge(
+  ctx: CanvasRenderingContext2D,
+  screenX: number,
+  screenY: number,
+  score: number,
+  practice: boolean,
+  side: 'above' | 'below' = 'above',
+) {
+  const label = practice ? `${score} · oefen` : `${score}`;
+  ctx.save();
+  ctx.font = `800 16px ${BADGE_FONT}`;
+  const width = ctx.measureText(label).width + 22;
+  const height = 30;
+  // Clear of the corner-number badge either way; the caller picks the side the
+  // corner's name label is not using.
+  const x = screenX - width / 2;
+  const y = side === 'above' ? screenY - height - 22 : screenY + 24;
+  ctx.beginPath();
+  ctx.roundRect(x, y, width, height, height / 2);
+  ctx.fillStyle = practice ? 'rgba(30, 30, 30, 0.75)' : PALETTE.white;
+  ctx.strokeStyle = practice ? PALETTE.white : '#1e1e1e';
+  ctx.lineWidth = 2;
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = practice ? PALETTE.white : '#1e1e1e';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, screenX, y + height / 2 + 1);
+  ctx.restore();
+}
+
 export function drawScaleBar(ctx: CanvasRenderingContext2D, projection: ScreenProjection, canvasHeight: number) {
   // Pick a round meter length that lands between 40 and 100 px on screen.
   const candidates = [25, 50, 100, 200, 500, 1000];
@@ -817,7 +850,7 @@ export function drawScaleBar(ctx: CanvasRenderingContext2D, projection: ScreenPr
   ctx.moveTo(x + lengthPx, y - 4);
   ctx.lineTo(x + lengthPx, y + 4);
   ctx.stroke();
-  ctx.font = "700 16px Effra, 'Helvetica Neue', Helvetica, Arial, sans-serif";
+  ctx.font = `700 16px ${CHROME_FONT}`;
   ctx.textAlign = 'center';
   ctx.fillStyle = '#5b5648';
   ctx.fillText(`${lengthM} m`, x + lengthPx / 2, y - 9);
