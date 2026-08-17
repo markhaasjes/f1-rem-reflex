@@ -1212,9 +1212,14 @@ function App() {
                 als goed.
               </li>
               <li>
-                Per pedaalstand krijg je zo een percentage, de drie balken op je bochtkaart. Die drie worden met elkaar
-                verrekend, dus je moet ze alle drie goed doen: sla je er één over, bijvoorbeeld door nooit te remmen,
-                dan drukt dat je bochtscore hard omlaag.
+                Elke seconde dat je een pedaal ingedrukt houdt waar Max dat niet doet, gaat er weer van dat pedaal af.
+                Gas geven waar Max remt of uitrolt levert dus niets op, het kost je punten: geef je de hele bocht gas,
+                dan blijft er van je gas 0% over.
+              </li>
+              <li>
+                Per pedaalstand houd je zo een percentage over, de drie balken op je bochtkaart. Die drie worden met
+                elkaar verrekend, dus je moet ze alle drie goed doen: sla je er één over, bijvoorbeeld door nooit te
+                remmen, dan drukt dat je bochtscore hard omlaag.
               </li>
               <li>Je eindscore is het gemiddelde van de drie echte bochten, de oefenbocht telt niet mee.</li>
             </ul>

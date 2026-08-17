@@ -15,6 +15,14 @@ const REACTION_GRACE_S = 0.2;
 // would otherwise carry a third of a round's score.
 const MIN_PHASE_S = 0.5;
 
+// A second on the wrong pedal costs a little more than a right second earns.
+// Straight 1:1 subtraction still left "hold the gas through the whole corner"
+// with a positive GAS bar in the windows where Max happens to be flat out for
+// more than half the time (Hugenholtz: 18%), which is exactly the free credit
+// the penalty exists to remove. At 1.25 every single-pedal run bottoms out at
+// 0 for that pedal in every corner, while a mirrored lap is untouched.
+const WRONG_PEDAL_PENALTY = 1.25;
+
 /** One contiguous stretch of the round where Max holds the same phase, with
  * how much of it the player's pedals agreed. */
 export interface ZoneResult {
@@ -29,6 +37,8 @@ export interface ZoneResult {
 interface PhaseAccuracy {
   matchedS: number;
   totalS: number;
+  /** Time the player held *this* pedal while Max was doing something else. */
+  wrongS: number;
 }
 
 export interface RoundResult {
@@ -36,15 +46,21 @@ export interface RoundResult {
   /** The pedal timeline this result was scored from (feeds the share link). */
   transitions: InputTransition[];
   zones: ZoneResult[];
-  /** Match time per phase of Max's driving (totalS 0 = phase absent). */
+  /** Match and mistake time per phase of Max's driving (totalS 0 = absent). */
   phaseAccuracy: Record<DrivingPhase, PhaseAccuracy>;
   /** 0-100: the average of the per-phase match percentages. */
   score: number;
 }
 
-/** A phase's match share as the whole percentage the result card shows. */
+/** A phase's score as the whole percentage the result card shows: the share of
+ * Max's time on this pedal the player matched, *minus* the time they held the
+ * pedal where Max did not. Without that second term the bar rewards holding one
+ * pedal down: gas through a whole corner used to read GAS 100% (every flat-out
+ * moment matched) while the player was demonstrably not driving the corner. */
 export function phasePercent(accuracy: PhaseAccuracy): number {
-  return accuracy.totalS === 0 ? 0 : Math.round((accuracy.matchedS / accuracy.totalS) * 100);
+  if (accuracy.totalS === 0) return 0;
+  const net = accuracy.matchedS - WRONG_PEDAL_PENALTY * accuracy.wrongS;
+  return Math.max(0, Math.min(100, Math.round((net / accuracy.totalS) * 100)));
 }
 
 // Walks the round window on the same grid the ribbons render at and compares
@@ -62,16 +78,24 @@ export function phasePercent(accuracy: PhaseAccuracy): number {
 //
 // Multiplying instead of averaging means every phase has to be answered: one
 // pedal you never use drags the whole round down, no matter how good the other
-// two are (do-nothing ~33, gas-only ~25), while a genuinely good run barely
-// notices the difference (85/75/80 -> 80, 95/90/95 -> 93). The trade-off is
-// that the player can no longer verify the score by averaging the bars in
-// their head, so the explainer modal describes the rule in words instead.
+// two are, while a genuinely good run barely notices the difference
+// (85/75/80 -> 80, 95/90/95 -> 93). The trade-off is that the player can no
+// longer verify the score by averaging the bars in their head, so the explainer
+// modal describes the rule in words instead.
+//
+// Each bar is itself net of its own mistakes (see `phasePercent`): the time on
+// a pedal Max was not using is subtracted from that pedal's bar, so the lazy
+// strategies now bottom out where they belong. Calibration against the fixture
+// (scripted, see the verification workflow): mirroring Max's telemetry with
+// 120ms lag **99**, 250ms **93**, 400ms **74**, and holding one pedal for the
+// whole corner **0** - gas-only, brake-only and touch-nothing alike, with that
+// pedal's bar reading 0 in every corner.
 export function scoreRound(round: GameRound, samples: LapSample[], transitions: InputTransition[]): RoundResult {
   const zones: ZoneResult[] = [];
   const phaseAccuracy: Record<DrivingPhase, PhaseAccuracy> = {
-    flat: { matchedS: 0, totalS: 0 },
-    coast: { matchedS: 0, totalS: 0 },
-    brake: { matchedS: 0, totalS: 0 },
+    flat: { matchedS: 0, totalS: 0, wrongS: 0 },
+    coast: { matchedS: 0, totalS: 0, wrongS: 0 },
+    brake: { matchedS: 0, totalS: 0, wrongS: 0 },
   };
 
   let zone: { phase: DrivingPhase; tStart: number; tEnd: number; matchedS: number; totalS: number } | null = null;
@@ -110,8 +134,12 @@ export function scoreRound(round: GameRound, samples: LapSample[], transitions: 
     if (matched) {
       zone.matchedS += STEP_S;
       phaseAccuracy[maxPhase].matchedS += STEP_S;
-    } else if (zoneWrong) {
-      zoneWrong[playerInput] += STEP_S;
+    } else {
+      // The mistake is charged to the pedal the player actually held, not to
+      // the one they should have been on: "gas where Max brakes" has to cost
+      // GAS points, otherwise gas-through-the-corner keeps a perfect GAS bar.
+      phaseAccuracy[playerPhase].wrongS += STEP_S;
+      if (zoneWrong) zoneWrong[playerInput] += STEP_S;
     }
   }
   closeZone();
@@ -126,18 +154,19 @@ export function scoreRound(round: GameRound, samples: LapSample[], transitions: 
 
 /** The whole run's match time per phase, summed over the scoring rounds -
  * the same rounds the total reflects (practice excluded). Feeds the overall
- * REM/LOS/GAS bars on the shared-score landing. */
+ * Rem/Los/Gas bars on the shared-score landing. */
 export function aggregatePhaseAccuracy(results: RoundResult[]): Record<DrivingPhase, PhaseAccuracy> {
   const aggregate: Record<DrivingPhase, PhaseAccuracy> = {
-    flat: { matchedS: 0, totalS: 0 },
-    coast: { matchedS: 0, totalS: 0 },
-    brake: { matchedS: 0, totalS: 0 },
+    flat: { matchedS: 0, totalS: 0, wrongS: 0 },
+    coast: { matchedS: 0, totalS: 0, wrongS: 0 },
+    brake: { matchedS: 0, totalS: 0, wrongS: 0 },
   };
   for (const result of results) {
     if (result.round.practice) continue;
     for (const phase of Object.keys(aggregate) as DrivingPhase[]) {
       aggregate[phase].matchedS += result.phaseAccuracy[phase].matchedS;
       aggregate[phase].totalS += result.phaseAccuracy[phase].totalS;
+      aggregate[phase].wrongS += result.phaseAccuracy[phase].wrongS;
     }
   }
   return aggregate;
