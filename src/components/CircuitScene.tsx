@@ -114,9 +114,17 @@ const LABEL_OFFSETS: Record<string, { dx: number; dy: number }> = {
 // Max's line and the player's line share one position on the track and one
 // style: comparing them by flipping between them beats reading two parallel
 // ribbons, and it leaves the drawn line exactly where the car went. Which of
-// the two is on screen is said in words by the legend and the toggle, so the
-// line itself needs no dashes.
+// the two is on screen is said in words by the legend and the toggle, so a
+// scored line needs no dashes.
 const RESULT_LINE_WIDTH_M = 3.4;
+
+// The practice corner is the exception, in both directions: Max's coaching
+// line runs *next to* the player's own trail while they drive it, and its
+// result stays on the map next to three corners that did count. Dashed and
+// half-transparent says both things at once, "follow this" and "this one is
+// practice", without a second color.
+const GUIDE_LINE_DASH_M: [number, number] = [6, 4.5];
+const GUIDE_LINE_ALPHA = 0.55;
 
 // The glow disc under the car while driving, colored by the held pedal.
 const GLOW_RADIUS_M = 9;
@@ -186,10 +194,28 @@ export function CircuitScene(props: CircuitSceneProps) {
   useEffect(() => {
     let raf = 0;
 
-    const drawMaxLine = (ctx: CanvasRenderingContext2D, projection: ScreenProjection, roundIndex: number) => {
+    // `guide` is the practice corner's coaching line: dashed and faded, so it
+    // reads as a line to follow rather than as a line that was driven, and the
+    // player's own solid trail stays legible on top of it.
+    const drawMaxLine = (
+      ctx: CanvasRenderingContext2D,
+      projection: ScreenProjection,
+      roundIndex: number,
+      guide = false,
+    ) => {
+      ctx.save();
+      if (guide) ctx.globalAlpha = GUIDE_LINE_ALPHA;
       for (const segment of maxSegments[roundIndex]) {
-        drawRibbon(ctx, segment.points, PHASE_COLOR[segment.phase], projection, RESULT_LINE_WIDTH_M);
+        drawRibbon(
+          ctx,
+          segment.points,
+          PHASE_COLOR[segment.phase],
+          projection,
+          RESULT_LINE_WIDTH_M,
+          guide ? GUIDE_LINE_DASH_M : undefined,
+        );
       }
+      ctx.restore();
     };
 
     const render = (now: number) => {
@@ -249,7 +275,7 @@ export function CircuitScene(props: CircuitSceneProps) {
       // match without reading anything (the zone colors say where to brake and
       // where to get back on the gas - no point markers needed) ---
       if (round.practice && (phase === 'ready' || phase === 'running')) {
-        drawMaxLine(ctx, projection, roundIndex);
+        drawMaxLine(ctx, projection, roundIndex, true);
       }
 
       // --- live trail: the driven line so far, colored by what the player's
@@ -267,17 +293,30 @@ export function CircuitScene(props: CircuitSceneProps) {
       // went. ---
       for (const result of resultLines) {
         const index = fixture.rounds.indexOf(result.round);
+        // The practice corner stays dashed and faded here too, so a map with
+        // every driven corner on it says at a glance which one did not count.
+        const guide = result.round.practice;
         if (lineMode === 'max') {
-          if (index >= 0) drawMaxLine(ctx, projection, index);
+          if (index >= 0) drawMaxLine(ctx, projection, index, guide);
         } else {
+          ctx.save();
+          if (guide) ctx.globalAlpha = GUIDE_LINE_ALPHA;
           for (const segment of buildInputSegments(
             samples,
             result.transitions,
             result.round.tStart,
             result.round.tEnd,
           )) {
-            drawRibbon(ctx, segment.points, PHASE_COLOR[segment.phase], projection, RESULT_LINE_WIDTH_M);
+            drawRibbon(
+              ctx,
+              segment.points,
+              PHASE_COLOR[segment.phase],
+              projection,
+              RESULT_LINE_WIDTH_M,
+              guide ? GUIDE_LINE_DASH_M : undefined,
+            );
           }
+          ctx.restore();
         }
       }
 

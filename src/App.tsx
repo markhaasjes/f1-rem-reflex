@@ -65,6 +65,9 @@ const BTN_BASE =
 const BTN_LIGHT = `${BTN_BASE} focus-ring-ink bg-white text-ink hover:bg-[#f3f3f0] hover:scale-[1.02]`;
 const BTN_RED = `${BTN_BASE} focus-ring-ink bg-[#e61f15] text-white hover:bg-[#ca1a11] hover:scale-[1.02]`;
 const BTN_DARK = `${BTN_BASE} bg-ink text-white hover:bg-track-blue hover:scale-[1.02]`;
+// White on white is invisible, so the third action on the score card is an
+// outlined button instead: red primary, dark secondary, outlined tertiary.
+const BTN_OUTLINE = `${BTN_BASE} focus-ring-ink border-2 border-ink bg-white text-ink hover:bg-[#f3f3f0] hover:scale-[1.02]`;
 
 // The share link carries the sharer's whole run - per-round scores plus the
 // pedal timelines, packed into one short opaque token (~80 characters, see
@@ -127,10 +130,14 @@ function parseSharedScore(): SharedScore | null {
 
 // Display config for the three driving phases, in pedal order: brake on the
 // left like the brake pedal, full throttle on the right like the gas pedal.
-const PHASE_ROWS: { phase: DrivingPhase; label: string; sublabel: string; color: string }[] = [
-  { phase: 'brake', label: 'Rem', sublabel: 'remmen', color: '#e61f15' },
-  { phase: 'coast', label: 'Los', sublabel: 'uitrollen', color: '#f2a11c' },
-  { phase: 'flat', label: 'Gas', sublabel: 'vol gas', color: '#10b981' },
+// `color` fills the bar, `textColor` writes the label and the percentage: the
+// signal orange and green are 2.1:1 and 2.5:1 on white, so as text they get a
+// darkened version of the same hue (4.7:1 and 5.5:1) while the bar keeps the
+// colour the map uses.
+const PHASE_ROWS: { phase: DrivingPhase; label: string; sublabel: string; color: string; textColor: string }[] = [
+  { phase: 'brake', label: 'Rem', sublabel: 'remmen', color: '#e61f15', textColor: '#e61f15' },
+  { phase: 'coast', label: 'Los', sublabel: 'uitrollen', color: '#f2a11c', textColor: '#a86407' },
+  { phase: 'flat', label: 'Gas', sublabel: 'vol gas', color: '#10b981', textColor: '#047857' },
 ];
 
 // How well the player matched each of Max's three pedal states, as one card
@@ -146,6 +153,13 @@ function accuracyRows(accuracy: RoundResult['phaseAccuracy']) {
   );
 }
 
+// "Gelijk met Max" read as Max's own numbers, so the card now says whose score
+// it is, and the percentages carry the same green/orange/red as the pedal they
+// belong to and as the lines on the map: your gas number is the green of the
+// gas stretches, your brake number the red of the braking zones.
+const ACCURACY_TITLE = 'Jouw score per pedaal';
+const ACCURACY_SUBTITLE = 'hoe vaak deed jij hetzelfde als Max';
+
 // The stacked bars themselves, without card chrome: the wide round-result
 // card and the shared-score landing both render these.
 function AccuracyBarsStack({ accuracy }: { accuracy: RoundResult['phaseAccuracy'] }) {
@@ -155,12 +169,14 @@ function AccuracyBarsStack({ accuracy }: { accuracy: RoundResult['phaseAccuracy'
         <div key={row.phase}>
           <div className="flex items-baseline justify-between gap-2">
             <span>
-              <span className="text-base font-extrabold" style={{ color: row.color }}>
+              <span className="text-base font-extrabold" style={{ color: row.textColor }}>
                 {row.label}
               </span>
-              <span className="ml-1.5 text-sm font-bold text-[#1e1e1e]/45 sm:text-base">{row.sublabel}</span>
+              <span className="ml-1.5 text-sm text-[#1e1e1e]/55 sm:text-base">{row.sublabel}</span>
             </span>
-            <span className="text-base font-extrabold tabular-nums text-[#1e1e1e]">{row.percent}%</span>
+            <span className="text-base font-extrabold tabular-nums" style={{ color: row.textColor }}>
+              {row.percent}%
+            </span>
           </div>
           <div className="relative mt-1 h-2.5 overflow-hidden rounded-full bg-[#ececec]">
             <span
@@ -174,11 +190,21 @@ function AccuracyBarsStack({ accuracy }: { accuracy: RoundResult['phaseAccuracy'
   );
 }
 
+function AccuracyCardTitle({ subtitle = false }: { subtitle?: boolean }) {
+  return (
+    <p className="text-left">
+      <span className="text-sm font-extrabold tracking-wide text-[#1e1e1e] sm:text-base">{ACCURACY_TITLE}</span>
+      {subtitle && <span className="ml-1.5 text-sm text-[#1e1e1e]/55 sm:text-base">{ACCURACY_SUBTITLE}</span>}
+    </p>
+  );
+}
+
 function RoundAccuracyCard({ result, layout }: { result: RoundResult; layout: 'row' | 'stack' }) {
   if (layout === 'stack') {
     return (
       <div className="w-full max-w-xs rounded-2xl bg-white px-4 py-3 text-left shadow-lg">
-        <p className="text-sm font-extrabold tracking-wide text-[#1e1e1e]/50 sm:text-base">Gelijk met Max</p>
+        <AccuracyCardTitle />
+        <p className="text-left text-sm text-[#1e1e1e]/55 sm:text-base">{ACCURACY_SUBTITLE}</p>
         <div className="mt-1.5">
           <AccuracyBarsStack accuracy={result.phaseAccuracy} />
         </div>
@@ -189,17 +215,17 @@ function RoundAccuracyCard({ result, layout }: { result: RoundResult; layout: 'r
   const rows = accuracyRows(result.phaseAccuracy);
   return (
     <div className="rounded-2xl bg-white px-2.5 py-1.5 shadow-lg">
-      <p className="text-left text-sm font-extrabold tracking-wide text-[#1e1e1e]/50 sm:text-base">
-        Gelijk met Max
-      </p>
+      <AccuracyCardTitle />
       <div className="flex gap-2.5">
         {rows.map((row) => (
           <div key={row.phase} className="w-20">
             <div className="flex items-baseline justify-between gap-2">
-              <span className="text-sm font-extrabold sm:text-base" style={{ color: row.color }}>
+              <span className="text-sm font-extrabold sm:text-base" style={{ color: row.textColor }}>
                 {row.label}
               </span>
-              <span className="text-sm font-extrabold tabular-nums text-[#1e1e1e] sm:text-base">{row.percent}%</span>
+              <span className="text-sm font-extrabold tabular-nums sm:text-base" style={{ color: row.textColor }}>
+                {row.percent}%
+              </span>
             </div>
             <div className="relative mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#ececec]">
               <span
@@ -490,11 +516,11 @@ function ScoreDiagram() {
         </div>
       </div>
       <p className="mt-2 text-sm leading-snug text-[#1e1e1e]/70 sm:text-base">
-        <span className="font-extrabold text-emerald-600">Groen</span> = vol gas,{' '}
-        <span className="font-extrabold text-[#c77b0a]">oranje</span> = uitrollen,{' '}
+        <span className="font-extrabold text-[#047857]">Groen</span> = vol gas,{' '}
+        <span className="font-extrabold text-[#a86407]">oranje</span> = uitrollen,{' '}
         <span className="font-extrabold text-[#e61f15]">rood</span> = remmen. De{' '}
-        <span className="font-extrabold text-[#1e1e1e]">donkerblauwe</span> vakjes in de onderste strook markeren waar
-        jij iets anders deed dan Max, daar verlies je punten.
+        <span className="font-extrabold text-[#1e1e1e]">zwarte</span> vakjes in de onderste strook markeren waar jij
+        iets anders deed dan Max, daar verlies je punten.
       </p>
     </div>
   );
@@ -613,13 +639,14 @@ function App() {
   // keep the static corner framing.
   //
   // The zoom happens BEFORE the player drives, on the ready screen: the corner
-  // overview holds for a few seconds so they can read the corner, then one
-  // eased dive settles on the parked car, and the run starts already zoomed in
+  // overview holds for a second after the fly-in lands, so the corner registers
+  // as a shape, then one eased dive settles on the parked car and the run
+  // starts already zoomed in
   // (the frame-by-frame follow then takes over from a box it is already on, so
   // there is no jump). Starting early is allowed: a gas press mid-hold flips
   // the phase to `running`, which flies the remaining distance to the car in
   // CHASE_SNAP_MS instead of waiting out the storyboard.
-  const CHASE_HOLD_MS = 2500;
+  const CHASE_HOLD_MS = 1000;
   const CHASE_DIVE_MS = 1600;
   const CHASE_SNAP_MS = 650;
   const isWide = useWideViewport();
@@ -820,15 +847,17 @@ function App() {
           back to the start: it restarts the flow from anywhere, including
           mid-run and from the score card. On hover the tab pulls a little
           further out of the top edge, so it reads as pressable. */}
-      <div className="absolute top-0 left-4 z-[60] sm:left-8 wide:left-10">
-        <button
-          type="button"
-          onClick={restart}
-          aria-label="NOS Rem Reflex, terug naar het begin"
-          className="inline-block rounded-b-[10px] bg-white px-[18px] pt-[12px] pb-[15px] shadow-[0_6px_24px_rgba(30,30,30,0.45)] transition-all duration-150 hover:bg-[#f3f3f0] hover:pb-[19px] hover:shadow-[0_10px_28px_rgba(30,30,30,0.5)] focus-ring focus-ring-ink max-[359px]:px-3 max-[359px]:pb-2.5 max-[359px]:pt-2 max-[359px]:hover:pb-3.5"
-        >
-          <NOSLogo className="w-12 h-auto fill-current text-white max-[359px]:w-9" />
-        </button>
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-[60] flex justify-center px-4 sm:px-8 wide:px-10">
+        <div className="w-full max-w-[1600px]">
+          <button
+            type="button"
+            onClick={restart}
+            aria-label="NOS Rem Reflex, terug naar het begin"
+            className="pointer-events-auto inline-block rounded-b-[10px] bg-white px-[18px] pt-[12px] pb-[15px] shadow-[0_6px_24px_rgba(30,30,30,0.45)] transition-all duration-150 hover:bg-[#f3f3f0] hover:pb-[19px] hover:shadow-[0_10px_28px_rgba(30,30,30,0.5)] focus-ring focus-ring-ink max-[359px]:px-3 max-[359px]:pb-2.5 max-[359px]:pt-2 max-[359px]:hover:pb-3.5"
+          >
+            <NOSLogo className="w-12 h-auto fill-current text-white max-[359px]:w-9" />
+          </button>
+        </div>
       </div>
       <div
         inert={exploreOpen || undefined}
@@ -848,7 +877,7 @@ function App() {
           </div>
         </div>
 
-        <main className="flex min-h-0 w-full max-w-md flex-1 flex-col gap-3 sm:max-w-2xl lg:max-w-4xl wide:grid wide:w-full wide:max-w-none wide:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)] wide:items-stretch wide:gap-6">
+        <main className="flex min-h-0 w-full max-w-md flex-1 flex-col gap-3 sm:max-w-2xl lg:max-w-4xl wide:grid wide:w-full wide:max-w-[1600px] wide:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)] wide:items-stretch wide:gap-6">
           {/* Stage */}
           <div className="relative min-h-[13rem] w-full flex-1 overflow-hidden rounded-3xl wide:h-full wide:min-h-[min(22rem,60svh)]">
             <CircuitScene
@@ -876,7 +905,9 @@ function App() {
               aria-hidden={!round.practice || phase === 'roundResult'}
               className={`pointer-events-none absolute left-3 top-3 flex items-center gap-2 rounded-full bg-[#ffc828] px-3 py-1.5 shadow transition-opacity duration-300 ${round.practice && (phase === 'flying' || phase === 'ready' || phase === 'running') ? 'opacity-100' : 'opacity-0'}`}
             >
-              <span className="font-display text-sm font-extrabold tracking-wide text-ink sm:text-base">Oefenbocht</span>
+              <span className="font-display text-sm font-extrabold tracking-wide text-ink sm:text-base">
+                Oefenbocht
+              </span>
               <span className="text-sm font-bold text-ink/70 sm:text-base">telt niet mee</span>
             </div>
 
@@ -1040,9 +1071,12 @@ function App() {
           inert={!(phase === 'intro' && !hideIntroChrome) || undefined}
           className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-track-blue/85 px-4 pb-4 pt-16 backdrop-blur-[3px] sm:pt-4 transition-all duration-500 ${phase === 'intro' && !hideIntroChrome ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
-          <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:max-w-md sm:p-10">
+          <div className="m-auto w-full max-w-md rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:max-w-lg sm:p-10">
             <HeroCar className="mx-auto h-9 w-auto sm:h-12" />
-            <h1 id="intro-title" className="mt-4 font-display text-xl font-normal leading-tight text-[#1e1e1e] sm:mt-5 sm:text-2xl">
+            <h1
+              id="intro-title"
+              className="mt-4 font-display text-xl font-normal leading-tight text-[#1e1e1e] sm:mt-5 sm:text-2xl"
+            >
               Rem jij net zo laat als <span className="font-extrabold">Max Verstappen</span>?
             </h1>
             <p className="mt-2 text-base leading-snug text-ink/75 sm:mt-3">
@@ -1064,9 +1098,7 @@ function App() {
             {/* the two pedals the game is played with; keyboard hints join in
                 on larger screens, touch players just see what to expect */}
             <div className="mt-4 rounded-2xl bg-[#f3f3f0] p-3.5 sm:mt-5 sm:p-5">
-              <p className="text-left text-sm font-extrabold tracking-wide text-ink/50 sm:text-base">
-                Zo speel je
-              </p>
+              <p className="text-left text-sm font-extrabold tracking-wide text-ink/50 sm:text-base">Zo speel je</p>
               <p className="mt-2 text-left text-base leading-snug text-ink/70">
                 Houd een pedaal ingedrukt om gas te geven of te remmen, laat beide los om uit te rollen.
               </p>
@@ -1111,7 +1143,7 @@ function App() {
           inert={!(phase === 'finished' && !showShared) || showScoreInfo || undefined}
           className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-track-blue/80 px-4 pb-4 pt-16 backdrop-blur-[2px] sm:pt-4 transition-all duration-700 ${phase === 'finished' && !showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
-          <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:max-w-md sm:p-10">
+          <div className="m-auto w-full max-w-md rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:max-w-lg sm:p-10">
             <h2 id="final-title" className="font-display text-base font-extrabold tracking-wide text-[#e61f15]">
               Jouw eindscore
             </h2>
@@ -1131,9 +1163,7 @@ function App() {
             {runContext && savedScores.best && (
               <div className="mb-3 grid grid-cols-1 gap-2 text-left min-[360px]:grid-cols-2 sm:mb-4">
                 <div className="rounded-2xl bg-[#f3f3f0] px-3 py-2">
-                  <p className="text-sm font-extrabold tracking-wide text-[#1e1e1e]/50 sm:text-base">
-                    Beste score
-                  </p>
+                  <p className="text-sm font-extrabold tracking-wide text-[#1e1e1e]/50 sm:text-base">Beste score</p>
                   <p className="font-display text-xl font-extrabold tabular-nums text-[#1e1e1e]">
                     {savedScores.best.total}
                     {runContext.isNewBest && (
@@ -1144,9 +1174,7 @@ function App() {
                   </p>
                 </div>
                 <div className="rounded-2xl bg-[#f3f3f0] px-3 py-2">
-                  <p className="text-sm font-extrabold tracking-wide text-[#1e1e1e]/50 sm:text-base">
-                    Vorige poging
-                  </p>
+                  <p className="text-sm font-extrabold tracking-wide text-[#1e1e1e]/50 sm:text-base">Vorige poging</p>
                   <p className="font-display text-xl font-extrabold tabular-nums text-[#1e1e1e]">
                     {runContext.previousLast ? runContext.previousLast.total : '\u2014'}
                   </p>
@@ -1170,7 +1198,11 @@ function App() {
                 Nog een keer
               </button>
             </div>
-            <button type="button" onClick={() => setExploreOpen(true)} className={`${BTN_LIGHT} mt-2 w-full px-6 py-3`}>
+            <button
+              type="button"
+              onClick={() => setExploreOpen(true)}
+              className={`${BTN_OUTLINE} mt-2 w-full px-6 py-3`}
+            >
               Bekijk je lijnen op de kaart
             </button>
             <button
@@ -1193,7 +1225,7 @@ function App() {
           inert={!showScoreInfo || undefined}
           className={`fixed inset-0 z-50 backdrop-carbon flex overflow-y-auto bg-track-blue/85 px-4 pb-4 pt-16 backdrop-blur-[3px] sm:pt-4 transition-all duration-300 ${showScoreInfo ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
-          <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-left text-ink shadow-2xl sm:max-w-md sm:p-8">
+          <div className="m-auto w-full max-w-md rounded-3xl bg-white p-6 text-left text-ink shadow-2xl sm:max-w-lg sm:p-8">
             <h2 id="score-info-title" className="font-display text-base font-extrabold tracking-wide text-[#e61f15]">
               Zo werkt je score
             </h2>
@@ -1266,7 +1298,7 @@ function App() {
           inert={!showShared || undefined}
           className={`fixed inset-0 z-40 backdrop-carbon flex overflow-y-auto bg-track-blue/80 px-4 pb-4 pt-16 backdrop-blur-[2px] sm:pt-4 transition-all duration-500 ${showShared ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
         >
-          <div className="m-auto w-full max-w-sm rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:max-w-md sm:p-8">
+          <div className="m-auto w-full max-w-md rounded-3xl bg-white p-6 text-center text-ink shadow-2xl sm:max-w-lg sm:p-8">
             <h2 id="shared-title" className="font-display text-base font-extrabold tracking-wide text-[#e61f15]">
               Gedeelde score
             </h2>
@@ -1276,9 +1308,8 @@ function App() {
                 accuracy bars are recomputed from them right here */}
             {sharedAccuracy && (
               <div className="mb-4 rounded-2xl bg-[#f3f3f0] px-4 py-3 text-left">
-                <p className="text-sm font-extrabold tracking-wide text-[#1e1e1e]/50 sm:text-base">
-                  Gelijk met Max
-                </p>
+                <p className="text-sm font-extrabold tracking-wide text-[#1e1e1e] sm:text-base">Score per pedaal</p>
+                <p className="text-sm text-[#1e1e1e]/55 sm:text-base">hoe vaak deed diegene hetzelfde als Max</p>
                 <div className="mt-1.5">
                   <AccuracyBarsStack accuracy={sharedAccuracy} />
                 </div>

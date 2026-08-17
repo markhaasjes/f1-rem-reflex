@@ -3,14 +3,7 @@ import { useElementSize } from '../hooks/useElementSize';
 import { viewBoxFromCam, type CamBox } from '../hooks/useCameraFlight';
 import { fitProjection } from '../lib/canvas';
 import { CircuitScene, type ResultLine } from './CircuitScene';
-import {
-  CompressIcon,
-  LineModeToggle,
-  MapControlButton,
-  MinusIcon,
-  PlusIcon,
-  WholeCircuitIcon,
-} from './MapControls';
+import { CompressIcon, LineModeToggle, MapControlButton, MinusIcon, PlusIcon, WholeCircuitIcon } from './MapControls';
 import { MapLegend, activeLineLabel } from './MapLegend';
 import type { Bounds, LineMode, ZandvoortFixture } from '../types';
 
