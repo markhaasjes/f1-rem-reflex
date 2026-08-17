@@ -41,10 +41,11 @@ flying               "Onderweg naar de <bocht>..." — no interactive controls
   | camera done -> game.arm()
   v
 ready                car waits at the window start; both pedals are live and
-  |                  the gas pedal is ringed: "Houd GAS ingedrukt om te
+  |                  the gas pedal is ringed: "Houd Gas ingedrukt om te
   |                  starten" — the first gas press IS the start. On phones
-  |                  the camera holds the corner overview, then dives onto
-  |                  the car, so driving starts zoomed in (see Rendering)
+  |                  the camera holds the corner overview for one second, then
+  |                  dives onto the car, so driving starts zoomed in (see
+  |                  Rendering)
   | setPedal('gas', true)
   v
 running              rAF clock plays lap.samples from round.tStart to tEnd in
@@ -54,8 +55,9 @@ running              rAF clock plays lap.samples from round.tStart to tEnd in
   |                  trail behind the car is colored by the player's input
   | t >= tEnd        round is scored (scoreRound) and appended to results
   v
-roundResult          Max's dashed zone line beside the player's solid line,
-  |                  verdict banner, REM/LOS/GAS accuracy card
+roundResult          one line at a time on the track (yours by default, Max's
+  |                  via the toggle), verdict banner, "Jouw score per pedaal"
+  |                  card with the Rem/Los/Gas bars
   | nextRound()      camera: corner -> overview (1.2s) -> hold -> next corner
   |                  (1.5s); back to `flying` above ... repeat for 4 rounds
   | showFinal()      after the last round: camera drifts back to overview
@@ -73,8 +75,10 @@ Things worth knowing before changing the flow:
 - **Practice does not count.** The Tarzanbocht round (`practice: true`) is
   played and scored like any other and shown on the final card, but
   `totalScore` excludes practice rounds from the overall 0-100. During
-  practice, Max's zones render as a wide colored corridor on the road.
-- **Held pedals, one 3-state input.** REM! and GAS! are held, not tapped
+  practice, Max's zones render as a dashed, half-transparent guide line, and
+  that round's line stays dashed on the accumulated results map so it reads as
+  the corner that did not count.
+- **Held pedals, one 3-state input.** Rem! and Gas! are held, not tapped
   (pointer capture keeps a press alive when the finger drifts off; keyboard
   is keydown/keyup with auto-repeat ignored). The combined state is a single
   `PedalInput` — brake wins when both pedals are down — and only _changes_
@@ -234,7 +238,9 @@ in screen space, covering any zoom-out past the decorated field.
   corner → overview → next corner two-stage move the user sees.
 - **Chase cam on phones**: on non-`wide` viewports the zoom happens
   **before** the player drives. On `ready` the camera holds the corner
-  overview for `CHASE_HOLD_MS` (2.5s, long enough to read the corner) and
+  overview for `CHASE_HOLD_MS` (1s, measured from the moment the fly-in
+  lands: long enough for the corner to register as a shape, short enough that
+  nobody wonders whether the game is stuck - it was 2.5s) and
   then eases down onto the parked car over `CHASE_DIVE_MS` (1.6s), so
   `running` starts already zoomed in and `follow(getTarget)` (7% of the
   remaining distance per frame) takes over with nothing to travel. Starting
@@ -375,29 +381,46 @@ step the player's pedal state (from the transition timeline) is compared
 against Max's phase (`classifyAt`: brakeActive → brake, throttle < 95 →
 coast, else flat).
 
-- **Numeric**: the round score is the **geometric** mean of the three
-  per-phase match percentages (the REM/LOS/GAS bars on the result card),
-  rounded per phase first so a 0% bar really does zero the round. Both
-  simpler formulas pay out ~50 for not playing, and both were shipped and
+- **Per phase, net of its own mistakes**: a phase's percentage
+  (`phasePercent`, the Rem/Los/Gas bars) is
+  `(matchedS - 1.25 * wrongS) / totalS`, clamped to 0-100, where `matchedS` is
+  the share of Max's time on that pedal the player matched and `wrongS` is the
+  time the player held **that** pedal while Max was doing something else. The
+  mistake is charged to the pedal that was wrong, not to the one that was
+  missed: without that, holding the gas through a whole corner kept a perfect
+  gas bar (every flat-out moment does match) while the player was demonstrably
+  not driving the corner. The penalty is 1.25x rather than 1:1 because at 1:1
+  the gas-only run still kept a positive gas bar (18%) in Hugenholtz, where Max
+  is flat out for more than half the window - exactly the free credit the
+  penalty exists to remove.
+- **Numeric**: the round score is the **geometric** mean of those per-phase
+  percentages, rounded per phase first so a 0% bar really does zero the round.
+  Both simpler formulas pay out ~50 for not playing, and both were shipped and
   rejected: the matched share of _time_ gave ~51 for holding the gas down
   (Max is flat out 40-55% of every window), and the _arithmetic_ mean gave
   ~48 for touching nothing after the start, because coasting is the absence
   of input and collects a free 100% on that phase. Multiplying instead of
   averaging means every phase has to be answered - one pedal you never use
   drags the whole round down however good the other two are. Calibration
-  (scripted, see the verification workflow): mirroring Max's telemetry with
-  120ms lag **100**, doing nothing **29**, holding gas only **14**. The
-  trade-off is that the player can no longer verify the score by averaging
-  the bars, so the explainer modal states the rule in words instead of
-  arithmetic. A step counts as matched when the player's state matches Max's
-  phase directly or 0.2s to either side (`REACTION_GRACE_S`), forgiving
-  reaction lag at zone boundaries; phases shorter than `MIN_PHASE_S` in a
-  window are left out. `totalScore` still averages the scoring rounds'
-  rounded scores (equal round weight, practice excluded).
+  (scripted through the real module, see the verification workflow): mirroring
+  Max's telemetry 120ms late **100**, 250ms late **90**, 400ms late **71**, and
+  every single-pedal strategy **0** - gas-only, brake-only and touch-nothing
+  alike, each with that pedal's bar reading 0 in every corner. The trade-off is
+  that the player can no longer verify the score by averaging the bars, so the
+  explainer modal states both rules in words instead of arithmetic. A step
+  counts as matched when the player's state matches Max's phase directly or
+  0.2s to either side (`REACTION_GRACE_S`), forgiving reaction lag at zone
+  boundaries; phases shorter than `MIN_PHASE_S` in a window are left out.
+  `totalScore` still averages the scoring rounds' rounded scores (equal round
+  weight, practice excluded).
 - **Zones**: the same walk is grouped into contiguous same-phase zones
   (`ZoneResult`: match fraction + the dominant wrong input) and into
-  per-phase totals (`phaseAccuracy`), which feed the REM/LOS/GAS accuracy
-  card and the tips.
+  per-phase totals (`phaseAccuracy`: matched, wrong and total seconds), which
+  feed the "Jouw score per pedaal" card and the tips. The card names the player
+  on purpose: it used to be headed "Gelijk met Max", which read as Max's own
+  numbers, and its percentages carry the colour of the pedal they belong to
+  (darkened for text: the signal orange and green are 2.1:1 and 2.5:1 on
+  white).
 - **History**: [storage.ts](../src/lib/storage.ts) persists the last attempt
   and the best run in localStorage (key `nos-rem-reflex:scores`); the intro
   shows the stored bests, the score card compares against them and tips the
@@ -470,7 +493,10 @@ Rules that keep it that way:
   as secondary. Text on other surfaces states its own color: white on NOS red
   (4.6:1), ink on white cards (16.7:1), `track-blue` links on white (7.3:1).
   Only the hatch lines are allowed below AA (2.0:1) because they are texture,
-  not text. **The surface has flipped once already** (light blue base with
+  not text. The three signal colours are fills first: as _text_ the coast
+  orange and throttle green are 2.1:1 and 2.5:1 on white, so the accuracy card
+  writes them as `#a86407` and `#047857` (4.7:1, 5.5:1) and leaves the bars in
+  the map's colour. **The surface has flipped once already** (light blue base with
   sport-blue lines), so if it flips again, re-check every `text-white*` and
   `text-ink*` on the page against the numbers above - contrast is the whole
   reason those two sets exist.
@@ -508,9 +534,49 @@ Rules that keep it that way:
   their circles. Measured, not eyeballed: a probe walks every text node and
   reports the smallest rendered size (14px at 320/390, 16px at 1280).
 - **The practice round marks the stage, not just the deck.** A yellow
-  `OEFENBOCHT · telt niet mee` badge sits at the stage's top-left for the
+  `Oefenbocht · telt niet mee` badge sits at the stage's top-left for the
   whole practice round: the deck label alone was missed because the player is
   looking at the circuit.
+- **One map chrome, two views.** Both maps (the game stage and the full-screen
+  explorer) place their overlays identically, so nothing has to be found twice:
+  explanatory text top-left under the NOS badge, the verdict banner top-centre
+  (stage only), every control in one bottom-right column with the legend
+  directly under it, and the canvas keeping the bottom-left for its scale bar.
+  The shared pieces live in
+  [MapControls.tsx](../src/components/MapControls.tsx) (line toggle, circular
+  button, icon set) and [MapLegend.tsx](../src/components/MapLegend.tsx). Full
+  screen is one button in one slot: expand on the stage, compress in the
+  overlay, same size and position, so opening and closing are the same gesture
+  (there is no separate ×; Escape still closes).
+- **Map controls carry drawn icons, not glyphs.** `+`, `-`, `×` and `⤢` as text
+  render at wildly different sizes per platform and left the circles looking
+  empty. Every control icon is an inline SVG on a 24-unit box at 55% of the
+  button diameter, so they all have the same optical weight, and "hele circuit
+  tonen" gets a track-in-a-viewfinder of its own instead of borrowing the
+  full-screen arrows.
+- **Chrome shrinks by stage size, not by viewport size.** Those two come apart
+  on a landscape phone: 844px counts as a roomy screen, but half of it is the
+  control panel, so the stage is 356px wide. The roomy legend (259px) plus the
+  controls beside it came to 419px there and pushed the toggle off screen at
+  x=-79. `short:` hands back the phone-sized legend and lays the controls out
+  in a row beside it instead of a column above it; the toggle's callout wraps
+  at 13rem and flips its anchor there for the same reason.
+- **Desktop is capped at 1600px and centred.** `<main>` carries
+  `wide:max-w-[1600px]`; the page background still fills the viewport, and the
+  NOS badge sits in a matching centred track so it hugs the content column
+  rather than the far left of an ultrawide screen.
+- **Two families, one job each.** `--font-display` (Effra Bold) is titles, name
+  badges and score numbers; `--font-sans` (Helvetica Neue) is everything read
+  or operated, canvas scale bar included, while canvas badges stay on Effra
+  (`BADGE_FONT`/`CHROME_FONT` in scene.ts mirror the two CSS tokens). Only
+  EffraBold.woff is loaded and it is declared 700-900, so before the split
+  every paragraph asking for a normal weight was rendered by the bold face:
+  anything that needs a real weight belongs in Helvetica Neue.
+- **Signal colours are for fills, darkened for text.** The coast orange
+  (`#f2a11c`) and throttle green (`#10b981`) are 2.1:1 and 2.5:1 on white, so
+  the accuracy card writes its labels and percentages in `#a86407` and
+  `#047857` (4.7:1 and 5.5:1) while the bars keep the map's colour. NOS red
+  passes as text at 4.6:1 and is unchanged.
 - **Controls are sized by their label.** `BTN_BASE` carries
   `mx-auto block w-fit max-w-full`, so every button hugs its text (the pill's
   rounded end starts right after the label) and still cannot outgrow a narrow
@@ -533,11 +599,15 @@ Rules that keep it that way:
   (`overlapsweep.mjs`) walks every element that renders its own text or is a
   control, drops what is invisible, inert, or behind an open modal, and reports
   pairs whose boxes intersect without one containing the other, plus anything
-  outside the viewport that is not inside a scrollable container. Run it across
-  iPhone SE / Galaxy S20 / iPhone 14 / 14 Pro Max / landscape phone / iPad mini
-  / iPad Pro / laptop / desktop, in every phase including the explorer. It
-  found 31 real collisions the screenshots had not made obvious; the target is
-  zero.
+  outside the viewport that is not inside a scrollable container, plus any text
+  under the 14px floor. Run it across iPhone SE / Galaxy S20 / iPhone 14 / 14
+  Pro Max / landscape phone / iPad mini / iPad Pro / laptop / desktop /
+  ultrawide, in every phase including the explorer. It found 31 real collisions
+  the screenshots had not made obvious; the target is zero. Two classes of
+  false positive have to be filtered or they drown the signal: an inline child
+  against its own ancestor (a `<span>` inside an `<h1>` that wraps, a `<kbd>`
+  inside a paragraph) and slivers of 2px or less, which is what an inline badge
+  shares with the label on the line above it (`nieuw record!`).
 - **The NOS badge is the way home.** It is a real `<button>` that calls
   `restart()`, so it works from anywhere: mid-run, from the score card, and
   from a shared-score landing (where it also strips the `?r=` token). On hover
@@ -572,9 +642,9 @@ Rules that keep it that way:
 
 [CircuitExplorer.tsx](../src/components/CircuitExplorer.tsx) is the results
 view at full size: a full-viewport overlay showing every corner driven so far
-on one track, free to pan and zoom. It opens from the button on the stage
-(bottom-left, next to the line toggle) after any round and from the final score
-card, and closes with the × or Escape.
+on one track, free to pan and zoom. It opens from the expand button in the
+stage's control column after any round and from the final score card, and
+closes with the compress button in that same slot or with Escape.
 
 - **Not the Fullscreen API.** iOS Safari does not give an element true
   fullscreen on iPhone, so this is a plain full-viewport overlay - identical
@@ -660,7 +730,7 @@ timeline quantized to 0.1s — one byte per pedal change (2 bits state, 6
 bits time delta), see the byte layout in
 [shareToken.ts](../src/lib/shareToken.ts). The receiving browser has the
 full fixture baked in, so the landing card recomputes the sharer's overall
-REM/LOS/GAS accuracy bars from the timeline (an earlier iteration also drew
+Rem/Los/Gas bars from the timeline (an earlier iteration also drew
 their racelines on a mini SVG circuit; playtesting cut it — the bars carry
 the message). The displayed scores come from the token itself, not from the
 recompute, so the number on the card always matches what the sharer saw
@@ -755,17 +825,22 @@ telemetry channels (`brakeActive` / `throttle < 95`), start each round with
 `keyboard.down('KeyG')`, then walk the spans with `keyboard.down`/`up` on
 KeyR/KeyG about 120ms late (inside the 0.2s scoring grace) — screenshot
 each phase, and look at the screenshots. A telemetry-mirroring run must
-score 100 on every round; the two lazy strategies are part of the suite,
+score 100 on every round; the three lazy strategies are part of the suite,
 because they are what the scoring rules exist to punish: `STRATEGY=fullgas`
-(hold gas, never brake) must land near 14 and `STRATEGY=nothing` (release
-everything after the mandatory start press) near 29. If any of the three
-drifts, the reaction grace, the geometric mean or the transition recording
-broke. Two traps: layered UI
+(hold gas, never brake), `STRATEGY=fullbrake` and `STRATEGY=nothing` (release
+everything after the mandatory start press) must each land on **0**, with the
+held pedal's own bar reading 0 in every corner. If any of them drifts, the
+reaction grace, the wrong-pedal penalty, the geometric mean or the transition
+recording broke. Three traps: layered UI
 keeps hidden buttons in the DOM (`opacity-0` + `pointer-events-none`), so
 Playwright's `visible` check passes early — gate on _clickability_, not
 visibility (and match the pedals by `aria-label`, their text is just
-"REM!"/"GAS!"); and Space advances the flow on `roundResult`, so drive the
-pedals with KeyG/KeyR only and release every key at `tEnd`.
+"Rem!"/"Gas!"); Space advances the flow on `roundResult`, so drive the
+pedals with KeyG/KeyR only and release every key at `tEnd`; and settle ~400ms
+after the ready screen appears before the first press. A keydown dispatched in
+the same frame the phase flips can beat React re-binding the window key
+handler and is then dropped, which silently ruins every later round in the run
+(no human is that fast; the harness is).
 
 Hard-won additions to that pattern:
 
@@ -774,7 +849,8 @@ Hard-won additions to that pattern:
   later one). Wait for the phase's button to leave its `inert` layer
   (`!btn.closest('[inert]')`), then click it.
 - **Test mobile at three viewports**: 390×844 (portrait), 844×390
-  (landscape phone), and a desktop size. For the no-jump guarantee, compare
+  (landscape phone), and a desktop size, plus an ultrawide one (2560px) since
+  the layout is capped at 1600px and centred. For the no-jump guarantee, compare
   `getBoundingClientRect()` of the stage and the pedal deck across
   ready/running/result — they must be pixel-identical.
 - **Screenshots race the 500ms layer crossfade**: a probe that fires the
