@@ -1215,7 +1215,7 @@ function App() {
             <button
               type="button"
               onClick={() => setExploreOpen(true)}
-              className={`${BTN_OUTLINE} mt-2 w-full px-6 py-3`}
+              className={`${BTN_OUTLINE} mt-2 px-6 py-3`}
             >
               Bekijk je lijnen op de kaart
             </button>

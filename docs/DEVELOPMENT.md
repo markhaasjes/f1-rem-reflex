@@ -599,8 +599,11 @@ Rules that keep it that way:
   passes as text at 4.6:1 and is unchanged.
 - **Controls are sized by their label.** `BTN_BASE` carries
   `mx-auto block w-fit max-w-full`, so every button hugs its text (the pill's
-  rounded end starts right after the label) and still cannot outgrow a narrow
-  phone. The verdict banner does the same with `w-fit` inside `inset-x-3`.
+  rounded cap starts right after the last character and ends right before the
+  first) and still cannot outgrow a narrow phone. The way this breaks is always
+  the same: a width added at the call site, which overrides `w-fit` and
+  stretches the pill into a bar - the score card's map button shipped that way
+  once. A button in a grid cell or on a full-width card needs no width at all. The verdict banner does the same with `w-fit` inside `inset-x-3`.
   Deliberately still full width: the accuracy **bars** (they are meters, the
   fill length is the data), the modal cards, and the two pedals (a hugged
   pedal would shrink the touch target that the whole game runs on). A pill

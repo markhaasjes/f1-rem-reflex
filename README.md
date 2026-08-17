@@ -161,9 +161,13 @@ for how the pieces fit together; the rules below are about how to change them.
   [the layout notes](docs/DEVELOPMENT.md#layout-invariants-portrait--landscape)
   before shrinking anything.
 - **Pills, badges and buttons hug their label.** They are sized by their
-  content (`BTN_BASE` carries `w-fit`), never stretched to the container, so
-  the rounded end starts right after the text. Progress bars, cards and the
-  pedals are the exceptions: those are meant to fill their width.
+  content (`BTN_BASE` carries `w-fit`), never stretched to the container: the
+  rounded cap starts right after the last character and ends right before the
+  first, on every button, in every layout, including inside a grid cell or on a
+  full-width card. Adding `w-full` (or any other width) to a `BTN_*` className
+  silently overrides that `w-fit` - don't; the `mx-auto block` it already
+  carries centers it. Progress bars, cards and the pedals are the only
+  exceptions: those are meant to fill their width.
 - **User-facing copy is Dutch; code, comments, docs and commit messages are
   English.** Keep new UI strings consistent with the existing verdict/copy
   tone in [scoring.ts](src/lib/scoring.ts) and [App.tsx](src/App.tsx). Never
